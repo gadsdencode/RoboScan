@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -144,11 +144,13 @@ interface ScanResult {
 const TerminalDemo = ({ 
   isScanning, 
   targetUrl, 
-  onScanComplete 
+  onScanComplete,
+  onUnlockReport
 }: { 
   isScanning: boolean; 
   targetUrl: string;
   onScanComplete: (scanId: number) => void;
+  onUnlockReport: () => void;
 }) => {
   const [lines, setLines] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -352,6 +354,7 @@ const TerminalDemo = ({
                       </div>
                       <Button 
                         className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+                        onClick={onUnlockReport}
                         data-testid="button-get-report"
                       >
                         <Lock className="w-4 h-4 mr-2" />
@@ -455,17 +458,17 @@ export default function Home() {
     }
   };
 
-  const handleScanComplete = (scanId: number) => {
+  const handleScanComplete = useCallback((scanId: number) => {
     setCurrentScanId(scanId);
-  };
+  }, []);
 
-  const handleUnlockReport = () => {
+  const handleUnlockReport = useCallback(() => {
     if (currentScanId) {
       setShowPaymentModal(true);
     }
-  };
+  }, [currentScanId]);
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = useCallback(async () => {
     setShowPaymentModal(false);
     
     if (currentScanId) {
@@ -481,14 +484,6 @@ export default function Home() {
       } catch (error) {
         console.error('Failed to fetch report:', error);
       }
-    }
-  };
-
-  useEffect(() => {
-    const button = document.querySelector('[data-testid="button-get-report"]');
-    if (button) {
-      button.addEventListener('click', handleUnlockReport);
-      return () => button.removeEventListener('click', handleUnlockReport);
     }
   }, [currentScanId]);
 
@@ -507,6 +502,7 @@ export default function Home() {
             isScanning={isScanning} 
             targetUrl={targetUrl} 
             onScanComplete={handleScanComplete}
+            onUnlockReport={handleUnlockReport}
           />
         </>
       )}
