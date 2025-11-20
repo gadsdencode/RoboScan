@@ -1,13 +1,24 @@
+// Reference: blueprint:javascript_log_in_with_replit
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { scanWebsite } from "./scanner";
 import { generateOptimizationReport } from "./report-generator";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 import Stripe from "stripe";
 
+// Validate required environment variables
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error('Missing required environment variable: SESSION_SECRET');
+}
+
+if (!process.env.REPL_ID) {
+  throw new Error('Missing required environment variable: REPL_ID');
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -20,14 +31,64 @@ const createPaymentSchema = z.object({
   scanId: z.number(),
 });
 
+// Guard against duplicate auth setup
+let authInitialized = false;
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.post("/api/scan", async (req, res) => {
+  // Setup authentication only once
+  if (!authInitialized) {
+    await setupAuth(app);
+    authInitialized = true;
+  }
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Get user's scans (protected)
+  app.get('/api/user/scans', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const scans = await storage.getUserScans(userId);
+      
+      // Add purchase status to each scan (only user's own scans)
+      const scansWithPurchaseStatus = await Promise.all(
+        scans.map(async (scan) => {
+          const purchase = await storage.getPurchaseByScanId(scan.id);
+          return {
+            ...scan,
+            isPurchased: !!purchase,
+          };
+        })
+      );
+      
+      res.json(scansWithPurchaseStatus);
+    } catch (error) {
+      console.error("Error fetching user scans:", error);
+      res.status(500).json({ message: "Failed to fetch scans" });
+    }
+  });
+
+  // Scan endpoint (works for both authenticated and anonymous users)
+  app.post("/api/scan", async (req: any, res) => {
     try {
       const { url } = scanRequestSchema.parse(req.body);
 
       const result = await scanWebsite(url);
 
+      // Attach userId if user is authenticated
+      const userId = req.isAuthenticated() ? req.user?.claims?.sub : undefined;
+
       const scan = await storage.createScan({
+        userId,
         url,
         robotsTxtFound: result.robotsTxtFound,
         robotsTxtContent: result.robotsTxtContent,
@@ -65,13 +126,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/create-payment-intent", async (req, res) => {
+  // Create payment intent (requires authentication)
+  app.post("/api/create-payment-intent", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const { scanId } = createPaymentSchema.parse(req.body);
 
       const scan = await storage.getScan(scanId);
       if (!scan) {
         return res.status(404).json({ message: "Scan not found" });
+      }
+
+      // Security: Verify scan ownership
+      if (scan.userId !== userId && scan.userId !== null) {
+        return res.status(403).json({ 
+          message: "You can only purchase reports for your own scans" 
+        });
       }
 
       const existingPurchase = await storage.getPurchaseByScanId(scanId);
@@ -87,6 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency: "usd",
         metadata: {
           scanId: scanId.toString(),
+          userId: userId,
         },
         automatic_payment_methods: {
           enabled: true,
@@ -113,13 +184,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/confirm-payment", async (req, res) => {
+  // Confirm payment (requires authentication)
+  app.post("/api/confirm-payment", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const { paymentIntentId } = z.object({
         paymentIntentId: z.string(),
       }).parse(req.body);
 
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      // Security: Verify user matches payment intent metadata
+      if (paymentIntent.metadata.userId !== userId) {
+        return res.status(403).json({ 
+          message: "Unauthorized: This payment belongs to another user" 
+        });
+      }
       
       if (paymentIntent.status === 'succeeded') {
         const scanId = parseInt(paymentIntent.metadata.scanId);
@@ -148,13 +228,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/optimization-report/:scanId", async (req, res) => {
+  // Get optimization report (requires authentication and ownership)
+  app.get("/api/optimization-report/:scanId", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const scanId = parseInt(req.params.scanId);
       
       const scan = await storage.getScan(scanId);
       if (!scan) {
         return res.status(404).json({ message: "Scan not found" });
+      }
+
+      // Security: Verify scan ownership
+      if (scan.userId !== userId && scan.userId !== null) {
+        return res.status(403).json({ 
+          message: "You can only access reports for your own scans" 
+        });
       }
 
       const purchase = await storage.getPurchaseByScanId(scanId);

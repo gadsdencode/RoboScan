@@ -1,97 +1,96 @@
-import { type User, type InsertUser, type Scan, type InsertScan, type Purchase, type InsertPurchase } from "@shared/schema";
-import { randomUUID } from "crypto";
+// Reference: blueprint:javascript_log_in_with_replit
+import {
+  users,
+  scans,
+  purchases,
+  type User,
+  type UpsertUser,
+  type Scan,
+  type InsertScan,
+  type Purchase,
+  type InsertPurchase,
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
+  // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Scan operations
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: number): Promise<Scan | undefined>;
+  getUserScans(userId: string): Promise<Scan[]>;
+  
+  // Purchase operations
   createPurchase(purchase: InsertPurchase): Promise<Purchase>;
   getPurchaseByScanId(scanId: number): Promise<Purchase | undefined>;
   getPurchaseByPaymentIntent(paymentIntentId: string): Promise<Purchase | undefined>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private scans: Map<number, Scan>;
-  private purchases: Map<number, Purchase>;
-  private scanIdCounter: number;
-  private purchaseIdCounter: number;
-
-  constructor() {
-    this.users = new Map();
-    this.scans = new Map();
-    this.purchases = new Map();
-    this.scanIdCounter = 1;
-    this.purchaseIdCounter = 1;
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
     return user;
   }
 
   async createScan(insertScan: InsertScan): Promise<Scan> {
-    const id = this.scanIdCounter++;
-    const scan: Scan = {
-      id,
-      url: insertScan.url,
-      robotsTxtFound: insertScan.robotsTxtFound,
-      robotsTxtContent: insertScan.robotsTxtContent ?? null,
-      llmsTxtFound: insertScan.llmsTxtFound,
-      llmsTxtContent: insertScan.llmsTxtContent ?? null,
-      botPermissions: insertScan.botPermissions ?? null,
-      errors: insertScan.errors ? [...insertScan.errors] : null,
-      warnings: insertScan.warnings ? [...insertScan.warnings] : null,
-      createdAt: new Date(),
-    };
-    this.scans.set(id, scan);
+    const [scan] = await db.insert(scans).values(insertScan).returning();
     return scan;
   }
 
   async getScan(id: number): Promise<Scan | undefined> {
-    return this.scans.get(id);
+    const [scan] = await db.select().from(scans).where(eq(scans.id, id));
+    return scan;
+  }
+
+  async getUserScans(userId: string): Promise<Scan[]> {
+    return await db
+      .select()
+      .from(scans)
+      .where(eq(scans.userId, userId))
+      .orderBy(desc(scans.createdAt));
   }
 
   async createPurchase(insertPurchase: InsertPurchase): Promise<Purchase> {
-    const id = this.purchaseIdCounter++;
-    const purchase: Purchase = {
-      id,
-      scanId: insertPurchase.scanId,
-      stripePaymentIntentId: insertPurchase.stripePaymentIntentId,
-      amount: insertPurchase.amount,
-      currency: insertPurchase.currency ?? "usd",
-      status: insertPurchase.status,
-      createdAt: new Date(),
-    };
-    this.purchases.set(id, purchase);
+    const [purchase] = await db
+      .insert(purchases)
+      .values(insertPurchase)
+      .returning();
     return purchase;
   }
 
   async getPurchaseByScanId(scanId: number): Promise<Purchase | undefined> {
-    return Array.from(this.purchases.values()).find(
-      (purchase) => purchase.scanId === scanId && purchase.status === 'succeeded'
-    );
+    const [purchase] = await db
+      .select()
+      .from(purchases)
+      .where(eq(purchases.scanId, scanId));
+    return purchase;
   }
 
   async getPurchaseByPaymentIntent(paymentIntentId: string): Promise<Purchase | undefined> {
-    return Array.from(this.purchases.values()).find(
-      (purchase) => purchase.stripePaymentIntentId === paymentIntentId
-    );
+    const [purchase] = await db
+      .select()
+      .from(purchases)
+      .where(eq(purchases.stripePaymentIntentId, paymentIntentId));
+    return purchase;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
