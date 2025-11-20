@@ -8,6 +8,67 @@ interface ScanResult {
   warnings: string[];
 }
 
+interface BotRules {
+  disallows: string[];
+  allows: string[];
+}
+
+function parseRobotsTxt(content: string): Map<string, BotRules> {
+  const rules = new Map<string, BotRules>();
+  const lines = content.split('\n');
+  let currentUserAgent = '';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.toLowerCase().startsWith('user-agent:')) {
+      currentUserAgent = trimmed.substring(11).trim();
+      if (!rules.has(currentUserAgent)) {
+        rules.set(currentUserAgent, { disallows: [], allows: [] });
+      }
+    } else if (trimmed.toLowerCase().startsWith('disallow:') && currentUserAgent) {
+      const disallowValue = trimmed.substring(9).trim();
+      if (disallowValue) {
+        rules.get(currentUserAgent)!.disallows.push(disallowValue);
+      }
+    } else if (trimmed.toLowerCase().startsWith('allow:') && currentUserAgent) {
+      const allowValue = trimmed.substring(6).trim();
+      if (allowValue) {
+        rules.get(currentUserAgent)!.allows.push(allowValue);
+      }
+    }
+  }
+
+  return rules;
+}
+
+function getBotPermissionStatus(botName: string, rules: Map<string, BotRules>): string {
+  // Check if there are specific rules for this bot
+  let botRules = rules.get(botName);
+  
+  // If no specific rules, fall back to wildcard rules
+  if (!botRules || (botRules.disallows.length === 0 && botRules.allows.length === 0)) {
+    botRules = rules.get('*');
+  }
+
+  if (!botRules) {
+    return 'Allowed';
+  }
+
+  // Check if completely blocked
+  if (botRules.disallows.includes('/')) {
+    return 'Blocked';
+  }
+
+  // If there are disallow rules but not a complete block
+  if (botRules.disallows.length > 0) {
+    return `Restricted (${botRules.disallows.length} path${botRules.disallows.length > 1 ? 's' : ''} blocked)`;
+  }
+
+  // If only allow rules or no rules
+  return 'Allowed';
+}
+
 export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -55,26 +116,35 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
       robotsTxtFound = true;
       robotsTxtContent = await robotsResponse.text();
 
-      const lines = robotsTxtContent.split('\n');
-      let currentUserAgent = '';
+      // Parse the robots.txt file
+      const rules = parseRobotsTxt(robotsTxtContent);
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        
-        if (trimmed.toLowerCase().startsWith('user-agent:')) {
-          currentUserAgent = trimmed.substring(11).trim();
-        } else if (trimmed.toLowerCase().startsWith('disallow:') && currentUserAgent) {
-          const disallowValue = trimmed.substring(9).trim();
-          
-          if (currentUserAgent === '*') {
-            if (!botPermissions['GPTBot']) botPermissions['GPTBot'] = disallowValue === '/' ? 'Blocked' : 'Allowed';
-            if (!botPermissions['CCBot']) botPermissions['CCBot'] = disallowValue === '/' ? 'Blocked' : 'Allowed';
-            if (!botPermissions['Anthropic-AI']) botPermissions['Anthropic-AI'] = disallowValue === '/' ? 'Blocked' : 'Allowed';
-          } else {
-            botPermissions[currentUserAgent] = disallowValue === '/' ? 'Blocked' : 'Allowed';
+      // Analyze permissions for key AI bots
+      const aiBotsToCheck = [
+        'GPTBot',
+        'ChatGPT-User',
+        'CCBot',
+        'anthropic-ai',
+        'Claude-Web',
+        'Googlebot',
+        'Bingbot',
+        'Slurp'  // Yahoo
+      ];
+
+      for (const bot of aiBotsToCheck) {
+        botPermissions[bot] = getBotPermissionStatus(bot, rules);
+      }
+
+      // Also check case-insensitive variations that might be in the file
+      Array.from(rules.entries()).forEach(([userAgent]) => {
+        if (userAgent !== '*' && !aiBotsToCheck.some(b => b.toLowerCase() === userAgent.toLowerCase())) {
+          // Include other notable bots found in the file
+          const lowerUA = userAgent.toLowerCase();
+          if (lowerUA.includes('bot') || lowerUA.includes('crawler') || lowerUA.includes('spider')) {
+            botPermissions[userAgent] = getBotPermissionStatus(userAgent, rules);
           }
         }
-      }
+      });
 
       if (!robotsTxtContent.toLowerCase().includes('sitemap:')) {
         warnings.push('robots.txt found but missing sitemap reference');
@@ -114,10 +184,11 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
     errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
-  if (!Object.keys(botPermissions).length) {
+  // If no robots.txt was found, default to allowed
+  if (!robotsTxtFound) {
     botPermissions['GPTBot'] = 'Allowed';
     botPermissions['CCBot'] = 'Allowed';
-    botPermissions['Anthropic-AI'] = 'Allowed';
+    botPermissions['anthropic-ai'] = 'Allowed';
   }
 
   return {
