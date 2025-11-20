@@ -157,7 +157,11 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
         clearInterval(interval);
         return;
       }
-      setLines(prev => [...prev, steps[currentLine]]);
+      
+      const nextLine = steps[currentLine];
+      if (nextLine) {
+        setLines(prev => [...prev, nextLine]);
+      }
       currentLine++;
     }, 400);
 
@@ -212,21 +216,24 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
                     Waiting for input...
                   </div>
                 ) : (
-                  lines.map((line, i) => (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className={`mb-1 ${
-                        line.includes("[ERROR]") ? "text-red-400" : 
-                        line.includes("[WARN]") ? "text-yellow-400" : 
-                        line.includes("[SUCCESS]") ? "text-green-400" : 
-                        line.includes(">") ? "text-primary" : "text-muted-foreground"
-                      }`}
-                    >
-                      {line}
-                    </motion.div>
-                  ))
+                  lines.map((line, i) => {
+                    if (!line) return null;
+                    return (
+                      <motion.div 
+                        key={i}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`mb-1 ${
+                          line.includes("[ERROR]") ? "text-red-400" : 
+                          line.includes("[WARN]") ? "text-yellow-400" : 
+                          line.includes("[SUCCESS]") ? "text-green-400" : 
+                          line.includes(">") ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      >
+                        {line}
+                      </motion.div>
+                    );
+                  })
                 )}
                 {isScanning && (
                   <motion.span 
