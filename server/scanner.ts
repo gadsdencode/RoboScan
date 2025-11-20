@@ -39,10 +39,17 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   let robotsTxtContent: string | null = null;
 
   try {
+    console.log(`[Scanner] Fetching ${baseUrl}/robots.txt`);
     const robotsResponse = await fetch(`${baseUrl}/robots.txt`, {
-      headers: { 'User-Agent': 'RoboscanBot/1.0' },
+      headers: { 
+        'User-Agent': 'RoboscanBot/1.0',
+        'Accept': 'text/plain,*/*'
+      },
+      redirect: 'follow',
       signal: AbortSignal.timeout(10000),
     });
+
+    console.log(`[Scanner] robots.txt response status: ${robotsResponse.status}`);
 
     if (robotsResponse.ok) {
       robotsTxtFound = true;
@@ -72,8 +79,11 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
       if (!robotsTxtContent.toLowerCase().includes('sitemap:')) {
         warnings.push('robots.txt found but missing sitemap reference');
       }
+    } else {
+      console.log(`[Scanner] robots.txt not found (status ${robotsResponse.status})`);
     }
   } catch (error) {
+    console.error('[Scanner] Error fetching robots.txt:', error);
     errors.push(`Failed to fetch robots.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
@@ -81,16 +91,26 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   let llmsTxtContent: string | null = null;
 
   try {
+    console.log(`[Scanner] Fetching ${baseUrl}/llms.txt`);
     const llmsResponse = await fetch(`${baseUrl}/llms.txt`, {
-      headers: { 'User-Agent': 'RoboscanBot/1.0' },
+      headers: { 
+        'User-Agent': 'RoboscanBot/1.0',
+        'Accept': 'text/plain,*/*'
+      },
+      redirect: 'follow',
       signal: AbortSignal.timeout(10000),
     });
+
+    console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
 
     if (llmsResponse.ok) {
       llmsTxtFound = true;
       llmsTxtContent = await llmsResponse.text();
+    } else {
+      console.log(`[Scanner] llms.txt not found (status ${llmsResponse.status})`);
     }
   } catch (error) {
+    console.error('[Scanner] Error fetching llms.txt:', error);
     errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
