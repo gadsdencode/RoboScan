@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X } from "lucide-react";
+import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { PaymentModal } from "@/components/PaymentModal";
+import { PremiumReport } from "@/components/PremiumReport";
 import heroBg from "@assets/generated_images/cybernetic_data_scanning_visualization.png";
 
 const Navbar = () => {
@@ -129,6 +131,7 @@ const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
 };
 
 interface ScanResult {
+  id: number;
   robotsTxtFound: boolean;
   robotsTxtContent: string | null;
   llmsTxtFound: boolean;
@@ -138,15 +141,25 @@ interface ScanResult {
   warnings: string[];
 }
 
-const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUrl: string }) => {
+const TerminalDemo = ({ 
+  isScanning, 
+  targetUrl, 
+  onScanComplete 
+}: { 
+  isScanning: boolean; 
+  targetUrl: string;
+  onScanComplete: (scanId: number) => void;
+}) => {
   const [lines, setLines] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
     if (!isScanning || !targetUrl) return;
     
     setLines([]);
     setScanResult(null);
+    setIsComplete(false);
 
     const performScan = async () => {
       const steps = [
@@ -206,13 +219,15 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
           result.errors.forEach(err => newLines.push(`> [ERROR] ${err}`));
         }
 
-        newLines.push("> Generating optimization report...");
+        newLines.push("> Basic scan complete.");
         newLines.push("> DONE.");
 
         let currentLine = 0;
         const interval = setInterval(() => {
           if (currentLine >= newLines.length) {
             clearInterval(interval);
+            setIsComplete(true);
+            onScanComplete(result.id);
             return;
           }
           
@@ -234,7 +249,7 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
     };
 
     performScan();
-  }, [isScanning, targetUrl]);
+  }, [isScanning, targetUrl, onScanComplete]);
 
   return (
     <section id="demo" className="py-20 bg-black/20 border-y border-white/5">
@@ -265,7 +280,7 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
             </div>
           </div>
 
-          <div className="flex-1 w-full">
+          <div className="flex-1 w-full space-y-4">
             <Card className="bg-[#0d1117] border-white/10 p-0 overflow-hidden shadow-2xl shadow-primary/5">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/5">
                 <div className="flex gap-1.5">
@@ -312,6 +327,41 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
                 )}
               </div>
             </Card>
+
+            <AnimatePresence>
+              {isComplete && scanResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="p-6 bg-gradient-to-r from-primary/10 to-blue-500/10 border border-primary/20 rounded-xl"
+                  data-testid="upgrade-cta"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-primary/20 rounded-xl">
+                      <Sparkles className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg mb-2">Want the Full Report?</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Get actionable recommendations, optimized files ready to deploy, and SEO impact analysis for just <span className="text-primary font-bold">$9.99</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-xs mb-4">
+                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded">✓ Priority action plan</span>
+                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded">✓ Ready-to-use files</span>
+                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded">✓ Instant delivery</span>
+                      </div>
+                      <Button 
+                        className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+                        data-testid="button-get-report"
+                      >
+                        <Lock className="w-4 h-4 mr-2" />
+                        Unlock Optimization Report
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -389,23 +439,88 @@ const Footer = () => (
 export default function Home() {
   const [isScanning, setIsScanning] = useState(false);
   const [targetUrl, setTargetUrl] = useState("");
+  const [currentScanId, setCurrentScanId] = useState<number | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPremiumReport, setShowPremiumReport] = useState(false);
+  const [premiumReportData, setPremiumReportData] = useState<any>(null);
 
   const handleScan = (url: string) => {
     setTargetUrl(url);
     setIsScanning(true);
+    setCurrentScanId(null);
+    setShowPremiumReport(false);
     const demoSection = document.getElementById("demo");
     if (demoSection) {
       demoSection.scrollIntoView({ behavior: "smooth" });
     }
   };
 
+  const handleScanComplete = (scanId: number) => {
+    setCurrentScanId(scanId);
+  };
+
+  const handleUnlockReport = () => {
+    if (currentScanId) {
+      setShowPaymentModal(true);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    setShowPaymentModal(false);
+    
+    if (currentScanId) {
+      try {
+        const response = await fetch(`/api/optimization-report/${currentScanId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setPremiumReportData(data);
+          setShowPremiumReport(true);
+          
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } catch (error) {
+        console.error('Failed to fetch report:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const button = document.querySelector('[data-testid="button-get-report"]');
+    if (button) {
+      button.addEventListener('click', handleUnlockReport);
+      return () => button.removeEventListener('click', handleUnlockReport);
+    }
+  }, [currentScanId]);
+
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
       <Navbar />
-      <Hero onScan={handleScan} />
-      <Features />
-      <TerminalDemo isScanning={isScanning} targetUrl={targetUrl} />
+      {showPremiumReport && premiumReportData ? (
+        <div className="container mx-auto px-6 pt-24">
+          <PremiumReport report={premiumReportData.report} url={targetUrl} />
+        </div>
+      ) : (
+        <>
+          <Hero onScan={handleScan} />
+          <Features />
+          <TerminalDemo 
+            isScanning={isScanning} 
+            targetUrl={targetUrl} 
+            onScanComplete={handleScanComplete}
+          />
+        </>
+      )}
       <Footer />
+
+      {currentScanId && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          scanId={currentScanId}
+          url={targetUrl}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }

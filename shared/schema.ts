@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, serial, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, timestamp, boolean, jsonb, integer, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -37,3 +37,21 @@ export const insertScanSchema = createInsertSchema(scans).omit({
 
 export type InsertScan = z.infer<typeof insertScanSchema>;
 export type Scan = typeof scans.$inferSelect;
+
+export const purchases = pgTable("purchases", {
+  id: serial("id").primaryKey(),
+  scanId: integer("scan_id").notNull().references(() => scans.id),
+  stripePaymentIntentId: text("stripe_payment_intent_id").notNull().unique(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("usd"),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPurchaseSchema = createInsertSchema(purchases).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPurchase = z.infer<typeof insertPurchaseSchema>;
+export type Purchase = typeof purchases.$inferSelect;
