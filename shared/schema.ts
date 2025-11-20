@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, serial, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -16,3 +16,24 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const scans = pgTable("scans", {
+  id: serial("id").primaryKey(),
+  url: text("url").notNull(),
+  robotsTxtFound: boolean("robots_txt_found").notNull(),
+  robotsTxtContent: text("robots_txt_content"),
+  llmsTxtFound: boolean("llms_txt_found").notNull(),
+  llmsTxtContent: text("llms_txt_content"),
+  botPermissions: jsonb("bot_permissions").$type<Record<string, string>>(),
+  errors: jsonb("errors").$type<string[]>(),
+  warnings: jsonb("warnings").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScanSchema = createInsertSchema(scans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScan = z.infer<typeof insertScanSchema>;
+export type Scan = typeof scans.$inferSelect;
