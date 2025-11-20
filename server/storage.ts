@@ -47,8 +47,8 @@ export class MemStorage implements IStorage {
       llmsTxtFound: insertScan.llmsTxtFound,
       llmsTxtContent: insertScan.llmsTxtContent ?? null,
       botPermissions: insertScan.botPermissions ?? null,
-      errors: insertScan.errors ?? null,
-      warnings: insertScan.warnings ?? null,
+      errors: insertScan.errors ? [...insertScan.errors] : null,
+      warnings: insertScan.warnings ? [...insertScan.warnings] : null,
       createdAt: new Date(),
     };
     this.scans.set(id, scan);

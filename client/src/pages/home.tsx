@@ -6,8 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import heroBg from "@assets/generated_images/cybernetic_data_scanning_visualization.png";
 
-// --- Components ---
-
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -19,7 +17,6 @@ const Navbar = () => {
           <span>ROBOSCAN</span>
         </div>
 
-        {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
           <a href="#demo" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Live Demo</a>
@@ -32,13 +29,11 @@ const Navbar = () => {
           </Button>
         </div>
 
-        {/* Mobile Toggle */}
         <button className="md:hidden text-foreground" onClick={() => setIsOpen(!isOpen)}>
           {isOpen ? <X /> : <Menu />}
         </button>
       </div>
 
-      {/* Mobile Nav */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -70,7 +65,6 @@ const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
 
   return (
     <section className="relative min-h-screen pt-20 flex items-center justify-center overflow-hidden">
-      {/* Background */}
       <div className="absolute inset-0 z-0">
         <img 
           src={heroBg} 
@@ -112,9 +106,15 @@ const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
                 className="pl-10 h-12 bg-background/50 backdrop-blur border-white/10 focus:border-primary/50 transition-colors"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
+                data-testid="input-url"
               />
             </div>
-            <Button type="submit" size="lg" className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold">
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+              data-testid="button-scan"
+            >
               Scan Now
             </Button>
           </form>
@@ -128,44 +128,112 @@ const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
   );
 };
 
+interface ScanResult {
+  robotsTxtFound: boolean;
+  robotsTxtContent: string | null;
+  llmsTxtFound: boolean;
+  llmsTxtContent: string | null;
+  botPermissions: Record<string, string>;
+  errors: string[];
+  warnings: string[];
+}
+
 const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUrl: string }) => {
   const [lines, setLines] = useState<string[]>([]);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
 
   useEffect(() => {
-    if (!isScanning) return;
+    if (!isScanning || !targetUrl) return;
     
     setLines([]);
-    const steps = [
-      `> Connecting to ${targetUrl || 'target'}...`,
-      "> Resolving DNS...",
-      "> [SUCCESS] Connection established (200 OK)",
-      "> Searching for robots.txt...",
-      "> [WARN] robots.txt found but missing sitemap",
-      "> Searching for llms.txt...",
-      "> [ERROR] llms.txt not found (404)",
-      "> Analyzing AI agent permissions...",
-      "> [INFO] GPTBot: Allowed",
-      "> [INFO] CCBot: Allowed",
-      "> [INFO] Anthropic-AI: Blocked",
-      "> Generating optimization report...",
-      "> DONE."
-    ];
+    setScanResult(null);
 
-    let currentLine = 0;
-    const interval = setInterval(() => {
-      if (currentLine >= steps.length) {
-        clearInterval(interval);
-        return;
-      }
-      
-      const nextLine = steps[currentLine];
-      if (nextLine) {
-        setLines(prev => [...prev, nextLine]);
-      }
-      currentLine++;
-    }, 400);
+    const performScan = async () => {
+      const steps = [
+        `> Connecting to ${targetUrl}...`,
+        "> Resolving DNS...",
+      ];
 
-    return () => clearInterval(interval);
+      setLines([...steps]);
+
+      try {
+        const response = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: targetUrl }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          setLines(prev => [
+            ...prev,
+            `> [ERROR] Connection failed: ${error.message || 'Unknown error'}`,
+            "> Scan aborted."
+          ]);
+          return;
+        }
+
+        const result: ScanResult = await response.json();
+        setScanResult(result);
+
+        const newLines = [...steps];
+        newLines.push("> [SUCCESS] Connection established (200 OK)");
+        newLines.push("> Searching for robots.txt...");
+
+        if (result.robotsTxtFound) {
+          newLines.push("> [SUCCESS] robots.txt found");
+          if (result.warnings && result.warnings.length > 0) {
+            result.warnings.forEach(w => newLines.push(`> [WARN] ${w}`));
+          }
+        } else {
+          newLines.push("> [WARN] robots.txt not found (404)");
+        }
+
+        newLines.push("> Searching for llms.txt...");
+        if (result.llmsTxtFound) {
+          newLines.push("> [SUCCESS] llms.txt found");
+        } else {
+          newLines.push("> [ERROR] llms.txt not found (404)");
+        }
+
+        newLines.push("> Analyzing AI agent permissions...");
+        
+        Object.entries(result.botPermissions).forEach(([bot, permission]) => {
+          newLines.push(`> [INFO] ${bot}: ${permission}`);
+        });
+
+        if (result.errors && result.errors.length > 0) {
+          result.errors.forEach(err => newLines.push(`> [ERROR] ${err}`));
+        }
+
+        newLines.push("> Generating optimization report...");
+        newLines.push("> DONE.");
+
+        let currentLine = 0;
+        const interval = setInterval(() => {
+          if (currentLine >= newLines.length) {
+            clearInterval(interval);
+            return;
+          }
+          
+          setLines(prev => {
+            const nextLine = newLines[currentLine];
+            return nextLine ? [...prev, nextLine] : prev;
+          });
+          currentLine++;
+        }, 200);
+
+        return () => clearInterval(interval);
+      } catch (error) {
+        setLines(prev => [
+          ...prev,
+          `> [ERROR] Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          "> Scan aborted."
+        ]);
+      }
+    };
+
+    performScan();
   }, [isScanning, targetUrl]);
 
   return (
@@ -210,7 +278,7 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
                   roboscan-cli — v1.0.4
                 </div>
               </div>
-              <div className="p-6 font-mono text-sm min-h-[300px] flex flex-col">
+              <div className="p-6 font-mono text-sm min-h-[300px] flex flex-col" data-testid="terminal-output">
                 {!isScanning && lines.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground/50">
                     Waiting for input...
@@ -235,7 +303,7 @@ const TerminalDemo = ({ isScanning, targetUrl }: { isScanning: boolean, targetUr
                     );
                   })
                 )}
-                {isScanning && (
+                {isScanning && lines.length > 0 && !lines[lines.length - 1]?.includes("DONE") && !lines[lines.length - 1]?.includes("aborted") && (
                   <motion.span 
                     animate={{ opacity: [0, 1, 0] }} 
                     transition={{ repeat: Infinity, duration: 0.8 }}
@@ -317,8 +385,6 @@ const Footer = () => (
     </div>
   </footer>
 );
-
-// --- Page ---
 
 export default function Home() {
   const [isScanning, setIsScanning] = useState(false);
