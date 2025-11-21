@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight } from "lucide-react";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -242,6 +242,38 @@ export default function Dashboard() {
                       </span>
                     </div>
 
+                    {/* Bot Permissions Preview */}
+                    {scan.botPermissions && Object.keys(scan.botPermissions).length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                          <Bot className="w-4 h-4 text-primary" />
+                          AI Bot Permissions
+                        </h4>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {Object.entries(scan.botPermissions as Record<string, string>).slice(0, 6).map(([bot, permission]) => (
+                            <div 
+                              key={bot} 
+                              className="flex items-center gap-2 p-2 bg-background/50 border border-white/5 rounded text-xs"
+                            >
+                              <div className={`w-2 h-2 rounded-full ${
+                                permission.toLowerCase().includes('allow') || permission.toLowerCase().includes('yes')
+                                  ? 'bg-green-400' 
+                                  : permission.toLowerCase().includes('disallow') || permission.toLowerCase().includes('no')
+                                  ? 'bg-red-400'
+                                  : 'bg-yellow-400'
+                              }`} />
+                              <span className="font-mono truncate">{bot}</span>
+                            </div>
+                          ))}
+                          {Object.keys(scan.botPermissions as Record<string, string>).length > 6 && (
+                            <div className="flex items-center gap-2 p-2 bg-primary/10 border border-primary/20 rounded text-xs text-primary font-semibold">
+                              +{Object.keys(scan.botPermissions as Record<string, string>).length - 6} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {scan.isPurchased ? (
                       <>
                         <Button
@@ -304,24 +336,52 @@ export default function Dashboard() {
                         )}
                       </>
                     ) : (
-                      <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                        <div className="flex items-start gap-3">
-                          <Lock className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                      <div className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/30 rounded-lg">
+                        <div className="flex items-start gap-4">
+                          <div className="p-3 bg-primary/20 rounded-lg">
+                            <Lock className="w-6 h-6 text-primary" />
+                          </div>
                           <div className="flex-1">
-                            <p className="text-sm mb-3">
-                              Unlock the full optimization report to access{" "}
-                              <span className="font-semibold">robots.txt</span> and{" "}
-                              <span className="font-semibold">llms.txt</span> files with detailed recommendations.
+                            <h4 className="font-bold text-lg mb-2 flex items-center gap-2">
+                              <Sparkles className="w-5 h-5 text-primary" />
+                              Premium Optimization Report
+                            </h4>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Unlock comprehensive insights and downloadable files:
                             </p>
-                            <Button
-                              onClick={() => handleUnlock(scan)}
-                              size="sm"
-                              className="bg-primary text-primary-foreground hover:bg-primary/90"
-                              data-testid={`button-unlock-${scan.id}`}
-                            >
-                              <Sparkles className="w-4 h-4 mr-2" />
-                              Unlock for $9.99
-                            </Button>
+                            <div className="grid gap-2 mb-4">
+                              <div className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <span>Full <span className="font-semibold font-mono">robots.txt</span> content with validation</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <span>Complete <span className="font-semibold font-mono">llms.txt</span> file analysis</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <span>Detailed bot permissions breakdown</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <span>Downloadable optimization recommendations</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <span>Ready-to-use configuration files</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Button
+                                onClick={() => handleUnlock(scan)}
+                                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+                                data-testid={`button-unlock-${scan.id}`}
+                              >
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Unlock for $9.99
+                              </Button>
+                              <span className="text-xs text-muted-foreground">One-time payment • Instant access</span>
+                            </div>
                           </div>
                         </div>
                       </div>
