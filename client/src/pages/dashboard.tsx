@@ -1,15 +1,70 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { PaymentModal } from "@/components/PaymentModal";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import type { Scan } from "@shared/schema";
 
 interface ScanWithPurchase extends Scan {
   isPurchased: boolean;
+}
+
+interface RecurringScan {
+  id: number;
+  url: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  isActive: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string;
+  createdAt: string;
+}
+
+interface Notification {
+  id: number;
+  recurringScanId: number;
+  changeType: string;
+  changeDetails: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface NotificationPreferences {
+  id: number;
+  recurringScanId: number;
+  notifyOnRobotsTxtChange: boolean;
+  notifyOnLlmsTxtChange: boolean;
+  notifyOnBotPermissionChange: boolean;
+  notifyOnNewErrors: boolean;
+  notificationMethod: 'in-app' | 'email' | 'both';
 }
 
 export default function Dashboard() {
@@ -23,8 +78,37 @@ export default function Dashboard() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
+  // Recurring scans state
+  const [recurringScans, setRecurringScans] = useState<RecurringScan[]>([]);
+  const [showCreateRecurringDialog, setShowCreateRecurringDialog] = useState(false);
+  const [newRecurringUrl, setNewRecurringUrl] = useState("");
+  const [newRecurringFrequency, setNewRecurringFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [isCreatingRecurring, setIsCreatingRecurring] = useState(false);
+
+  // Notifications state
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationsSheet, setShowNotificationsSheet] = useState(false);
+
+  // Notification preferences state
+  const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
+  const [selectedRecurringScan, setSelectedRecurringScan] = useState<RecurringScan | null>(null);
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+
   useEffect(() => {
     fetchScans();
+    fetchRecurringScans();
+    fetchNotifications();
+    fetchUnreadCount();
+
+    // Poll for notifications every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotifications();
+      fetchUnreadCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchScans = async () => {
@@ -41,6 +125,42 @@ export default function Dashboard() {
     }
   };
 
+  const fetchRecurringScans = async () => {
+    try {
+      const response = await fetch('/api/recurring-scans');
+      if (response.ok) {
+        const data = await response.json();
+        setRecurringScans(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch recurring scans:', error);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await fetch('/api/notifications');
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await fetch('/api/notifications/unread-count');
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.count);
+      }
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error);
+    }
+  };
+
   const handleUnlock = (scan: ScanWithPurchase) => {
     setSelectedScan(scan);
     setShowPaymentModal(true);
@@ -48,7 +168,7 @@ export default function Dashboard() {
 
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
-    fetchScans(); // Refresh scans to update purchase status
+    fetchScans();
   };
 
   const downloadFile = (content: string, filename: string) => {
@@ -84,7 +204,6 @@ export default function Dashboard() {
 
       await response.json();
       
-      // Refresh scans list
       await fetchScans();
       setScanUrl("");
     } catch (error) {
@@ -93,6 +212,175 @@ export default function Dashboard() {
     } finally {
       setIsScanning(false);
     }
+  };
+
+  const handleCreateRecurringScan = async () => {
+    if (!newRecurringUrl.trim()) return;
+
+    setIsCreatingRecurring(true);
+
+    try {
+      const response = await fetch('/api/recurring-scans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          url: newRecurringUrl, 
+          frequency: newRecurringFrequency 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create recurring scan');
+      }
+
+      await fetchRecurringScans();
+      setShowCreateRecurringDialog(false);
+      setNewRecurringUrl("");
+      setNewRecurringFrequency('daily');
+    } catch (error) {
+      console.error('Create recurring scan error:', error);
+    } finally {
+      setIsCreatingRecurring(false);
+    }
+  };
+
+  const handleToggleRecurringScan = async (id: number, currentlyActive: boolean) => {
+    try {
+      const response = await fetch(`/api/recurring-scans/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive: !currentlyActive }),
+      });
+
+      if (response.ok) {
+        await fetchRecurringScans();
+      }
+    } catch (error) {
+      console.error('Toggle recurring scan error:', error);
+    }
+  };
+
+  const handleDeleteRecurringScan = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this recurring scan?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/recurring-scans/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await fetchRecurringScans();
+      }
+    } catch (error) {
+      console.error('Delete recurring scan error:', error);
+    }
+  };
+
+  const handleMarkNotificationRead = async (id: number) => {
+    try {
+      const response = await fetch(`/api/notifications/${id}/read`, {
+        method: 'PATCH',
+      });
+
+      if (response.ok) {
+        await fetchNotifications();
+        await fetchUnreadCount();
+      }
+    } catch (error) {
+      console.error('Mark notification read error:', error);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        await fetchNotifications();
+        await fetchUnreadCount();
+      }
+    } catch (error) {
+      console.error('Mark all read error:', error);
+    }
+  };
+
+  const handleOpenPreferences = async (scan: RecurringScan) => {
+    setSelectedRecurringScan(scan);
+    
+    try {
+      const response = await fetch(`/api/recurring-scans/${scan.id}/preferences`);
+      if (response.ok) {
+        const data = await response.json();
+        setPreferences(data);
+        setShowPreferencesDialog(true);
+      }
+    } catch (error) {
+      console.error('Fetch preferences error:', error);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!selectedRecurringScan || !preferences) return;
+
+    setIsSavingPreferences(true);
+
+    try {
+      const response = await fetch(`/api/recurring-scans/${selectedRecurringScan.id}/preferences`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notifyOnRobotsTxtChange: preferences.notifyOnRobotsTxtChange,
+          notifyOnLlmsTxtChange: preferences.notifyOnLlmsTxtChange,
+          notifyOnBotPermissionChange: preferences.notifyOnBotPermissionChange,
+          notifyOnNewErrors: preferences.notifyOnNewErrors,
+          notificationMethod: preferences.notificationMethod,
+        }),
+      });
+
+      if (response.ok) {
+        setShowPreferencesDialog(false);
+        setSelectedRecurringScan(null);
+        setPreferences(null);
+      }
+    } catch (error) {
+      console.error('Save preferences error:', error);
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
+  const getFrequencyLabel = (frequency: string) => {
+    switch (frequency) {
+      case 'daily': return 'Every day';
+      case 'weekly': return 'Every week';
+      case 'monthly': return 'Every month';
+      default: return frequency;
+    }
+  };
+
+  const formatRelativeTime = (date: string) => {
+    const now = new Date();
+    const then = new Date(date);
+    const diffMs = now.getTime() - then.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return then.toLocaleDateString();
   };
 
   return (
@@ -106,6 +394,20 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Notifications Bell */}
+            <button
+              onClick={() => setShowNotificationsSheet(true)}
+              className="relative p-2 hover:bg-white/5 rounded-lg transition-colors"
+              data-testid="button-notifications"
+            >
+              <Bell className="w-5 h-5 text-muted-foreground" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
             {user && (
               <div className="flex items-center gap-3">
                 {user.profileImageUrl && (
@@ -189,6 +491,103 @@ export default function Dashboard() {
           )}
         </Card>
 
+        {/* Recurring Scans Section */}
+        <Card className="p-6 bg-card border-white/5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Repeat className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold">Recurring Scans</h2>
+            </div>
+            <Button
+              onClick={() => setShowCreateRecurringDialog(true)}
+              size="sm"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              data-testid="button-create-recurring"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Recurring Scan
+            </Button>
+          </div>
+
+          {recurringScans.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/20 rounded-full mb-3">
+                <Repeat className="w-6 h-6 text-primary" />
+              </div>
+              <p className="text-muted-foreground text-sm">
+                No recurring scans yet. Set up automatic monitoring to get notified of changes.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recurringScans.map((scan) => (
+                <div
+                  key={scan.id}
+                  className="p-4 bg-background/50 border border-white/5 rounded-lg hover:border-primary/20 transition-all"
+                  data-testid={`recurring-scan-${scan.id}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Globe className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="font-mono font-semibold">{scan.url}</span>
+                        <Badge 
+                          variant={scan.isActive ? "default" : "secondary"}
+                          className={scan.isActive ? "bg-green-500/20 text-green-400 border-green-500/30" : ""}
+                        >
+                          {scan.isActive ? 'Active' : 'Paused'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {getFrequencyLabel(scan.frequency)}
+                        </span>
+                        {scan.lastRunAt && (
+                          <span>Last scan: {formatRelativeTime(scan.lastRunAt)}</span>
+                        )}
+                        <span>Next: {new Date(scan.nextRunAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleRecurringScan(scan.id, scan.isActive)}
+                        data-testid={`button-toggle-${scan.id}`}
+                      >
+                        {scan.isActive ? (
+                          <Pause className="w-4 h-4" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenPreferences(scan)}
+                        data-testid={`button-preferences-${scan.id}`}
+                      >
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteRecurringScan(scan.id)}
+                        className="text-red-400 hover:text-red-300"
+                        data-testid={`button-delete-${scan.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Scans List */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -418,6 +817,7 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Payment Modal */}
       {selectedScan && (
         <PaymentModal
           isOpen={showPaymentModal}
@@ -427,6 +827,268 @@ export default function Dashboard() {
           onSuccess={handlePaymentSuccess}
         />
       )}
+
+      {/* Create Recurring Scan Dialog */}
+      <Dialog open={showCreateRecurringDialog} onOpenChange={setShowCreateRecurringDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Repeat className="w-5 h-5 text-primary" />
+              Create Recurring Scan
+            </DialogTitle>
+            <DialogDescription>
+              Set up automatic monitoring to get notified when your website's bot configuration changes
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="url">Website URL</Label>
+              <Input
+                id="url"
+                type="url"
+                placeholder="example.com"
+                value={newRecurringUrl}
+                onChange={(e) => setNewRecurringUrl(e.target.value)}
+                data-testid="input-recurring-url"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="frequency">Scan Frequency</Label>
+              <Select value={newRecurringFrequency} onValueChange={(value: any) => setNewRecurringFrequency(value)}>
+                <SelectTrigger id="frequency" data-testid="select-frequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateRecurringDialog(false)}
+              data-testid="button-cancel-recurring"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateRecurringScan}
+              disabled={isCreatingRecurring || !newRecurringUrl.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              data-testid="button-confirm-recurring"
+            >
+              {isCreatingRecurring ? 'Creating...' : 'Create Scan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notification Preferences Dialog */}
+      <Dialog open={showPreferencesDialog} onOpenChange={setShowPreferencesDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              Notification Settings
+            </DialogTitle>
+            <DialogDescription>
+              {selectedRecurringScan && (
+                <span className="font-mono text-xs">{selectedRecurringScan.url}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {preferences && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-3">
+                <Label className="text-sm font-semibold">Notify me when:</Label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="robots-change" className="text-sm font-normal">
+                      robots.txt changes
+                    </Label>
+                    <Switch
+                      id="robots-change"
+                      checked={preferences.notifyOnRobotsTxtChange}
+                      onCheckedChange={(checked) => 
+                        setPreferences({...preferences, notifyOnRobotsTxtChange: checked})
+                      }
+                      data-testid="switch-robots"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="llms-change" className="text-sm font-normal">
+                      llms.txt changes
+                    </Label>
+                    <Switch
+                      id="llms-change"
+                      checked={preferences.notifyOnLlmsTxtChange}
+                      onCheckedChange={(checked) => 
+                        setPreferences({...preferences, notifyOnLlmsTxtChange: checked})
+                      }
+                      data-testid="switch-llms"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="bot-permission-change" className="text-sm font-normal">
+                      Bot permissions change
+                    </Label>
+                    <Switch
+                      id="bot-permission-change"
+                      checked={preferences.notifyOnBotPermissionChange}
+                      onCheckedChange={(checked) => 
+                        setPreferences({...preferences, notifyOnBotPermissionChange: checked})
+                      }
+                      data-testid="switch-bot-permissions"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="errors" className="text-sm font-normal">
+                      New errors detected
+                    </Label>
+                    <Switch
+                      id="errors"
+                      checked={preferences.notifyOnNewErrors}
+                      onCheckedChange={(checked) => 
+                        setPreferences({...preferences, notifyOnNewErrors: checked})
+                      }
+                      data-testid="switch-errors"
+                    />
+                  </div>
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label htmlFor="method">Notification Method</Label>
+                <Select 
+                  value={preferences.notificationMethod} 
+                  onValueChange={(value: any) => setPreferences({...preferences, notificationMethod: value})}
+                >
+                  <SelectTrigger id="method" data-testid="select-notification-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in-app">In-app only</SelectItem>
+                    <SelectItem value="email">Email only</SelectItem>
+                    <SelectItem value="both">Both in-app and email</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPreferencesDialog(false);
+                setSelectedRecurringScan(null);
+                setPreferences(null);
+              }}
+              data-testid="button-cancel-preferences"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePreferences}
+              disabled={isSavingPreferences}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              data-testid="button-save-preferences"
+            >
+              {isSavingPreferences ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notifications Sheet */}
+      <Sheet open={showNotificationsSheet} onOpenChange={setShowNotificationsSheet}>
+        <SheetContent className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              Notifications
+            </SheetTitle>
+            <SheetDescription>
+              Changes detected in your monitored websites
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            {notifications.length > 0 && unreadCount > 0 && (
+              <div className="mb-4 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleMarkAllRead}
+                  data-testid="button-mark-all-read"
+                >
+                  Mark all as read
+                </Button>
+              </div>
+            )}
+            {notifications.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/20 rounded-full mb-3">
+                  <Bell className="w-6 h-6 text-primary" />
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  No notifications yet
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <AnimatePresence>
+                  {notifications.map((notification) => (
+                    <motion.div
+                      key={notification.id}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className={`p-4 rounded-lg border transition-all ${
+                        notification.isRead 
+                          ? 'bg-background/30 border-white/5' 
+                          : 'bg-primary/10 border-primary/30'
+                      }`}
+                      data-testid={`notification-${notification.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-xs">
+                              {notification.changeType}
+                            </Badge>
+                            {!notification.isRead && (
+                              <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-sm text-foreground/90 break-words">
+                            {notification.changeDetails}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {formatRelativeTime(notification.createdAt)}
+                          </p>
+                        </div>
+                        {!notification.isRead && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMarkNotificationRead(notification.id)}
+                            className="flex-shrink-0"
+                            data-testid={`button-mark-read-${notification.id}`}
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
