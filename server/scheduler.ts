@@ -62,7 +62,7 @@ async function processRecurringScan(recurringScanId: number) {
                 type: 'robots_txt_change',
                 title: 'robots.txt Changed',
                 message: `Changes detected in robots.txt for ${recurringScan.url}`,
-                changes: { robotsTxtChanged: true },
+                changes: { robotsTxtChanged: true } as Record<string, any>,
                 isRead: false,
               });
             }
@@ -75,7 +75,7 @@ async function processRecurringScan(recurringScanId: number) {
                 type: 'llms_txt_change',
                 title: 'llms.txt Changed',
                 message: `Changes detected in llms.txt for ${recurringScan.url}`,
-                changes: { llmsTxtChanged: true },
+                changes: { llmsTxtChanged: true } as Record<string, any>,
                 isRead: false,
               });
             }
@@ -89,7 +89,7 @@ async function processRecurringScan(recurringScanId: number) {
                 type: 'bot_permission_change',
                 title: 'Bot Permissions Changed',
                 message: `Bot permission changes detected for ${changedBots.length} bot(s) on ${recurringScan.url}`,
-                changes: changeDetection.changes.botPermissionsChanged,
+                changes: changeDetection.changes.botPermissionsChanged as Record<string, any>,
                 isRead: false,
               });
             }
@@ -102,7 +102,7 @@ async function processRecurringScan(recurringScanId: number) {
                 type: 'new_errors',
                 title: 'New Errors Detected',
                 message: `${changeDetection.changes.newErrors.length} new error(s) detected on ${recurringScan.url}`,
-                changes: { newErrors: changeDetection.changes.newErrors },
+                changes: { newErrors: changeDetection.changes.newErrors } as Record<string, any>,
                 isRead: false,
               });
             }

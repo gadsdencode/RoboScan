@@ -331,14 +331,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Create notification preferences
-      const prefs = notificationPreferences || {};
       await storage.createNotificationPreference({
         recurringScanId: recurringScan.id,
-        notifyOnRobotsTxtChange: prefs.notifyOnRobotsTxtChange ?? true,
-        notifyOnLlmsTxtChange: prefs.notifyOnLlmsTxtChange ?? true,
-        notifyOnBotPermissionChange: prefs.notifyOnBotPermissionChange ?? true,
-        notifyOnNewErrors: prefs.notifyOnNewErrors ?? true,
-        notificationMethod: prefs.notificationMethod || 'in-app',
+        notifyOnRobotsTxtChange: notificationPreferences?.notifyOnRobotsTxtChange ?? true,
+        notifyOnLlmsTxtChange: notificationPreferences?.notifyOnLlmsTxtChange ?? true,
+        notifyOnBotPermissionChange: notificationPreferences?.notifyOnBotPermissionChange ?? true,
+        notifyOnNewErrors: notificationPreferences?.notifyOnNewErrors ?? true,
+        notificationMethod: notificationPreferences?.notificationMethod ?? 'in-app',
       });
 
       res.json(recurringScan);

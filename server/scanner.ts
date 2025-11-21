@@ -94,11 +94,31 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
     };
   }
 
-  const baseUrl = new URL(normalizedUrl).origin;
+  const parsedUrl = new URL(normalizedUrl);
+  const baseUrl = parsedUrl.origin;
+  
+  // Extract the directory path from the URL, removing trailing slash
+  // Examples:
+  //   https://example.com/docs -> /docs
+  //   https://example.com/docs/ -> /docs
+  //   https://example.com/.well-known -> /.well-known
+  //   https://example.com -> (empty, root only)
+  let basePath = parsedUrl.pathname;
+  
+  // Normalize: remove trailing slash
+  if (basePath.endsWith('/') && basePath !== '/') {
+    basePath = basePath.slice(0, -1);
+  }
+  
+  // If basePath is just '/', treat as empty (no subdirectory)
+  if (basePath === '/') {
+    basePath = '';
+  }
 
   let robotsTxtFound = false;
   let robotsTxtContent: string | null = null;
 
+  // robots.txt must always be at the domain root per RFC 9309
   try {
     console.log(`[Scanner] Fetching ${baseUrl}/robots.txt`);
     const robotsResponse = await fetch(`${baseUrl}/robots.txt`, {
@@ -160,28 +180,48 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   let llmsTxtFound = false;
   let llmsTxtContent: string | null = null;
 
-  try {
-    console.log(`[Scanner] Fetching ${baseUrl}/llms.txt`);
-    const llmsResponse = await fetch(`${baseUrl}/llms.txt`, {
-      headers: { 
-        'User-Agent': 'RoboscanBot/1.0',
-        'Accept': 'text/plain,*/*'
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
-    });
+  // llms.txt: try user's provided path first, then fall back to domain root
+  const llmsTxtUrls: string[] = [];
+  
+  // If user provided a path, check there first
+  if (basePath && basePath !== '') {
+    llmsTxtUrls.push(`${baseUrl}${basePath}/llms.txt`);
+  }
+  
+  // Always also check the domain root as fallback
+  llmsTxtUrls.push(`${baseUrl}/llms.txt`);
 
-    console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
+  for (const llmsTxtUrl of llmsTxtUrls) {
+    // Skip if we already found it
+    if (llmsTxtFound) break;
 
-    if (llmsResponse.ok) {
-      llmsTxtFound = true;
-      llmsTxtContent = await llmsResponse.text();
-    } else {
-      console.log(`[Scanner] llms.txt not found (status ${llmsResponse.status})`);
+    try {
+      console.log(`[Scanner] Fetching ${llmsTxtUrl}`);
+      const llmsResponse = await fetch(llmsTxtUrl, {
+        headers: { 
+          'User-Agent': 'RoboscanBot/1.0',
+          'Accept': 'text/plain,*/*'
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(10000),
+      });
+
+      console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
+
+      if (llmsResponse.ok) {
+        llmsTxtFound = true;
+        llmsTxtContent = await llmsResponse.text();
+        console.log(`[Scanner] llms.txt found at ${llmsTxtUrl}`);
+      } else {
+        console.log(`[Scanner] llms.txt not found at ${llmsTxtUrl} (status ${llmsResponse.status})`);
+      }
+    } catch (error) {
+      console.error(`[Scanner] Error fetching llms.txt from ${llmsTxtUrl}:`, error);
+      // Only add error if this was the last URL to try
+      if (llmsTxtUrl === llmsTxtUrls[llmsTxtUrls.length - 1] && !llmsTxtFound) {
+        errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
-  } catch (error) {
-    console.error('[Scanner] Error fetching llms.txt:', error);
-    errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
   // If no robots.txt was found, default to allowed

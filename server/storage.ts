@@ -82,7 +82,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createScan(insertScan: InsertScan): Promise<Scan> {
-    const [scan] = await db.insert(scans).values(insertScan).returning();
+    const [scan] = await db.insert(scans).values(insertScan as any).returning();
     return scan;
   }
 
