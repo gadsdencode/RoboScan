@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare } from "lucide-react";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare, Tag, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -104,11 +104,19 @@ export default function Dashboard() {
   const [comparisonOldScan, setComparisonOldScan] = useState<ScanWithPurchase | null>(null);
   const [comparisonNewScan, setComparisonNewScan] = useState<ScanWithPurchase | null>(null);
 
+  // Tag management state
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [editingTagsForScan, setEditingTagsForScan] = useState<number | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const [showTagFilter, setShowTagFilter] = useState(false);
+
   useEffect(() => {
     fetchScans();
     fetchRecurringScans();
     fetchNotifications();
     fetchUnreadCount();
+    fetchAllTags();
 
     // Poll for notifications every 30 seconds
     const interval = setInterval(() => {
@@ -119,9 +127,16 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchScans = async () => {
+  const fetchScans = async (tagFilter?: string[]) => {
     try {
-      const response = await fetch('/api/user/scans');
+      const params = new URLSearchParams();
+      if (tagFilter && tagFilter.length > 0) {
+        tagFilter.forEach(tag => params.append('tags', tag));
+      }
+      const queryString = params.toString();
+      const url = queryString ? `/api/user/scans?${queryString}` : '/api/user/scans';
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setScans(data);
@@ -130,6 +145,18 @@ export default function Dashboard() {
       console.error('Failed to fetch scans:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllTags = async () => {
+    try {
+      const response = await fetch('/api/user/tags');
+      if (response.ok) {
+        const data = await response.json();
+        setAllTags(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tags:', error);
     }
   };
 
@@ -436,6 +463,70 @@ export default function Dashboard() {
     }
   };
 
+  const handleToggleTagFilter = async (tag: string) => {
+    const newSelectedTags = selectedTags.includes(tag)
+      ? selectedTags.filter(t => t !== tag)
+      : [...selectedTags, tag];
+    setSelectedTags(newSelectedTags);
+    setLoading(true);
+    await fetchScans(newSelectedTags.length > 0 ? newSelectedTags : undefined);
+    setLoading(false);
+  };
+
+  const handleClearTagFilter = async () => {
+    setSelectedTags([]);
+    setLoading(true);
+    await fetchScans();
+    setLoading(false);
+  };
+
+  const handleAddTag = async (scanId: number, tag: string) => {
+    if (!tag.trim()) return;
+    
+    const scan = scans.find(s => s.id === scanId);
+    if (!scan) return;
+
+    const updatedTags = [...(scan.tags || []), tag.trim()];
+    
+    try {
+      const response = await fetch(`/api/scans/${scanId}/tags`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: updatedTags }),
+      });
+
+      if (response.ok) {
+        await fetchScans(selectedTags.length > 0 ? selectedTags : undefined);
+        await fetchAllTags();
+        setTagInput("");
+      }
+    } catch (error) {
+      console.error('Failed to add tag:', error);
+    }
+  };
+
+  const handleRemoveTag = async (scanId: number, tagToRemove: string) => {
+    const scan = scans.find(s => s.id === scanId);
+    if (!scan) return;
+
+    const updatedTags = (scan.tags || []).filter(t => t !== tagToRemove);
+    
+    try {
+      const response = await fetch(`/api/scans/${scanId}/tags`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: updatedTags }),
+      });
+
+      if (response.ok) {
+        await fetchScans(selectedTags.length > 0 ? selectedTags : undefined);
+        await fetchAllTags();
+      }
+    } catch (error) {
+      console.error('Failed to remove tag:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -659,9 +750,24 @@ export default function Dashboard() {
           </Card>
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
               <h2 className="text-xl font-bold">Your Scans</h2>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                {allTags.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTagFilter(!showTagFilter)}
+                    className="border-primary/30"
+                    data-testid="button-toggle-tag-filter"
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    Filter by Tags
+                    {selectedTags.length > 0 && (
+                      <Badge className="ml-2 bg-primary">{selectedTags.length}</Badge>
+                    )}
+                  </Button>
+                )}
                 {comparisonMode && (
                   <Button
                     variant="outline"
@@ -675,6 +781,44 @@ export default function Dashboard() {
                 <span className="text-sm text-muted-foreground">{scans.length} {scans.length === 1 ? 'scan' : 'scans'}</span>
               </div>
             </div>
+
+            {/* Tag Filter */}
+            {showTagFilter && allTags.length > 0 && (
+              <Card className="p-4 mb-4 bg-card border-white/5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-primary" />
+                    Filter by Tags
+                  </h3>
+                  {selectedTags.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearTagFilter}
+                      data-testid="button-clear-tag-filter"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      onClick={() => handleToggleTagFilter(tag)}
+                      className={`cursor-pointer transition-all ${
+                        selectedTags.includes(tag)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background border-white/10 hover:bg-primary/20'
+                      }`}
+                      data-testid={`tag-filter-${tag}`}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             {comparisonMode && selectedScanForComparison && (
               <Card className="p-4 bg-primary/10 border-primary/30 mb-4">
@@ -713,7 +857,7 @@ export default function Dashboard() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         {new Date(scan.createdAt).toLocaleDateString()}
@@ -724,6 +868,86 @@ export default function Dashboard() {
                       <span className={scan.llmsTxtFound ? "text-green-400" : "text-red-400"}>
                         {scan.llmsTxtFound ? "✓ llms.txt found" : "✗ llms.txt missing"}
                       </span>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold">Tags</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {scan.tags && scan.tags.length > 0 ? (
+                          scan.tags.map((tag) => (
+                            <Badge
+                              key={tag}
+                              className="bg-primary/20 border-primary/30 group cursor-pointer hover:bg-red-500/20 hover:border-red-500/30"
+                              onClick={() => handleRemoveTag(scan.id, tag)}
+                              data-testid={`tag-${scan.id}-${tag}`}
+                            >
+                              {tag}
+                              <X className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No tags</span>
+                        )}
+                        {editingTagsForScan === scan.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={tagInput}
+                              onChange={(e) => setTagInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleAddTag(scan.id, tagInput);
+                                  setEditingTagsForScan(null);
+                                } else if (e.key === 'Escape') {
+                                  setEditingTagsForScan(null);
+                                  setTagInput("");
+                                }
+                              }}
+                              placeholder="Enter tag name"
+                              className="h-6 text-xs w-32"
+                              autoFocus
+                              data-testid={`input-tag-${scan.id}`}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2"
+                              onClick={() => {
+                                handleAddTag(scan.id, tagInput);
+                                setEditingTagsForScan(null);
+                              }}
+                              data-testid={`button-save-tag-${scan.id}`}
+                            >
+                              Add
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2"
+                              onClick={() => {
+                                setEditingTagsForScan(null);
+                                setTagInput("");
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs border-dashed"
+                            onClick={() => setEditingTagsForScan(scan.id)}
+                            data-testid={`button-add-tag-${scan.id}`}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Add Tag
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Bot Permissions Preview */}

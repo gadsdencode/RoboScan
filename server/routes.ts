@@ -526,7 +526,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tags: z.array(z.string()).default([]),
       }).parse(req.body);
 
-      const updatedScan = await storage.updateScanTags(scanId, tags);
+      // Normalize tags: trim, lowercase, deduplicate
+      const normalizedTags = Array.from(
+        new Set(
+          tags
+            .map(tag => tag.trim().toLowerCase())
+            .filter(tag => tag.length > 0)
+        )
+      );
+
+      const updatedScan = await storage.updateScanTags(scanId, normalizedTags);
       res.json(updatedScan);
     } catch (error) {
       console.error('Update tags error:', error);
