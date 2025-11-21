@@ -126,10 +126,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create payment intent (requires authentication)
-  app.post("/api/create-payment-intent", isAuthenticated, async (req: any, res) => {
+  // Create payment intent (works for both authenticated and anonymous users)
+  app.post("/api/create-payment-intent", async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
       const { scanId } = createPaymentSchema.parse(req.body);
 
       const scan = await storage.getScan(scanId);
@@ -137,11 +136,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Scan not found" });
       }
 
-      // Security: Verify scan ownership
-      if (scan.userId !== userId && scan.userId !== null) {
-        return res.status(403).json({ 
-          message: "You can only purchase reports for your own scans" 
-        });
+      // For authenticated users, verify they own the scan
+      if (req.isAuthenticated() && scan.userId) {
+        const userId = req.user.claims.sub;
+        if (scan.userId !== userId) {
+          return res.status(403).json({ 
+            message: "You can only purchase reports for your own scans" 
+          });
+        }
       }
 
       const existingPurchase = await storage.getPurchaseByScanId(scanId);
@@ -152,13 +154,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const metadata: Record<string, string> = {
+        scanId: scanId.toString(),
+      };
+      
+      // Add userId to metadata if user is authenticated
+      if (req.isAuthenticated()) {
+        metadata.userId = req.user.claims.sub;
+      }
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: 999,
         currency: "usd",
-        metadata: {
-          scanId: scanId.toString(),
-          userId: userId,
-        },
+        metadata,
         automatic_payment_methods: {
           enabled: true,
         },
@@ -184,21 +192,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Confirm payment (requires authentication)
-  app.post("/api/confirm-payment", isAuthenticated, async (req: any, res) => {
+  // Confirm payment (works for both authenticated and anonymous users)
+  app.post("/api/confirm-payment", async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
       const { paymentIntentId } = z.object({
         paymentIntentId: z.string(),
       }).parse(req.body);
 
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       
-      // Security: Verify user matches payment intent metadata
-      if (paymentIntent.metadata.userId !== userId) {
-        return res.status(403).json({ 
-          message: "Unauthorized: This payment belongs to another user" 
-        });
+      // For authenticated users, verify they own the payment
+      if (req.isAuthenticated() && paymentIntent.metadata.userId) {
+        const userId = req.user.claims.sub;
+        if (paymentIntent.metadata.userId !== userId) {
+          return res.status(403).json({ 
+            message: "Unauthorized: This payment belongs to another user" 
+          });
+        }
       }
       
       if (paymentIntent.status === 'succeeded') {
@@ -228,10 +238,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get optimization report (requires authentication and ownership)
-  app.get("/api/optimization-report/:scanId", isAuthenticated, async (req: any, res) => {
+  // Get optimization report (requires payment, authentication optional)
+  app.get("/api/optimization-report/:scanId", async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
       const scanId = parseInt(req.params.scanId);
       
       const scan = await storage.getScan(scanId);
@@ -239,11 +248,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Scan not found" });
       }
 
-      // Security: Verify scan ownership
-      if (scan.userId !== userId && scan.userId !== null) {
-        return res.status(403).json({ 
-          message: "You can only access reports for your own scans" 
-        });
+      // For authenticated users with owned scans, verify ownership
+      if (req.isAuthenticated() && scan.userId) {
+        const userId = req.user.claims.sub;
+        if (scan.userId !== userId) {
+          return res.status(403).json({ 
+            message: "You can only access reports for your own scans" 
+          });
+        }
       }
 
       const purchase = await storage.getPurchaseByScanId(scanId);
