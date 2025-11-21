@@ -23,9 +23,9 @@ const Navbar = () => {
           <Button 
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
             onClick={() => window.location.href = '/api/login'}
-            data-testid="button-get-started"
+            data-testid="button-login"
           >
-            Get Started
+            Login
           </Button>
         </div>
 
@@ -47,7 +47,7 @@ const Navbar = () => {
                 className="w-full bg-primary text-primary-foreground"
                 onClick={() => window.location.href = '/api/login'}
               >
-                Get Started
+                Login
               </Button>
             </div>
           </motion.div>
