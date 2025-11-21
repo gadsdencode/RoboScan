@@ -30,7 +30,7 @@ export interface IStorage {
   // Scan operations
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: number): Promise<Scan | undefined>;
-  getUserScans(userId: string, tagFilter?: string[]): Promise<Scan[]>;
+  getUserScans(userId: string, tagFilter?: string[], limit?: number, offset?: number): Promise<Scan[]>;
   updateScanTags(id: number, tags: string[]): Promise<Scan>;
   getAllUserTags(userId: string): Promise<string[]>;
   
@@ -54,7 +54,7 @@ export interface IStorage {
   
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
-  getUserNotifications(userId: string, limit?: number): Promise<Notification[]>;
+  getUserNotifications(userId: string, limit?: number, offset?: number): Promise<Notification[]>;
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationAsRead(id: number): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
@@ -91,25 +91,28 @@ export class DatabaseStorage implements IStorage {
     return scan;
   }
 
-  async getUserScans(userId: string, tagFilter?: string[]): Promise<Scan[]> {
-    if (tagFilter && tagFilter.length > 0) {
-      return await db
-        .select()
-        .from(scans)
-        .where(
-          and(
-            eq(scans.userId, userId),
-            sql`${scans.tags} && ${tagFilter}`
-          )
-        )
-        .orderBy(desc(scans.createdAt));
-    }
+  async getUserScans(userId: string, tagFilter?: string[], limit: number = 50, offset: number = 0): Promise<Scan[]> {
+    const safeLimit = !limit || isNaN(limit) || limit < 1 ? 50 : Math.min(limit, 100);
+    const safeOffset = !offset || isNaN(offset) || offset < 0 ? 0 : offset;
 
-    return await db
-      .select()
-      .from(scans)
-      .where(eq(scans.userId, userId))
-      .orderBy(desc(scans.createdAt));
+    const query = tagFilter && tagFilter.length > 0
+      ? db
+          .select()
+          .from(scans)
+          .where(
+            and(
+              eq(scans.userId, userId),
+              sql`${scans.tags} && ${tagFilter}`
+            )
+          )
+          .orderBy(desc(scans.createdAt))
+      : db
+          .select()
+          .from(scans)
+          .where(eq(scans.userId, userId))
+          .orderBy(desc(scans.createdAt));
+
+    return await query.limit(safeLimit).offset(safeOffset);
   }
 
   async updateScanTags(id: number, tags: string[]): Promise<Scan> {
@@ -247,13 +250,17 @@ export class DatabaseStorage implements IStorage {
     return notification;
   }
 
-  async getUserNotifications(userId: string, limit: number = 50): Promise<Notification[]> {
+  async getUserNotifications(userId: string, limit: number = 50, offset: number = 0): Promise<Notification[]> {
+    const safeLimit = !limit || isNaN(limit) || limit < 1 ? 50 : Math.min(limit, 100);
+    const safeOffset = !offset || isNaN(offset) || offset < 0 ? 0 : offset;
+
     return await db
       .select()
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt))
-      .limit(limit);
+      .limit(safeLimit)
+      .offset(safeOffset);
   }
 
   async getUnreadNotificationCount(userId: string): Promise<number> {

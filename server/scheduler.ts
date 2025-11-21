@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { scanWebsite } from "./scanner";
 import { detectChanges } from "./change-detector";
+import pLimit from "p-limit";
 
 // Calculate next run time based on frequency
 function calculateNextRun(frequency: string): Date {
@@ -131,10 +132,12 @@ export async function runScheduler() {
     if (dueScans.length > 0) {
       console.log(`[Scheduler] Found ${dueScans.length} due scan(s)`);
       
-      // Process all due scans
-      await Promise.all(
-        dueScans.map(scan => processRecurringScan(scan.id))
+      // Limit concurrency to 5 scans at a time
+      const limit = pLimit(5);
+      const tasks = dueScans.map(scan => 
+        limit(() => processRecurringScan(scan.id))
       );
+      await Promise.all(tasks);
     }
   } catch (error) {
     console.error('[Scheduler] Error running scheduler:', error);
