@@ -94,14 +94,73 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
     };
   }
 
-  const baseUrl = new URL(normalizedUrl).origin;
+  const parsedUrl = new URL(normalizedUrl);
+  
+  // Extract the directory path from the URL, removing trailing slash
+  // Examples:
+  //   https://example.com/docs -> /docs
+  //   https://example.com/docs/ -> /docs
+  //   https://example.com/.well-known -> /.well-known
+  //   https://example.com -> (empty, root only)
+  let basePath = parsedUrl.pathname;
+  
+  // Normalize: remove trailing slash
+  if (basePath.endsWith('/') && basePath !== '/') {
+    basePath = basePath.slice(0, -1);
+  }
+  
+  // If basePath is just '/', treat as empty (no subdirectory)
+  if (basePath === '/') {
+    basePath = '';
+  }
+
+  // Detect the canonical URL by making an initial request and following redirects
+  // This handles cases where example.com redirects to www.example.com or vice versa
+  let canonicalOrigin = parsedUrl.origin;
+  let canonicalBasePath = basePath;
+  
+  try {
+    console.log(`[Scanner] Detecting canonical URL for ${normalizedUrl}`);
+    const initialResponse = await fetch(normalizedUrl, {
+      method: 'GET',
+      headers: { 
+        'User-Agent': 'RoboscanBot/1.0',
+        'Accept': 'text/html,*/*'
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (initialResponse.ok) {
+      // Use the final URL after redirects as the canonical origin
+      const finalUrl = new URL(initialResponse.url);
+      canonicalOrigin = finalUrl.origin;
+      
+      // Also update the base path from the canonical URL
+      let finalPath = finalUrl.pathname;
+      if (finalPath.endsWith('/') && finalPath !== '/') {
+        finalPath = finalPath.slice(0, -1);
+      }
+      if (finalPath === '/') {
+        finalPath = '';
+      }
+      canonicalBasePath = finalPath;
+      
+      console.log(`[Scanner] Canonical origin: ${canonicalOrigin}, path: ${canonicalBasePath || '/'}`);
+    } else {
+      console.log(`[Scanner] Initial request returned ${initialResponse.status}, using original origin`);
+    }
+  } catch (error) {
+    console.log(`[Scanner] Could not detect canonical URL, using original: ${canonicalOrigin}`);
+  }
 
   let robotsTxtFound = false;
   let robotsTxtContent: string | null = null;
 
+  // robots.txt must always be at the domain root per RFC 9309
   try {
-    console.log(`[Scanner] Fetching ${baseUrl}/robots.txt`);
-    const robotsResponse = await fetch(`${baseUrl}/robots.txt`, {
+    console.log(`[Scanner] Fetching ${canonicalOrigin}/robots.txt`);
+    const robotsResponse = await fetch(`${canonicalOrigin}/robots.txt`, {
       headers: { 
         'User-Agent': 'RoboscanBot/1.0',
         'Accept': 'text/plain,*/*'
@@ -160,28 +219,51 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   let llmsTxtFound = false;
   let llmsTxtContent: string | null = null;
 
-  try {
-    console.log(`[Scanner] Fetching ${baseUrl}/llms.txt`);
-    const llmsResponse = await fetch(`${baseUrl}/llms.txt`, {
-      headers: { 
-        'User-Agent': 'RoboscanBot/1.0',
-        'Accept': 'text/plain,*/*'
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
-    });
+  // llms.txt: try canonical path first, then fall back to domain root
+  const llmsTxtUrls: string[] = [];
+  
+  // If there's a canonical path, check there first
+  if (canonicalBasePath && canonicalBasePath !== '') {
+    llmsTxtUrls.push(`${canonicalOrigin}${canonicalBasePath}/llms.txt`);
+  }
+  
+  // Always also check the domain root as fallback (avoid duplicates)
+  const rootUrl = `${canonicalOrigin}/llms.txt`;
+  if (!llmsTxtUrls.includes(rootUrl)) {
+    llmsTxtUrls.push(rootUrl);
+  }
 
-    console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
+  for (const llmsTxtUrl of llmsTxtUrls) {
+    // Skip if we already found it
+    if (llmsTxtFound) break;
 
-    if (llmsResponse.ok) {
-      llmsTxtFound = true;
-      llmsTxtContent = await llmsResponse.text();
-    } else {
-      console.log(`[Scanner] llms.txt not found (status ${llmsResponse.status})`);
+    try {
+      console.log(`[Scanner] Fetching ${llmsTxtUrl}`);
+      const llmsResponse = await fetch(llmsTxtUrl, {
+        headers: { 
+          'User-Agent': 'RoboscanBot/1.0',
+          'Accept': 'text/plain,*/*'
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(10000),
+      });
+
+      console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
+
+      if (llmsResponse.ok) {
+        llmsTxtFound = true;
+        llmsTxtContent = await llmsResponse.text();
+        console.log(`[Scanner] llms.txt found at ${llmsTxtUrl}`);
+      } else {
+        console.log(`[Scanner] llms.txt not found at ${llmsTxtUrl} (status ${llmsResponse.status})`);
+      }
+    } catch (error) {
+      console.error(`[Scanner] Error fetching llms.txt from ${llmsTxtUrl}:`, error);
+      // Only add error if this was the last URL to try
+      if (llmsTxtUrl === llmsTxtUrls[llmsTxtUrls.length - 1] && !llmsTxtFound) {
+        errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
-  } catch (error) {
-    console.error('[Scanner] Error fetching llms.txt:', error);
-    errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
   // If no robots.txt was found, default to allowed

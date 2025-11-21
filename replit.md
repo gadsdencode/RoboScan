@@ -44,7 +44,11 @@ Request validation uses Zod schemas for type-safe input validation.
 - Notification preferences and delivery
 All database operations use Drizzle's type-safe query builder.
 
-**Scanner Logic**: Custom website scanner fetches and parses robots.txt and llms.txt files from target domains. It normalizes URLs, handles timeouts, extracts bot permissions, and returns structured results with errors and warnings.
+**Scanner Logic**: Custom website scanner fetches and parses robots.txt and llms.txt files from target domains. Key features:
+- **Canonical URL Detection**: Makes an initial GET request to detect the final URL after redirects (handling www vs non-www, http vs https)
+- **Subdirectory Support**: For llms.txt, checks both the user-provided path and the domain root as fallback
+- **RFC Compliance**: robots.txt always checked at domain root per RFC 9309
+- **Error Handling**: Normalizes URLs, handles timeouts (10s), extracts bot permissions, and returns structured results with errors and warnings
 
 **Change Detection**: Compares previous and current scan results to identify:
 - robots.txt content changes
