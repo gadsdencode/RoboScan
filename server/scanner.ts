@@ -95,7 +95,6 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   }
 
   const parsedUrl = new URL(normalizedUrl);
-  const baseUrl = parsedUrl.origin;
   
   // Extract the directory path from the URL, removing trailing slash
   // Examples:
@@ -115,13 +114,53 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
     basePath = '';
   }
 
+  // Detect the canonical URL by making an initial request and following redirects
+  // This handles cases where example.com redirects to www.example.com or vice versa
+  let canonicalOrigin = parsedUrl.origin;
+  let canonicalBasePath = basePath;
+  
+  try {
+    console.log(`[Scanner] Detecting canonical URL for ${normalizedUrl}`);
+    const initialResponse = await fetch(normalizedUrl, {
+      method: 'GET',
+      headers: { 
+        'User-Agent': 'RoboscanBot/1.0',
+        'Accept': 'text/html,*/*'
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (initialResponse.ok) {
+      // Use the final URL after redirects as the canonical origin
+      const finalUrl = new URL(initialResponse.url);
+      canonicalOrigin = finalUrl.origin;
+      
+      // Also update the base path from the canonical URL
+      let finalPath = finalUrl.pathname;
+      if (finalPath.endsWith('/') && finalPath !== '/') {
+        finalPath = finalPath.slice(0, -1);
+      }
+      if (finalPath === '/') {
+        finalPath = '';
+      }
+      canonicalBasePath = finalPath;
+      
+      console.log(`[Scanner] Canonical origin: ${canonicalOrigin}, path: ${canonicalBasePath || '/'}`);
+    } else {
+      console.log(`[Scanner] Initial request returned ${initialResponse.status}, using original origin`);
+    }
+  } catch (error) {
+    console.log(`[Scanner] Could not detect canonical URL, using original: ${canonicalOrigin}`);
+  }
+
   let robotsTxtFound = false;
   let robotsTxtContent: string | null = null;
 
   // robots.txt must always be at the domain root per RFC 9309
   try {
-    console.log(`[Scanner] Fetching ${baseUrl}/robots.txt`);
-    const robotsResponse = await fetch(`${baseUrl}/robots.txt`, {
+    console.log(`[Scanner] Fetching ${canonicalOrigin}/robots.txt`);
+    const robotsResponse = await fetch(`${canonicalOrigin}/robots.txt`, {
       headers: { 
         'User-Agent': 'RoboscanBot/1.0',
         'Accept': 'text/plain,*/*'
@@ -180,16 +219,19 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
   let llmsTxtFound = false;
   let llmsTxtContent: string | null = null;
 
-  // llms.txt: try user's provided path first, then fall back to domain root
+  // llms.txt: try canonical path first, then fall back to domain root
   const llmsTxtUrls: string[] = [];
   
-  // If user provided a path, check there first
-  if (basePath && basePath !== '') {
-    llmsTxtUrls.push(`${baseUrl}${basePath}/llms.txt`);
+  // If there's a canonical path, check there first
+  if (canonicalBasePath && canonicalBasePath !== '') {
+    llmsTxtUrls.push(`${canonicalOrigin}${canonicalBasePath}/llms.txt`);
   }
   
-  // Always also check the domain root as fallback
-  llmsTxtUrls.push(`${baseUrl}/llms.txt`);
+  // Always also check the domain root as fallback (avoid duplicates)
+  const rootUrl = `${canonicalOrigin}/llms.txt`;
+  if (!llmsTxtUrls.includes(rootUrl)) {
+    llmsTxtUrls.push(rootUrl);
+  }
 
   for (const llmsTxtUrl of llmsTxtUrls) {
     // Skip if we already found it
