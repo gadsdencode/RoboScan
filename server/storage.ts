@@ -92,21 +92,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserScans(userId: string, tagFilter?: string[]): Promise<Scan[]> {
-    let query = db
-      .select()
-      .from(scans)
-      .where(eq(scans.userId, userId));
-
     if (tagFilter && tagFilter.length > 0) {
-      query = query.where(
-        and(
-          eq(scans.userId, userId),
-          sql`${scans.tags} && ${tagFilter}`
+      return await db
+        .select()
+        .from(scans)
+        .where(
+          and(
+            eq(scans.userId, userId),
+            sql`${scans.tags} && ${tagFilter}`
+          )
         )
-      );
+        .orderBy(desc(scans.createdAt));
     }
 
-    return await query.orderBy(desc(scans.createdAt));
+    return await db
+      .select()
+      .from(scans)
+      .where(eq(scans.userId, userId))
+      .orderBy(desc(scans.createdAt));
   }
 
   async updateScanTags(id: number, tags: string[]): Promise<Scan> {

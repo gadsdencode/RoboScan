@@ -57,7 +57,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/user/scans', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const scans = await storage.getUserScans(userId);
+      
+      // Parse tag filter from query params
+      const tagFilter = req.query.tags ? 
+        (Array.isArray(req.query.tags) ? req.query.tags : [req.query.tags]) : 
+        undefined;
+      
+      const scans = await storage.getUserScans(userId, tagFilter);
       
       // Add purchase status to each scan (only user's own scans)
       const scansWithPurchaseStatus = await Promise.all(
@@ -497,6 +503,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Update preferences error:', error);
       res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
+  // Tag management routes (require authentication)
+  app.patch("/api/scans/:id/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const scanId = parseInt(req.params.id);
+      
+      const scan = await storage.getScan(scanId);
+      if (!scan) {
+        return res.status(404).json({ message: "Scan not found" });
+      }
+
+      // Security: Verify ownership
+      if (scan.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { tags } = z.object({
+        tags: z.array(z.string()).default([]),
+      }).parse(req.body);
+
+      const updatedScan = await storage.updateScanTags(scanId, tags);
+      res.json(updatedScan);
+    } catch (error) {
+      console.error('Update tags error:', error);
+      res.status(500).json({ message: "Failed to update tags" });
+    }
+  });
+
+  app.get("/api/user/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tags = await storage.getAllUserTags(userId);
+      res.json(tags);
+    } catch (error) {
+      console.error('Get tags error:', error);
+      res.status(500).json({ message: "Failed to get tags" });
     }
   });
 
