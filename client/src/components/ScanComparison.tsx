@@ -336,7 +336,7 @@ export function ScanComparison({ oldScan, newScan, onClose }: ScanComparisonProp
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onClose} data-testid="button-done">
+        <Button variant="outline" onClick={onClose} className="btn-hover-lift" data-testid="button-done">
           Done
         </Button>
       </div>
