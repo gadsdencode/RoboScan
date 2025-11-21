@@ -27,6 +27,18 @@ const scanRequestSchema = z.object({
   url: z.string().min(1, "URL is required"),
 });
 
+function parsePositiveInt(value: any, defaultValue: number, min: number = 1, max: number = 100): number {
+  const parsed = parseInt(value);
+  if (isNaN(parsed) || parsed < min) return defaultValue;
+  return Math.min(parsed, max);
+}
+
+function parseNonNegativeInt(value: any, defaultValue: number): number {
+  const parsed = parseInt(value);
+  if (isNaN(parsed) || parsed < 0) return defaultValue;
+  return parsed;
+}
+
 const createPaymentSchema = z.object({
   scanId: z.number(),
 });
@@ -63,7 +75,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (Array.isArray(req.query.tags) ? req.query.tags : [req.query.tags]) : 
         undefined;
       
-      const scans = await storage.getUserScans(userId, tagFilter);
+      // Parse pagination params with validation
+      const limit = parsePositiveInt(req.query.limit, 50, 1, 100);
+      const offset = parseNonNegativeInt(req.query.offset, 0);
+      
+      const scans = await storage.getUserScans(userId, tagFilter, limit, offset);
       
       // Add purchase status to each scan (only user's own scans)
       const scansWithPurchaseStatus = await Promise.all(
@@ -397,8 +413,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const notifications = await storage.getUserNotifications(userId, limit);
+      const limit = parsePositiveInt(req.query.limit, 50, 1, 100);
+      const offset = parseNonNegativeInt(req.query.offset, 0);
+      const notifications = await storage.getUserNotifications(userId, limit, offset);
       res.json(notifications);
     } catch (error) {
       console.error('Get notifications error:', error);
