@@ -69,3 +69,70 @@ export const insertPurchaseSchema = createInsertSchema(purchases).omit({
 
 export type InsertPurchase = z.infer<typeof insertPurchaseSchema>;
 export type Purchase = typeof purchases.$inferSelect;
+
+// Recurring scans configuration
+export const recurringScans = pgTable("recurring_scans", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  url: text("url").notNull(),
+  frequency: text("frequency").notNull(), // 'daily', 'weekly', 'monthly'
+  isActive: boolean("is_active").notNull().default(true),
+  lastScanId: integer("last_scan_id").references(() => scans.id),
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRecurringScanSchema = createInsertSchema(recurringScans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRecurringScan = z.infer<typeof insertRecurringScanSchema>;
+export type RecurringScan = typeof recurringScans.$inferSelect;
+
+// Notification preferences for recurring scans
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: serial("id").primaryKey(),
+  recurringScanId: integer("recurring_scan_id").notNull().references(() => recurringScans.id),
+  notifyOnRobotsTxtChange: boolean("notify_on_robots_txt_change").notNull().default(true),
+  notifyOnLlmsTxtChange: boolean("notify_on_llms_txt_change").notNull().default(true),
+  notifyOnBotPermissionChange: boolean("notify_on_bot_permission_change").notNull().default(true),
+  notifyOnNewErrors: boolean("notify_on_new_errors").notNull().default(true),
+  notificationMethod: text("notification_method").notNull().default("in-app"), // 'in-app', 'email', 'both'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertNotificationPreferenceSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>;
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+
+// Notifications table to store change alerts
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  recurringScanId: integer("recurring_scan_id").references(() => recurringScans.id),
+  scanId: integer("scan_id").references(() => scans.id),
+  type: text("type").notNull(), // 'robots_txt_change', 'llms_txt_change', 'bot_permission_change', 'new_errors'
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  changes: jsonb("changes").$type<Record<string, any>>(),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

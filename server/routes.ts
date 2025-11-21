@@ -282,6 +282,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recurring scans routes (require authentication)
+  app.post("/api/recurring-scans", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { url, frequency, notificationPreferences } = z.object({
+        url: z.string().min(1),
+        frequency: z.enum(['daily', 'weekly', 'monthly']),
+        notificationPreferences: z.object({
+          notifyOnRobotsTxtChange: z.boolean().default(true),
+          notifyOnLlmsTxtChange: z.boolean().default(true),
+          notifyOnBotPermissionChange: z.boolean().default(true),
+          notifyOnNewErrors: z.boolean().default(true),
+          notificationMethod: z.enum(['in-app', 'email', 'both']).default('in-app'),
+        }).optional(),
+      }).parse(req.body);
+
+      const nextRunAt = new Date(Date.now() + 60 * 1000); // First run in 1 minute
+
+      const recurringScan = await storage.createRecurringScan({
+        userId,
+        url,
+        frequency,
+        isActive: true,
+        nextRunAt,
+      });
+
+      // Create notification preferences
+      const prefs = notificationPreferences || {};
+      await storage.createNotificationPreference({
+        recurringScanId: recurringScan.id,
+        notifyOnRobotsTxtChange: prefs.notifyOnRobotsTxtChange ?? true,
+        notifyOnLlmsTxtChange: prefs.notifyOnLlmsTxtChange ?? true,
+        notifyOnBotPermissionChange: prefs.notifyOnBotPermissionChange ?? true,
+        notifyOnNewErrors: prefs.notifyOnNewErrors ?? true,
+        notificationMethod: prefs.notificationMethod || 'in-app',
+      });
+
+      res.json(recurringScan);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request", errors: error.errors });
+      }
+      console.error('Create recurring scan error:', error);
+      res.status(500).json({ message: "Failed to create recurring scan" });
+    }
+  });
+
+  app.get("/api/recurring-scans", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const scans = await storage.getUserRecurringScans(userId);
+      res.json(scans);
+    } catch (error) {
+      console.error('Get recurring scans error:', error);
+      res.status(500).json({ message: "Failed to get recurring scans" });
+    }
+  });
+
+  app.patch("/api/recurring-scans/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      const recurringScan = await storage.getRecurringScan(id);
+      if (!recurringScan || recurringScan.userId !== userId) {
+        return res.status(404).json({ message: "Recurring scan not found" });
+      }
+
+      const { isActive, frequency } = z.object({
+        isActive: z.boolean().optional(),
+        frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+      }).parse(req.body);
+
+      // Only include defined fields
+      const updates: any = {};
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (frequency !== undefined) updates.frequency = frequency;
+
+      const updated = await storage.updateRecurringScan(id, updates);
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Update recurring scan error:', error);
+      res.status(500).json({ message: "Failed to update recurring scan" });
+    }
+  });
+
+  app.delete("/api/recurring-scans/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      const recurringScan = await storage.getRecurringScan(id);
+      if (!recurringScan || recurringScan.userId !== userId) {
+        return res.status(404).json({ message: "Recurring scan not found" });
+      }
+
+      await storage.deleteRecurringScan(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete recurring scan error:', error);
+      res.status(500).json({ message: "Failed to delete recurring scan" });
+    }
+  });
+
+  // Notification routes (require authentication)
+  app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const notifications = await storage.getUserNotifications(userId, limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Get notifications error:', error);
+      res.status(500).json({ message: "Failed to get notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error('Get unread count error:', error);
+      res.status(500).json({ message: "Failed to get unread count" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.markNotificationAsRead(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Mark notification read error:', error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.post("/api/notifications/mark-all-read", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.markAllNotificationsAsRead(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Mark all read error:', error);
+      res.status(500).json({ message: "Failed to mark all as read" });
+    }
+  });
+
+  app.get("/api/recurring-scans/:id/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      const recurringScan = await storage.getRecurringScan(id);
+      if (!recurringScan) {
+        return res.status(404).json({ message: "Recurring scan not found" });
+      }
+
+      // Security: Verify ownership
+      if (recurringScan.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const prefs = await storage.getNotificationPreferenceByRecurringScanId(id);
+      res.json(prefs);
+    } catch (error) {
+      console.error('Get preferences error:', error);
+      res.status(500).json({ message: "Failed to get preferences" });
+    }
+  });
+
+  app.patch("/api/recurring-scans/:id/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      
+      const recurringScan = await storage.getRecurringScan(id);
+      if (!recurringScan) {
+        return res.status(404).json({ message: "Recurring scan not found" });
+      }
+
+      // Security: Verify ownership
+      if (recurringScan.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const prefs = await storage.getNotificationPreferenceByRecurringScanId(id);
+      if (!prefs) {
+        return res.status(404).json({ message: "Preferences not found" });
+      }
+
+      const parsed = z.object({
+        notifyOnRobotsTxtChange: z.boolean().optional(),
+        notifyOnLlmsTxtChange: z.boolean().optional(),
+        notifyOnBotPermissionChange: z.boolean().optional(),
+        notifyOnNewErrors: z.boolean().optional(),
+        notificationMethod: z.enum(['in-app', 'email', 'both']).optional(),
+      }).parse(req.body);
+
+      // Only include defined fields
+      const updates: any = {};
+      if (parsed.notifyOnRobotsTxtChange !== undefined) updates.notifyOnRobotsTxtChange = parsed.notifyOnRobotsTxtChange;
+      if (parsed.notifyOnLlmsTxtChange !== undefined) updates.notifyOnLlmsTxtChange = parsed.notifyOnLlmsTxtChange;
+      if (parsed.notifyOnBotPermissionChange !== undefined) updates.notifyOnBotPermissionChange = parsed.notifyOnBotPermissionChange;
+      if (parsed.notifyOnNewErrors !== undefined) updates.notifyOnNewErrors = parsed.notifyOnNewErrors;
+      if (parsed.notificationMethod !== undefined) updates.notificationMethod = parsed.notificationMethod;
+
+      const updated = await storage.updateNotificationPreference(prefs.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('Update preferences error:', error);
+      res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
