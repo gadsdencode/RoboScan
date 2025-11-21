@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X } from "lucide-react";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { PaymentModal } from "@/components/PaymentModal";
+import { ScanComparison } from "@/components/ScanComparison";
 import { 
   Dialog, 
   DialogContent, 
@@ -95,6 +96,13 @@ export default function Dashboard() {
   const [selectedRecurringScan, setSelectedRecurringScan] = useState<RecurringScan | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+
+  // Comparison state
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [selectedScanForComparison, setSelectedScanForComparison] = useState<ScanWithPurchase | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonOldScan, setComparisonOldScan] = useState<ScanWithPurchase | null>(null);
+  const [comparisonNewScan, setComparisonNewScan] = useState<ScanWithPurchase | null>(null);
 
   useEffect(() => {
     fetchScans();
@@ -383,6 +391,51 @@ export default function Dashboard() {
     return then.toLocaleDateString();
   };
 
+  const handleCompareScans = (scan: ScanWithPurchase) => {
+    if (!comparisonMode) {
+      setComparisonMode(true);
+      setSelectedScanForComparison(scan);
+    } else {
+      if (selectedScanForComparison && selectedScanForComparison.id !== scan.id) {
+        // Determine which is older
+        const oldScan = new Date(selectedScanForComparison.createdAt) < new Date(scan.createdAt) 
+          ? selectedScanForComparison 
+          : scan;
+        const newScan = new Date(selectedScanForComparison.createdAt) < new Date(scan.createdAt) 
+          ? scan 
+          : selectedScanForComparison;
+        
+        setComparisonOldScan(oldScan);
+        setComparisonNewScan(newScan);
+        setShowComparison(true);
+        setComparisonMode(false);
+        setSelectedScanForComparison(null);
+      }
+    }
+  };
+
+  const cancelComparison = () => {
+    setComparisonMode(false);
+    setSelectedScanForComparison(null);
+  };
+
+  const getScansForUrl = (url: string) => {
+    return scans.filter(s => s.url === url).sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  };
+
+  const handleQuickCompare = (scan: ScanWithPurchase) => {
+    const urlScans = getScansForUrl(scan.url);
+    if (urlScans.length >= 2) {
+      const latest = urlScans[0];
+      const previous = urlScans[1];
+      setComparisonOldScan(previous);
+      setComparisonNewScan(latest);
+      setShowComparison(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -606,10 +659,40 @@ export default function Dashboard() {
           <>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold">Your Scans</h2>
-              <span className="text-sm text-muted-foreground">{scans.length} {scans.length === 1 ? 'scan' : 'scans'}</span>
+              <div className="flex items-center gap-3">
+                {comparisonMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={cancelComparison}
+                    data-testid="button-cancel-comparison"
+                  >
+                    Cancel Comparison
+                  </Button>
+                )}
+                <span className="text-sm text-muted-foreground">{scans.length} {scans.length === 1 ? 'scan' : 'scans'}</span>
+              </div>
             </div>
+
+            {comparisonMode && selectedScanForComparison && (
+              <Card className="p-4 bg-primary/10 border-primary/30 mb-4">
+                <div className="flex items-center gap-2">
+                  <GitCompare className="w-5 h-5 text-primary" />
+                  <p className="text-sm">
+                    <span className="font-semibold">Comparison Mode:</span> Select another scan of <span className="font-mono">{selectedScanForComparison.url}</span> to compare
+                  </p>
+                </div>
+              </Card>
+            )}
+
           <div className="space-y-4">
-            {scans.map((scan) => (
+            {scans.map((scan) => {
+              const urlScans = getScansForUrl(scan.url);
+              const canQuickCompare = urlScans.length >= 2;
+              const isLatestForUrl = urlScans[0]?.id === scan.id;
+              const isSelectedForComparison = selectedScanForComparison?.id === scan.id;
+              
+              return (
               <Card 
                 key={scan.id} 
                 className="p-6 bg-card border-white/5 hover:border-primary/20 transition-all"
@@ -810,8 +893,38 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
+
+                {/* Comparison Actions */}
+                <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {canQuickCompare && isLatestForUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuickCompare(scan)}
+                        className="border-primary/30"
+                        data-testid={`button-quick-compare-${scan.id}`}
+                      >
+                        <GitCompare className="w-4 h-4 mr-2" />
+                        Compare with Previous
+                      </Button>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCompareScans(scan)}
+                    disabled={comparisonMode && selectedScanForComparison?.url !== scan.url}
+                    className={isSelectedForComparison ? "bg-primary/20 border border-primary/30" : ""}
+                    data-testid={`button-compare-${scan.id}`}
+                  >
+                    <GitCompare className="w-4 h-4 mr-2" />
+                    {isSelectedForComparison ? 'Selected' : 'Select to Compare'}
+                  </Button>
+                </div>
               </Card>
-            ))}
+            );
+            })}
           </div>
           </>
         )}
@@ -1089,6 +1202,23 @@ export default function Dashboard() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Scan Comparison Dialog */}
+      <Dialog open={showComparison} onOpenChange={setShowComparison}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          {comparisonOldScan && comparisonNewScan && (
+            <ScanComparison
+              oldScan={comparisonOldScan}
+              newScan={comparisonNewScan}
+              onClose={() => {
+                setShowComparison(false);
+                setComparisonOldScan(null);
+                setComparisonNewScan(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
