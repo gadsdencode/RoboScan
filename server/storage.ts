@@ -20,7 +20,7 @@ import {
   type InsertNotification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, lte } from "drizzle-orm";
+import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -30,7 +30,9 @@ export interface IStorage {
   // Scan operations
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: number): Promise<Scan | undefined>;
-  getUserScans(userId: string): Promise<Scan[]>;
+  getUserScans(userId: string, tagFilter?: string[]): Promise<Scan[]>;
+  updateScanTags(id: number, tags: string[]): Promise<Scan>;
+  getAllUserTags(userId: string): Promise<string[]>;
   
   // Purchase operations
   createPurchase(purchase: InsertPurchase): Promise<Purchase>;
@@ -89,12 +91,47 @@ export class DatabaseStorage implements IStorage {
     return scan;
   }
 
-  async getUserScans(userId: string): Promise<Scan[]> {
-    return await db
+  async getUserScans(userId: string, tagFilter?: string[]): Promise<Scan[]> {
+    let query = db
       .select()
       .from(scans)
-      .where(eq(scans.userId, userId))
-      .orderBy(desc(scans.createdAt));
+      .where(eq(scans.userId, userId));
+
+    if (tagFilter && tagFilter.length > 0) {
+      query = query.where(
+        and(
+          eq(scans.userId, userId),
+          sql`${scans.tags} && ${tagFilter}`
+        )
+      );
+    }
+
+    return await query.orderBy(desc(scans.createdAt));
+  }
+
+  async updateScanTags(id: number, tags: string[]): Promise<Scan> {
+    const [scan] = await db
+      .update(scans)
+      .set({ tags })
+      .where(eq(scans.id, id))
+      .returning();
+    return scan;
+  }
+
+  async getAllUserTags(userId: string): Promise<string[]> {
+    const userScans = await db
+      .select({ tags: scans.tags })
+      .from(scans)
+      .where(eq(scans.userId, userId));
+
+    const allTags = new Set<string>();
+    userScans.forEach((scan) => {
+      if (scan.tags) {
+        scan.tags.forEach((tag) => allTags.add(tag));
+      }
+    });
+
+    return Array.from(allTags).sort();
   }
 
   async createPurchase(insertPurchase: InsertPurchase): Promise<Purchase> {
