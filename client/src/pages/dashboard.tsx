@@ -450,10 +450,10 @@ export default function Dashboard() {
             {/* Notifications Bell */}
             <button
               onClick={() => setShowNotificationsSheet(true)}
-              className="relative p-2 hover:bg-white/5 rounded-lg transition-colors"
+              className="relative p-2 hover:bg-white/5 rounded-lg transition-smooth btn-hover-scale group"
               data-testid="button-notifications"
             >
-              <Bell className="w-5 h-5 text-muted-foreground" />
+              <Bell className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -479,7 +479,7 @@ export default function Dashboard() {
               variant="outline" 
               size="sm"
               onClick={() => window.location.href = '/api/logout'}
-              className="border-white/10"
+              className="border-white/10 btn-hover-scale"
               data-testid="button-logout"
             >
               <LogOut className="w-4 h-4 mr-2" />
@@ -520,7 +520,7 @@ export default function Dashboard() {
             <Button
               onClick={handleScan}
               disabled={isScanning || !scanUrl.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 btn-hover-glow btn-hover-lift"
               data-testid="button-scan"
             >
               {isScanning ? (
@@ -554,7 +554,7 @@ export default function Dashboard() {
             <Button
               onClick={() => setShowCreateRecurringDialog(true)}
               size="sm"
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 btn-hover-scale"
               data-testid="button-create-recurring"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -607,27 +607,29 @@ export default function Dashboard() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleToggleRecurringScan(scan.id, scan.isActive)}
+                        className="btn-hover-scale group"
                         data-testid={`button-toggle-${scan.id}`}
                       >
                         {scan.isActive ? (
-                          <Pause className="w-4 h-4" />
+                          <Pause className="w-4 h-4 group-hover:text-primary transition-colors" />
                         ) : (
-                          <Play className="w-4 h-4" />
+                          <Play className="w-4 h-4 group-hover:text-primary transition-colors" />
                         )}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleOpenPreferences(scan)}
+                        className="btn-hover-scale group"
                         data-testid={`button-preferences-${scan.id}`}
                       >
-                        <Settings className="w-4 h-4" />
+                        <Settings className="w-4 h-4 group-hover:text-primary transition-colors" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteRecurringScan(scan.id)}
-                        className="text-red-400 hover:text-red-300"
+                        className="text-red-400 hover:text-red-300 btn-hover-scale"
                         data-testid={`button-delete-${scan.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -695,7 +697,7 @@ export default function Dashboard() {
               return (
               <Card 
                 key={scan.id} 
-                className="p-6 bg-card border-white/5 hover:border-primary/20 transition-all"
+                className="p-6 bg-card border-white/5 hover:border-primary/20 card-hover"
                 data-testid={`scan-card-${scan.id}`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -856,7 +858,7 @@ export default function Dashboard() {
                             <div className="flex items-center gap-3">
                               <Button
                                 onClick={() => handleUnlock(scan)}
-                                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+                                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
                                 data-testid={`button-unlock-${scan.id}`}
                               >
                                 <Sparkles className="w-4 h-4 mr-2" />
@@ -902,10 +904,10 @@ export default function Dashboard() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleQuickCompare(scan)}
-                        className="border-primary/30"
+                        className="border-primary/30 btn-hover-lift group"
                         data-testid={`button-quick-compare-${scan.id}`}
                       >
-                        <GitCompare className="w-4 h-4 mr-2" />
+                        <GitCompare className="w-4 h-4 mr-2 group-hover:text-primary transition-colors" />
                         Compare with Previous
                       </Button>
                     )}
@@ -915,7 +917,7 @@ export default function Dashboard() {
                     size="sm"
                     onClick={() => handleCompareScans(scan)}
                     disabled={comparisonMode && selectedScanForComparison?.url !== scan.url}
-                    className={isSelectedForComparison ? "bg-primary/20 border border-primary/30" : ""}
+                    className={`btn-hover-scale ${isSelectedForComparison ? "bg-primary/20 border border-primary/30" : ""}`}
                     data-testid={`button-compare-${scan.id}`}
                   >
                     <GitCompare className="w-4 h-4 mr-2" />
@@ -990,7 +992,7 @@ export default function Dashboard() {
             <Button
               onClick={handleCreateRecurringScan}
               disabled={isCreatingRecurring || !newRecurringUrl.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 btn-hover-lift"
               data-testid="button-confirm-recurring"
             >
               {isCreatingRecurring ? 'Creating...' : 'Create Scan'}
@@ -1106,7 +1108,7 @@ export default function Dashboard() {
             <Button
               onClick={handleSavePreferences}
               disabled={isSavingPreferences}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 btn-hover-lift"
               data-testid="button-save-preferences"
             >
               {isSavingPreferences ? 'Saving...' : 'Save Changes'}

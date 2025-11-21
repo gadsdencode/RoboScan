@@ -25,14 +25,14 @@ const Navbar = () => {
           <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pricing</a>
           <Button 
             variant="outline" 
-            className="border-primary/50 text-primary hover:bg-primary/10"
+            className="border-primary/50 text-primary hover:bg-primary/10 btn-hover-scale"
             onClick={() => window.location.href = '/api/login'}
             data-testid="button-login"
           >
             Login
           </Button>
           <Button 
-            className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
             onClick={() => window.location.href = '/api/login'}
             data-testid="button-get-started"
           >
@@ -128,7 +128,7 @@ const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
             <Button 
               type="submit" 
               size="lg" 
-              className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+              className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
               data-testid="button-scan"
             >
               Scan Now
