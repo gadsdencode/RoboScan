@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PremiumReport } from "@/components/PremiumReport";
+import { useAuth } from "@/hooks/useAuth";
 import heroBg from "@assets/generated_images/cybernetic_data_scanning_visualization.png";
 
 const Navbar = () => {
@@ -476,11 +477,19 @@ export default function Home() {
     setCurrentScanId(scanId);
   }, []);
 
+  const { user } = useAuth();
+
   const handleUnlockReport = useCallback(() => {
+    if (!user) {
+      // Redirect to login if not authenticated
+      window.location.href = '/api/login';
+      return;
+    }
+    
     if (currentScanId) {
       setShowPaymentModal(true);
     }
-  }, [currentScanId]);
+  }, [currentScanId, user]);
 
   const handlePaymentSuccess = useCallback(async () => {
     setShowPaymentModal(false);
