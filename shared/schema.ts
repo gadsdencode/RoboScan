@@ -41,6 +41,7 @@ export const scans = pgTable("scans", {
   botPermissions: jsonb("bot_permissions").$type<Record<string, string>>(),
   errors: jsonb("errors").$type<string[]>(),
   warnings: jsonb("warnings").$type<string[]>(),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
