@@ -22,7 +22,6 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Features</a>
           <a href="#demo" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Live Demo</a>
-          <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Pricing</a>
           <Button 
             variant="outline" 
             className="border-primary/50 text-primary hover:bg-primary/10 btn-hover-scale"
@@ -56,7 +55,6 @@ const Navbar = () => {
             <div className="flex flex-col p-6 gap-4">
               <a href="#features" className="text-sm font-medium" onClick={() => setIsOpen(false)}>Features</a>
               <a href="#demo" className="text-sm font-medium" onClick={() => setIsOpen(false)}>Live Demo</a>
-              <a href="#pricing" className="text-sm font-medium" onClick={() => setIsOpen(false)}>Pricing</a>
               <Button 
                 className="w-full bg-primary text-primary-foreground"
                 onClick={() => window.location.href = '/api/login'}
