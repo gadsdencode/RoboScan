@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles } from "lucide-react";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { PaymentModal } from "@/components/PaymentModal";
@@ -18,6 +19,9 @@ export default function Dashboard() {
   const [selectedScan, setSelectedScan] = useState<ScanWithPurchase | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
+  const [scanUrl, setScanUrl] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchScans();
@@ -57,6 +61,38 @@ export default function Dashboard() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleScan = async () => {
+    if (!scanUrl.trim()) return;
+
+    setIsScanning(true);
+    setScanError(null);
+
+    try {
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: scanUrl }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to scan website');
+      }
+
+      await response.json();
+      
+      // Refresh scans list
+      await fetchScans();
+      setScanUrl("");
+    } catch (error) {
+      console.error('Scan error:', error);
+      setScanError(error instanceof Error ? error.message : 'Failed to scan website');
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   return (
@@ -109,6 +145,50 @@ export default function Dashboard() {
           </p>
         </div>
 
+        {/* Scan Input Section */}
+        <Card className="p-6 bg-card border-white/5 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Search className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold">Scan a New Website</h2>
+          </div>
+          <div className="flex gap-3">
+            <Input
+              type="url"
+              placeholder="Enter website URL (e.g., example.com)"
+              value={scanUrl}
+              onChange={(e) => setScanUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !isScanning && handleScan()}
+              disabled={isScanning}
+              className="flex-1 bg-background border-white/10 focus:border-primary"
+              data-testid="input-scan-url"
+            />
+            <Button
+              onClick={handleScan}
+              disabled={isScanning || !scanUrl.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8"
+              data-testid="button-scan"
+            >
+              {isScanning ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="w-4 h-4 mr-2" />
+                  Scan
+                </>
+              )}
+            </Button>
+          </div>
+          {scanError && (
+            <div className="mt-3 text-sm text-red-400 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {scanError}
+            </div>
+          )}
+        </Card>
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -119,17 +199,16 @@ export default function Dashboard() {
               <FileText className="w-8 h-8 text-primary" />
             </div>
             <h3 className="text-xl font-bold mb-2">No scans yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Start by scanning your first website to see how AI bots interact with it
+            <p className="text-muted-foreground">
+              Use the scan input above to analyze your first website
             </p>
-            <Button 
-              onClick={() => window.location.href = '/'}
-              className="bg-primary text-primary-foreground"
-            >
-              Scan a Website
-            </Button>
           </Card>
         ) : (
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold">Your Scans</h2>
+              <span className="text-sm text-muted-foreground">{scans.length} {scans.length === 1 ? 'scan' : 'scans'}</span>
+            </div>
           <div className="space-y-4">
             {scans.map((scan) => (
               <Card 
@@ -275,6 +354,7 @@ export default function Dashboard() {
               </Card>
             ))}
           </div>
+          </>
         )}
       </div>
 
