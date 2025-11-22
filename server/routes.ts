@@ -7,6 +7,7 @@ import { generateOptimizationReport } from "./report-generator";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { z } from "zod";
 import Stripe from "stripe";
+import { getBotUserAgent } from "@shared/bot-user-agents";
 
 // Validate required environment variables
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -653,6 +654,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ 
         isValid: false,
         errors: ["Invalid request format"] 
+      });
+    }
+  });
+
+  app.post("/api/test-bot-access", async (req, res) => {
+    try {
+      const { url, botName } = z.object({
+        url: z.string().url("Invalid URL"),
+        botName: z.string().min(1, "Bot name is required"),
+      }).parse(req.body);
+
+      const botUserAgent = getBotUserAgent(botName);
+
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          headers: {
+            'User-Agent': botUserAgent,
+          },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(10000),
+        });
+
+        res.json({
+          status: response.status,
+          accessible: response.ok,
+          statusText: response.statusText,
+        });
+      } catch (fetchError) {
+        console.error('Bot access test error:', fetchError);
+        res.json({
+          status: 0,
+          accessible: false,
+          statusText: "Connection failed",
+          error: fetchError instanceof Error ? fetchError.message : "Unknown error",
+        });
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid request",
+          errors: error.errors,
+        });
+      }
+
+      console.error('Test bot access error:', error);
+      res.status(500).json({
+        message: "Failed to test bot access",
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   });

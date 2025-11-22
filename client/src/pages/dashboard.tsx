@@ -112,6 +112,10 @@ export default function Dashboard() {
   const [tagInput, setTagInput] = useState("");
   const [showTagFilter, setShowTagFilter] = useState(false);
 
+  // Bot access testing state
+  const [botAccessTests, setBotAccessTests] = useState<Record<string, { status: number; accessible: boolean; statusText: string; loading?: boolean }>>({});
+  const [testingBots, setTestingBots] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     fetchScans();
     fetchRecurringScans();
@@ -217,6 +221,50 @@ export default function Dashboard() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const testBotAccess = async (scanUrl: string, botName: string) => {
+    const testKey = `${scanUrl}-${botName}`;
+    
+    setTestingBots(prev => new Set(prev).add(testKey));
+    
+    try {
+      const response = await fetch('/api/test-bot-access', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: scanUrl, botName }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBotAccessTests(prev => ({
+          ...prev,
+          [testKey]: {
+            status: data.status,
+            accessible: data.accessible,
+            statusText: data.statusText,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to test bot access:', error);
+      setBotAccessTests(prev => ({
+        ...prev,
+        [testKey]: {
+          status: 0,
+          accessible: false,
+          statusText: 'Test failed',
+        },
+      }));
+    } finally {
+      setTestingBots(prev => {
+        const next = new Set(prev);
+        next.delete(testKey);
+        return next;
+      });
+    }
   };
 
   const handleScan = async () => {
@@ -971,22 +1019,69 @@ export default function Dashboard() {
                           <Bot className="w-4 h-4 text-primary" />
                           AI Bot Permissions
                         </h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {Object.entries(scan.botPermissions as Record<string, string>).slice(0, 6).map(([bot, permission]) => (
-                            <div 
-                              key={bot} 
-                              className="flex items-center gap-2 p-2 bg-background/50 border border-white/5 rounded text-xs"
-                            >
-                              <div className={`w-2 h-2 rounded-full ${
-                                permission.toLowerCase().includes('allow') || permission.toLowerCase().includes('yes')
-                                  ? 'bg-green-400' 
-                                  : permission.toLowerCase().includes('disallow') || permission.toLowerCase().includes('no')
-                                  ? 'bg-red-400'
-                                  : 'bg-yellow-400'
-                              }`} />
-                              <span className="font-mono truncate">{bot}</span>
-                            </div>
-                          ))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.entries(scan.botPermissions as Record<string, string>).slice(0, 6).map(([bot, permission]) => {
+                            const testKey = `${scan.url}-${bot}`;
+                            const testResult = botAccessTests[testKey];
+                            const isTesting = testingBots.has(testKey);
+
+                            return (
+                              <div 
+                                key={bot} 
+                                className="flex flex-col gap-2 p-2 bg-background/50 border border-white/5 rounded text-xs"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                      permission.toLowerCase().includes('allow') || permission.toLowerCase().includes('yes')
+                                        ? 'bg-green-400' 
+                                        : permission.toLowerCase().includes('disallow') || permission.toLowerCase().includes('no')
+                                        ? 'bg-red-400'
+                                        : 'bg-yellow-400'
+                                    }`} />
+                                    <span className="font-mono truncate">{bot}</span>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs flex-shrink-0"
+                                    onClick={() => testBotAccess(scan.url, bot)}
+                                    disabled={isTesting}
+                                    data-testid={`button-test-bot-${scan.id}-${bot}`}
+                                  >
+                                    {isTesting ? 'Testing...' : 'Test'}
+                                  </Button>
+                                </div>
+                                {testResult && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <Badge 
+                                      variant={testResult.accessible ? "default" : "destructive"}
+                                      className={`text-xs ${
+                                        testResult.accessible 
+                                          ? 'bg-green-500/20 text-green-400 border-green-500/30' 
+                                          : testResult.status === 403
+                                          ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                                          : testResult.status === 406
+                                          ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+                                          : 'bg-red-500/20 text-red-400 border-red-500/30'
+                                      }`}
+                                    >
+                                      {testResult.status} {testResult.statusText}
+                                    </Badge>
+                                    {testResult.accessible ? (
+                                      <span className="text-green-400 text-xs">Truly Accessible</span>
+                                    ) : testResult.status === 403 ? (
+                                      <span className="text-red-400 text-xs">Blocked by Firewall</span>
+                                    ) : testResult.status === 406 ? (
+                                      <span className="text-yellow-400 text-xs">Server Rejected Headers</span>
+                                    ) : (
+                                      <span className="text-red-400 text-xs">Not Accessible</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                           {Object.keys(scan.botPermissions as Record<string, string>).length > 6 && (
                             <div className="flex items-center gap-2 p-2 bg-primary/10 border border-primary/20 rounded text-xs text-primary font-semibold">
                               +{Object.keys(scan.botPermissions as Record<string, string>).length - 6} more
