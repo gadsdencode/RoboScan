@@ -588,6 +588,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/validate-llms-txt", async (req, res) => {
+    try {
+      const { content } = z.object({
+        content: z.string().min(1, "Content is required"),
+      }).parse(req.body);
+
+      const errors: string[] = [];
+
+      if (!content.includes('# llms.txt')) {
+        errors.push("Missing '# llms.txt' header comment");
+      }
+
+      if (!content.includes('# Website:')) {
+        errors.push("Missing '# Website:' field");
+      }
+
+      if (!content.includes('# Last updated:')) {
+        errors.push("Missing '# Last updated:' field");
+      }
+
+      if (!content.includes('# About')) {
+        errors.push("Missing '# About' section describing the website");
+      }
+
+      if (!content.includes('# Preferred Citation Format')) {
+        errors.push("Missing '# Preferred Citation Format' section");
+      }
+
+      if (!content.includes('# Allowed Bots')) {
+        errors.push("Missing '# Allowed Bots' section");
+      }
+
+      if (!content.includes('# Key Areas')) {
+        errors.push("Missing '# Key Areas' section");
+      }
+
+      if (!content.includes('# Content Guidelines')) {
+        errors.push("Missing '# Content Guidelines' section");
+      }
+
+      if (!content.includes('# Contact')) {
+        errors.push("Missing '# Contact' section");
+      }
+
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+      if (!emailRegex.test(content)) {
+        errors.push("No valid email address found in the content");
+      }
+
+      const urlRegex = /https?:\/\/[^\s]+/;
+      if (!urlRegex.test(content)) {
+        errors.push("No valid URLs found in the content");
+      }
+
+      const isValid = errors.length === 0;
+
+      res.json({
+        isValid,
+        errors,
+      });
+    } catch (error) {
+      console.error('Validation error:', error);
+      res.status(400).json({ 
+        isValid: false,
+        errors: ["Invalid request format"] 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

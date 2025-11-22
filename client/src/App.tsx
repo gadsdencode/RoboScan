@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
+import LLMsBuilder from "@/pages/llms-builder";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/dashboard">
         {isLoading || !isAuthenticated ? <Home /> : <Dashboard />}
       </Route>
+      <Route path="/tools/llms-builder" component={LLMsBuilder} />
       <Route component={NotFound} />
     </Switch>
   );
