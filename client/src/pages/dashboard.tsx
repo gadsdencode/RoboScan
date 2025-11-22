@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare, Tag, Filter } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -538,6 +539,19 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* llms.txt Builder */}
+            <Link href="/tools/llms-builder">
+              <Button 
+                variant="secondary" 
+                size="sm"
+                className="btn-hover-scale"
+                data-testid="button-llms-builder"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                llms.txt Builder
+              </Button>
+            </Link>
+
             {/* Notifications Bell */}
             <button
               onClick={() => setShowNotificationsSheet(true)}
