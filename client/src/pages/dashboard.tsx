@@ -1015,7 +1015,7 @@ export default function Dashboard() {
                                     Download
                                   </Button>
                                 </div>
-                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto max-h-64">
+                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto max-h-64 w-full">
                                   {scan.robotsTxtContent}
                                 </pre>
                               </div>
@@ -1035,7 +1035,7 @@ export default function Dashboard() {
                                     Download
                                   </Button>
                                 </div>
-                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto max-h-64">
+                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto max-h-64 w-full">
                                   {scan.llmsTxtContent}
                                 </pre>
                               </div>
