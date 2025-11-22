@@ -228,13 +228,13 @@ export function ScanComparison({ oldScan, newScan, onClose }: ScanComparisonProp
                         <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
                           <div className="min-w-0">
                             <div className="text-xs font-semibold mb-2 text-muted-foreground">Previous Version</div>
-                            <pre className="p-3 bg-black/40 border border-white/10 rounded text-xs overflow-x-auto overflow-y-auto max-h-64 whitespace-pre">
+                            <pre className="p-3 bg-black/40 border border-white/10 rounded text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
                               {diff.oldValue || 'Not found'}
                             </pre>
                           </div>
                           <div className="min-w-0">
                             <div className="text-xs font-semibold mb-2 text-primary">Current Version</div>
-                            <pre className="p-3 bg-black/40 border border-primary/30 rounded text-xs overflow-x-auto overflow-y-auto max-h-64 whitespace-pre">
+                            <pre className="p-3 bg-black/40 border border-primary/30 rounded text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
                               {diff.newValue || 'Not found'}
                             </pre>
                           </div>

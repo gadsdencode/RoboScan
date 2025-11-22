@@ -845,7 +845,7 @@ export default function Dashboard() {
                 data-testid={`scan-card-${scan.id}`}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-3">
                       <Globe className="w-5 h-5 text-primary" />
                       <h3 className="text-lg font-bold font-mono">{scan.url}</h3>
@@ -1015,7 +1015,7 @@ export default function Dashboard() {
                                     Download
                                   </Button>
                                 </div>
-                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto overflow-y-auto max-h-64 whitespace-pre">
+                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
                                   {scan.robotsTxtContent}
                                 </pre>
                               </div>
@@ -1035,7 +1035,7 @@ export default function Dashboard() {
                                     Download
                                   </Button>
                                 </div>
-                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto overflow-y-auto max-h-64 whitespace-pre">
+                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
                                   {scan.llmsTxtContent}
                                 </pre>
                               </div>
