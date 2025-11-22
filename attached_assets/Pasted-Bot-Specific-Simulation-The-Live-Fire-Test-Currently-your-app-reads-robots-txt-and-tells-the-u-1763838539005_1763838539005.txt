@@ -1,0 +1,55 @@
+Bot-Specific Simulation (The "Live Fire" Test)
+
+Currently, your app reads robots.txt and tells the user, "Theoretically, Googlebot is allowed here." However, in the real world, a server firewall (WAF), Cloudflare rule, or .htaccess file might still block that bot, returning a 403 Forbidden error even if robots.txt says "Allow".
+
+This feature bridges the gap between permission (what the file says) and access (what the server actually does).
+
+Why This Matters
+False Positives: A user might think their site is AI-ready because robots.txt is perfect, but their hosting provider is silently blocking GPTBot at the network level.
+
+Debugging: If an AI crawler isn't indexing their site, this tool helps them pinpoint if it's a robots.txt issue or a server configuration issue.
+
+How to Implement It
+1. Backend Logic (server/routes.ts)
+You need a new endpoint that doesn't just download the file, but attempts to access the home page while pretending to be a specific bot.
+
+Concept Code:
+
+TypeScript
+
+// Add to server/routes.ts
+app.post("/api/test-bot-access", async (req, res) => {
+  const { url, botUserAgent } = req.body;
+
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD', // We only need headers/status, not the full body
+      headers: {
+        'User-Agent': botUserAgent 
+        // e.g., "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.0; +https://openai.com/gptbot)"
+      },
+      redirect: 'follow' // Follow redirects to see final destination status
+    });
+
+    // If status is 200, it's truly accessible. 
+    // If 403/401, it's blocked by firewall/server config.
+    res.json({ 
+      status: response.status, 
+      accessible: response.ok 
+    });
+  } catch (error) {
+    res.status(500).json({ accessible: false, error: "Connection failed" });
+  }
+});
+2. Frontend UI (client/src/pages/dashboard.tsx)
+In your dashboard, where you list the bots (currently generated in scanner.ts), add a "Test" button next to each major bot.
+
+User Action: User clicks "Test Access" next to "GPTBot".
+
+Visual Feedback:
+
+<span style="color:green">200 OK</span>: (Green Badge) "Truly Accessible"
+
+<span style="color:red">403 Forbidden</span>: (Red Badge) "Blocked by Firewall"
+
+<span style="color:orange">406 Not Acceptable</span>: (Yellow Badge) "Server Rejected Headers"
