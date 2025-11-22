@@ -43,6 +43,16 @@ const createPaymentSchema = z.object({
   scanId: z.number(),
 });
 
+// Helper to check if the current user is an admin
+// Set ADMIN_EMAILS in your environment variables as a comma-separated list
+// Example: ADMIN_EMAILS="investor@example.com,me@roboscan.com"
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
+
+function isAdmin(req: any): boolean {
+  if (!req.isAuthenticated() || !req.user?.claims?.email) return false;
+  return ADMIN_EMAILS.includes(req.user.claims.email.toLowerCase());
+}
+
 // Guard against duplicate auth setup
 let authInitialized = false;
 
@@ -85,9 +95,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scansWithPurchaseStatus = await Promise.all(
         scans.map(async (scan) => {
           const purchase = await storage.getPurchaseByScanId(scan.id);
+          
+          // GOD MODE: If admin, force isPurchased to true
+          const isPurchased = !!purchase || isAdmin(req);
+          
           return {
             ...scan,
-            isPurchased: !!purchase,
+            isPurchased,
           };
         })
       );
@@ -169,7 +183,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const existingPurchase = await storage.getPurchaseByScanId(scanId);
-      if (existingPurchase) {
+      
+      // GOD MODE: If admin, tell the frontend it's already paid
+      if (existingPurchase || isAdmin(req)) {
         return res.status(400).json({ 
           message: "Report already purchased",
           alreadyPurchased: true 
@@ -281,7 +297,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const purchase = await storage.getPurchaseByScanId(scanId);
-      if (!purchase) {
+      
+      // GOD MODE: Allow access if purchase exists OR if user is admin
+      if (!purchase && !isAdmin(req)) {
         return res.status(403).json({ 
           message: "Payment required to access optimization report",
           requiresPayment: true 
@@ -293,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         scan,
         report,
-        purchasedAt: purchase.createdAt,
+        purchasedAt: purchase?.createdAt || null,
       });
     } catch (error) {
       console.error('Report generation error:', error);

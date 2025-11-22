@@ -1,0 +1,82 @@
+To implement an "Admin God-Mode" that bypasses payments without altering the UI or affecting regular users, the best approach is to handle this strictly on the server-side.
+
+This method allows you to designate specific email addresses as "Admins." For these users, the API will pretend that payment has already occurred, unlocking all premium features instantly.
+
+Here is the implementation plan for server/routes.ts.
+
+1. Define Admins via Environment Variables
+First, add a helper to identify admins based on their email address. This keeps the logic flexible and secure.
+
+In server/routes.ts (Add this near the top):
+
+TypeScript
+
+// Helper to check if the current user is an admin
+// Set ADMIN_EMAILS in your environment variables as a comma-separated list
+// Example: ADMIN_EMAILS="investor@example.com,me@roboscan.com"
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
+
+function isAdmin(req: any): boolean {
+  if (!req.isAuthenticated() || !req.user?.claims?.email) return false;
+  return ADMIN_EMAILS.includes(req.user.claims.email.toLowerCase());
+}
+2. Update API Endpoints
+You need to modify three specific endpoints in server/routes.ts to check for this admin status.
+
+A. Dashboard: Show Scans as "Premium"
+Modify the GET /api/user/scans endpoint. This ensures that when you load the dashboard, all your scans show the green "Premium" badge and "Show Details" buttons instead of "Unlock".
+
+TypeScript
+
+// Inside app.get('/api/user/scans', ...)
+const scansWithPurchaseStatus = await Promise.all(
+  scans.map(async (scan) => {
+    const purchase = await storage.getPurchaseByScanId(scan.id);
+    
+    // GOD MODE: If admin, force isPurchased to true
+    const isPurchased = !!purchase || isAdmin(req);
+    
+    return {
+      ...scan,
+      isPurchased,
+    };
+  })
+);
+B. Home Page: Bypass Payment Modal
+Modify the POST /api/create-payment-intent endpoint. If you run a scan on the Home page and click "Unlock," this change forces the payment modal to immediately skip to the "Success" state without asking for a credit card.
+
+TypeScript
+
+// Inside app.post("/api/create-payment-intent", ...)
+const existingPurchase = await storage.getPurchaseByScanId(scanId);
+
+// GOD MODE: If admin, tell the frontend it's already paid
+if (existingPurchase || isAdmin(req)) {
+  return res.status(400).json({ 
+    message: "Report already purchased",
+    alreadyPurchased: true 
+  });
+}
+C. Reports: Allow File Downloads
+Modify the GET /api/optimization-report/:scanId endpoint. This ensures the server actually delivers the robots.txt/llms.txt content when requested, bypassing the database purchase check.
+
+TypeScript
+
+// Inside app.get("/api/optimization-report/:scanId", ...)
+const purchase = await storage.getPurchaseByScanId(scanId);
+
+// GOD MODE: Allow access if purchase exists OR if user is admin
+if (!purchase && !isAdmin(req)) {
+  return res.status(403).json({ 
+    message: "Payment required to access optimization report",
+    requiresPayment: true 
+  });
+}
+Summary of User Experience (UX)
+Regular Users: See no changes. They still see the "Unlock for $9.99" button and the standard payment flow.
+
+You (Admin):
+
+Dashboard: All your scans appear with the "Premium" badge automatically. You can click "Show Details" immediately.
+
+Home Page: If you scan a site and click "Unlock," the modal will open, briefly show a green "Already Purchased!" success message, and immediately load your report.
