@@ -999,10 +999,10 @@ export default function Dashboard() {
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: "auto" }}
                             exit={{ opacity: 0, height: 0 }}
-                            className="mt-4 space-y-4"
+                            className="mt-4 space-y-4 min-w-0"
                           >
                             {scan.robotsTxtContent && (
-                              <div>
+                              <div className="min-w-0">
                                 <div className="flex items-center justify-between mb-2">
                                   <h4 className="font-semibold text-sm">robots.txt</h4>
                                   <Button
@@ -1015,14 +1015,14 @@ export default function Dashboard() {
                                     Download
                                   </Button>
                                 </div>
-                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto max-h-64 w-full">
+                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto overflow-y-auto max-h-64 whitespace-pre">
                                   {scan.robotsTxtContent}
                                 </pre>
                               </div>
                             )}
 
                             {scan.llmsTxtContent && (
-                              <div>
+                              <div className="min-w-0">
                                 <div className="flex items-center justify-between mb-2">
                                   <h4 className="font-semibold text-sm">llms.txt</h4>
                                   <Button
@@ -1035,7 +1035,7 @@ export default function Dashboard() {
                                     Download
                                   </Button>
                                 </div>
-                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto max-h-64 w-full">
+                                <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-x-auto overflow-y-auto max-h-64 whitespace-pre">
                                   {scan.llmsTxtContent}
                                 </pre>
                               </div>
