@@ -1,3 +1,5 @@
+import robotsParser from 'robots-parser';
+
 interface ScanResult {
   robotsTxtFound: boolean;
   robotsTxtContent: string | null;
@@ -8,64 +10,34 @@ interface ScanResult {
   warnings: string[];
 }
 
-interface BotRules {
-  disallows: string[];
-  allows: string[];
-}
-
-function parseRobotsTxt(content: string): Map<string, BotRules> {
-  const rules = new Map<string, BotRules>();
-  const lines = content.split('\n');
-  let currentUserAgent = '';
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    
-    if (trimmed.toLowerCase().startsWith('user-agent:')) {
-      currentUserAgent = trimmed.substring(11).trim();
-      if (!rules.has(currentUserAgent)) {
-        rules.set(currentUserAgent, { disallows: [], allows: [] });
-      }
-    } else if (trimmed.toLowerCase().startsWith('disallow:') && currentUserAgent) {
-      const disallowValue = trimmed.substring(9).trim();
-      if (disallowValue) {
-        rules.get(currentUserAgent)!.disallows.push(disallowValue);
-      }
-    } else if (trimmed.toLowerCase().startsWith('allow:') && currentUserAgent) {
-      const allowValue = trimmed.substring(6).trim();
-      if (allowValue) {
-        rules.get(currentUserAgent)!.allows.push(allowValue);
-      }
+function getBotPermissionStatus(
+  botName: string, 
+  robotsUrl: string, 
+  robotsTxtContent: string
+): string {
+  const robots = robotsParser(robotsUrl, robotsTxtContent);
+  
+  const testPaths = ['/', '/api', '/admin', '/search', '/content'];
+  const allowedPaths: string[] = [];
+  const blockedPaths: string[] = [];
+  
+  for (const path of testPaths) {
+    const testUrl = new URL(path, robotsUrl).href;
+    if (robots.isAllowed(testUrl, botName)) {
+      allowedPaths.push(path);
+    } else {
+      blockedPaths.push(path);
     }
   }
-
-  return rules;
-}
-
-function getBotPermissionStatus(botName: string, rules: Map<string, BotRules>): string {
-  // Check if there are specific rules for this bot
-  let botRules = rules.get(botName);
   
-  // If no specific rules, fall back to wildcard rules
-  if (!botRules || (botRules.disallows.length === 0 && botRules.allows.length === 0)) {
-    botRules = rules.get('*');
-  }
-
-  if (!botRules) {
-    return 'Allowed';
-  }
-
-  // Check if completely blocked
-  if (botRules.disallows.includes('/')) {
+  if (blockedPaths.length === testPaths.length) {
     return 'Blocked';
   }
-
-  // If there are disallow rules but not a complete block
-  if (botRules.disallows.length > 0) {
-    return `Restricted (${botRules.disallows.length} path${botRules.disallows.length > 1 ? 's' : ''} blocked)`;
+  
+  if (blockedPaths.length > 0) {
+    return `Restricted (${blockedPaths.length} of ${testPaths.length} common paths blocked)`;
   }
-
-  // If only allow rules or no rules
+  
   return 'Allowed';
 }
 
@@ -175,8 +147,7 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
       robotsTxtFound = true;
       robotsTxtContent = await robotsResponse.text();
 
-      // Parse the robots.txt file
-      const rules = parseRobotsTxt(robotsTxtContent);
+      const robotsUrl = `${canonicalOrigin}/robots.txt`;
 
       // Analyze permissions for key AI bots
       const aiBotsToCheck = [
@@ -191,19 +162,27 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
       ];
 
       for (const bot of aiBotsToCheck) {
-        botPermissions[bot] = getBotPermissionStatus(bot, rules);
+        botPermissions[bot] = getBotPermissionStatus(bot, robotsUrl, robotsTxtContent);
       }
 
-      // Also check case-insensitive variations that might be in the file
-      Array.from(rules.entries()).forEach(([userAgent]) => {
+      // Extract user agents from robots.txt to find additional bots
+      const userAgentMatches = Array.from(robotsTxtContent.matchAll(/user-agent:\s*([^\r\n]+)/gi));
+      const foundUserAgents = new Set<string>();
+      
+      for (const match of userAgentMatches) {
+        const userAgent = match[1].trim();
         if (userAgent !== '*' && !aiBotsToCheck.some(b => b.toLowerCase() === userAgent.toLowerCase())) {
-          // Include other notable bots found in the file
-          const lowerUA = userAgent.toLowerCase();
-          if (lowerUA.includes('bot') || lowerUA.includes('crawler') || lowerUA.includes('spider')) {
-            botPermissions[userAgent] = getBotPermissionStatus(userAgent, rules);
-          }
+          foundUserAgents.add(userAgent);
         }
-      });
+      }
+
+      // Check additional bots found in the file
+      for (const userAgent of Array.from(foundUserAgents)) {
+        const lowerUA = userAgent.toLowerCase();
+        if (lowerUA.includes('bot') || lowerUA.includes('crawler') || lowerUA.includes('spider')) {
+          botPermissions[userAgent] = getBotPermissionStatus(userAgent, robotsUrl, robotsTxtContent);
+        }
+      }
 
       if (!robotsTxtContent.toLowerCase().includes('sitemap:')) {
         warnings.push('robots.txt found but missing sitemap reference');
