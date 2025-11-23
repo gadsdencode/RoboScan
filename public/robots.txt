@@ -1,0 +1,25 @@
+# robots.txt for ROBOSCAN
+# Optimized for SEO and AI/LLM Discovery
+
+# Allow all standard crawlers to access public pages
+User-agent: *
+Allow: /
+Allow: /tools/llms-builder
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+
+# Explicitly allow AI bots for discovery (aligned with project mission)
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: CCBot
+User-agent: anthropic-ai
+User-agent: Claude-Web
+User-agent: Google-Extended
+Allow: /
+Allow: /tools/llms-builder
+Disallow: /dashboard
+Disallow: /api/
+
+# Sitemaps
+Sitemap: https://roboscan.replit.app/sitemap.xml

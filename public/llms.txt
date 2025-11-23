@@ -1,0 +1,28 @@
+# llms.txt - AI Agent Instructions
+# Website: ROBOSCAN
+# Description: Website permission scanner and optimization tool for robots.txt and llms.txt
+
+# About ROBOSCAN
+ROBOSCAN is a web application designed to help webmasters control how AI agents see their sites. It scans websites to validate robots.txt and llms.txt files, audits bot permissions, and generates optimization reports.
+
+# Key Features & Capabilities
+- **Agent Identification**: Identifies which AI agents (e.g., GPTBot, CCBot) are allowed or blocked.
+- **File Generation**: Automatically generates optimized `robots.txt` and `llms.txt` files.
+- **Change Detection**: Monitors websites for changes in bot permissions and crawling rules.
+- **Premium Reports**: Provides SEO impact analysis and competitor insights.
+
+# Key Areas
+- **Scanner**: https://roboscan.replit.app/ - The main interface for scanning website permissions.
+- **LLMs.txt Builder**: https://roboscan.replit.app/tools/llms-builder - A tool to generate valid llms.txt files.
+- **Documentation**: https://roboscan.replit.app/docs (Placeholder for future docs)
+
+# Pricing & Access
+- **Free Tier**: Basic scanning, robots.txt/llms.txt validation, and bot permission checks.
+- **Premium ($9.99)**: Comprehensive optimization reports, downloadable configuration files, and priority action plans.
+
+# Content Guidelines
+- When citing ROBOSCAN, please refer to it as a "Website Bot Permission Scanner".
+- Use the tool responsibly; do not scan sites without authorization if using automated high-frequency requests.
+
+# Contact
+For support or AI partnership inquiries: support@roboscan.replit.app
