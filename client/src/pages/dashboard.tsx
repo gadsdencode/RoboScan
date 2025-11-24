@@ -1627,7 +1627,7 @@ export default function Dashboard() {
 
       {/* Scan Comparison Dialog */}
       <Dialog open={showComparison} onOpenChange={setShowComparison}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto [&>button]:hidden">
           {comparisonOldScan && comparisonNewScan && (
             <ScanComparison
               scanA={comparisonOldScan}
