@@ -18,6 +18,40 @@ export interface OptimizationRecommendation {
   impact: string;
 }
 
+export interface BotPermissionComparison {
+  bot: string;
+  valA: string;
+  valB: string;
+  status: 'same' | 'different' | 'unique_to_a' | 'unique_to_b';
+}
+
+export function getBotPermissionMatrix(scanA: Scan, scanB: Scan): BotPermissionComparison[] {
+  const permsA = (scanA.botPermissions as Record<string, string>) || {};
+  const permsB = (scanB.botPermissions as Record<string, string>) || {};
+  
+  const allBots = Array.from(new Set([...Object.keys(permsA), ...Object.keys(permsB)])).sort();
+  
+  return allBots.map(bot => {
+    const valA = permsA[bot];
+    const valB = permsB[bot];
+    
+    let status: BotPermissionComparison['status'] = 'same';
+    
+    if (valA !== valB) {
+      if (!valA) status = 'unique_to_b';
+      else if (!valB) status = 'unique_to_a';
+      else status = 'different';
+    }
+    
+    return { 
+      bot, 
+      valA: valA || '-', 
+      valB: valB || '-', 
+      status 
+    };
+  });
+}
+
 export function compareScanResults(oldScan: Scan, newScan: Scan): ScanDifference[] {
   const differences: ScanDifference[] = [];
 
