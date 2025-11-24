@@ -1,0 +1,203 @@
+Based on the analysis of the code, the "notifications not working correctly" likely refers to **false positives** caused by minor whitespace changes (e.g., a new line at the end of a file) triggering alerts. The "not informative" part is because the current messages are generic (e.g., "Changes detected in robots.txt") instead of telling you *what* changed.
+
+Here are the recommendations to fix the sensitivity issues and make the notifications actually useful.
+
+### 1\. Fix False Positives (Improve Change Detector)
+
+Currently, `server/change-detector.ts` uses a strict equality check (`!==`). This means if you just add a blank line or a space to `robots.txt`, it triggers an alert.
+
+**Update `server/change-detector.ts`** to normalize the content before comparing.
+
+```typescript
+import type { Scan } from "@shared/schema";
+
+export interface ChangeDetectionResult {
+  hasChanges: boolean;
+  changes: {
+    robotsTxtChanged?: boolean;
+    llmsTxtChanged?: boolean;
+    botPermissionsChanged?: Record<string, { old: string; new: string }>;
+    newErrors?: string[];
+  };
+}
+
+// Helper to normalize content for comparison (ignore whitespace/newlines)
+function normalize(content: string | null): string {
+  return (content || '').trim().replace(/\r\n/g, '\n');
+}
+
+export function detectChanges(previousScan: Scan, newScan: Scan): ChangeDetectionResult {
+  const changes: ChangeDetectionResult['changes'] = {};
+  let hasChanges = false;
+
+  // Compare robots.txt content (Normalized)
+  if (normalize(previousScan.robotsTxtContent) !== normalize(newScan.robotsTxtContent)) {
+    changes.robotsTxtChanged = true;
+    hasChanges = true;
+  }
+
+  // Compare llms.txt content (Normalized)
+  if (normalize(previousScan.llmsTxtContent) !== normalize(newScan.llmsTxtContent)) {
+    changes.llmsTxtChanged = true;
+    hasChanges = true;
+  }
+
+  // Compare bot permissions
+  const oldPermissions = (previousScan.botPermissions as Record<string, string>) || {};
+  const newPermissions = (newScan.botPermissions as Record<string, string>) || {};
+  
+  const botPermissionChanges: Record<string, { old: string; new: string }> = {};
+  
+  const allBots = new Set([...Object.keys(oldPermissions), ...Object.keys(newPermissions)]);
+
+  allBots.forEach(bot => {
+    const oldPerm = oldPermissions[bot];
+    const newPerm = newPermissions[bot];
+
+    // Only register if there is an actual difference in value
+    if (oldPerm !== newPerm) {
+      // Ignore if simply moving from undefined to "Allowed" (default) or similar
+      // if both are falsy (null/undefined/empty), skip
+      if (!oldPerm && !newPerm) return;
+
+      botPermissionChanges[bot] = {
+        old: oldPerm || 'Not set',
+        new: newPerm || 'Removed'
+      };
+      hasChanges = true;
+    }
+  });
+
+  if (Object.keys(botPermissionChanges).length > 0) {
+    changes.botPermissionsChanged = botPermissionChanges;
+  }
+
+  // Compare errors
+  const oldErrors = (previousScan.errors as string[]) || [];
+  const newErrors = (newScan.errors as string[]) || [];
+  
+  // Find strictly NEW errors
+  const addedErrors = newErrors.filter(err => !oldErrors.includes(err));
+  
+  if (addedErrors.length > 0) {
+    changes.newErrors = addedErrors;
+    hasChanges = true;
+  }
+
+  return { hasChanges, changes };
+}
+```
+
+### 2\. Make Notifications Informative (Improve Scheduler)
+
+Currently, `server/scheduler.ts` sends generic messages like "Changes detected". Users want to know *what* happened without clicking through.
+
+**Update `server/scheduler.ts`** to construct dynamic, detailed messages.
+
+```typescript
+// ... imports
+
+// Process a single recurring scan
+async function processRecurringScan(recurringScanId: number) {
+  try {
+    // ... (existing setup code)
+
+    // Check for changes if there was a previous scan
+    if (recurringScan.lastScanId) {
+      const previousScan = await storage.getScan(recurringScan.lastScanId);
+      if (previousScan) {
+        const changeDetection = detectChanges(previousScan, newScan);
+
+        if (changeDetection.hasChanges) {
+          const prefs = await storage.getNotificationPreferenceByRecurringScanId(recurringScanId);
+          
+          if (prefs) {
+            // 1. Detailed Robots.txt Message
+            if (changeDetection.changes.robotsTxtChanged && prefs.notifyOnRobotsTxtChange) {
+              const oldSize = previousScan.robotsTxtContent?.length || 0;
+              const newSize = newScan.robotsTxtContent?.length || 0;
+              const diff = newSize - oldSize;
+              const sizeMsg = diff > 0 ? `(+${diff} chars)` : `(${diff} chars)`;
+              
+              await storage.createNotification({
+                userId: recurringScan.userId,
+                recurringScanId: recurringScanId,
+                scanId: newScan.id,
+                type: 'robots_txt_change',
+                title: 'robots.txt Updated',
+                // Informative: Shows size change
+                message: `robots.txt content changed ${sizeMsg} for ${recurringScan.url}`,
+                changes: { robotsTxtChanged: true, diff: diff } as Record<string, any>,
+                isRead: false,
+              });
+            }
+
+            // 2. Detailed LLMs.txt Message
+            if (changeDetection.changes.llmsTxtChanged && prefs.notifyOnLlmsTxtChange) {
+              const exists = newScan.llmsTxtFound ? "Found" : "Removed";
+              await storage.createNotification({
+                userId: recurringScan.userId,
+                recurringScanId: recurringScanId,
+                scanId: newScan.id,
+                type: 'llms_txt_change',
+                title: 'llms.txt Update',
+                message: `llms.txt is now ${exists} or modified on ${recurringScan.url}`,
+                changes: { llmsTxtChanged: true } as Record<string, any>,
+                isRead: false,
+              });
+            }
+
+            // 3. Detailed Bot Permissions Message (The most important one)
+            if (changeDetection.changes.botPermissionsChanged && prefs.notifyOnBotPermissionChange) {
+              const changes = changeDetection.changes.botPermissionsChanged;
+              const botNames = Object.keys(changes);
+              
+              // Construct a readable summary: "GPTBot: Allowed -> Blocked"
+              const summary = botNames.slice(0, 2).map(bot => 
+                `${bot}: ${changes[bot].old} → ${changes[bot].new}`
+              ).join(', ');
+              
+              const extra = botNames.length > 2 ? ` (+${botNames.length - 2} more)` : '';
+
+              await storage.createNotification({
+                userId: recurringScan.userId,
+                recurringScanId: recurringScanId,
+                scanId: newScan.id,
+                type: 'bot_permission_change',
+                title: 'Bot Permissions Changed',
+                // Informative: Lists actual changes
+                message: `${summary}${extra} on ${recurringScan.url}`,
+                changes: changes as Record<string, any>,
+                isRead: false,
+              });
+            }
+
+            // 4. Detailed Error Message
+            if (changeDetection.changes.newErrors && prefs.notifyOnNewErrors) {
+              const errors = changeDetection.changes.newErrors;
+              const firstError = errors[0];
+              const extra = errors.length > 1 ? ` (and ${errors.length - 1} others)` : '';
+
+              await storage.createNotification({
+                userId: recurringScan.userId,
+                recurringScanId: recurringScanId,
+                scanId: newScan.id,
+                type: 'new_errors',
+                title: 'New Errors Detected',
+                // Informative: Shows the actual error
+                message: `Error: "${firstError}"${extra} detected on ${recurringScan.url}`,
+                changes: { newErrors: errors } as Record<string, any>,
+                isRead: false,
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    // ... (rest of the function)
+  } catch (error) {
+    console.error(`[Scheduler] Error processing recurring scan #${recurringScanId}:`, error);
+  }
+}
+```
