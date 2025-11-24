@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare, Tag, Filter } from "lucide-react";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare, Tag, Filter, HelpCircle } from "lucide-react";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import { dashboardTourSteps } from "@/lib/tour-config";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,6 +142,28 @@ export default function Dashboard() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Tour Handler
+  const runTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      steps: dashboardTourSteps,
+      popoverClass: 'roboscan-driver-popover',
+      onDestroyed: () => {
+        localStorage.setItem('roboscan_tour_seen', 'true');
+      }
+    });
+    
+    driverObj.drive();
+  };
+
+  // Auto-start tour for new users
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem('roboscan_tour_seen');
+    if (!hasSeenTour && !loading && scans.length === 0) {
+      setTimeout(runTour, 1000);
+    }
+  }, [loading, scans.length]);
 
   const fetchScans = async (tagFilter?: string[]) => {
     try {
@@ -686,6 +711,18 @@ export default function Dashboard() {
                 llms.txt Builder
               </Button>
             </Link>
+
+            {/* Help/Tour Button */}
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={runTour}
+              className="btn-hover-scale text-muted-foreground hover:text-primary"
+              title="Start Feature Tour"
+              data-testid="button-tour"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Button>
 
             {/* Notifications Bell */}
             <button

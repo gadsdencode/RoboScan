@@ -142,3 +142,44 @@
   0% { background-position: -1000px 0; }
   100% { background-position: 1000px 0; }
 }
+
+/* Driver.js Cyberpunk Theme Overrides */
+.roboscan-driver-popover.driver-popover {
+  @apply bg-card border border-primary/30 text-foreground rounded-xl shadow-2xl shadow-primary/10;
+}
+
+.roboscan-driver-popover .driver-popover-title {
+  @apply font-mono text-lg font-bold text-primary flex items-center gap-2;
+}
+
+.roboscan-driver-popover .driver-popover-description {
+  @apply text-muted-foreground text-sm mt-2 mb-4 font-sans leading-relaxed;
+}
+
+/* Navigation Buttons */
+.roboscan-driver-popover .driver-popover-footer button {
+  @apply bg-secondary text-secondary-foreground border border-white/10 rounded-md px-3 py-1 text-xs font-medium transition-colors;
+  text-shadow: none;
+}
+
+.roboscan-driver-popover .driver-popover-footer button:hover {
+  @apply bg-primary/20 text-primary border-primary/30;
+}
+
+.roboscan-driver-popover .driver-popover-footer button.driver-popover-next-btn {
+  @apply bg-primary text-primary-foreground font-bold;
+}
+
+.roboscan-driver-popover .driver-popover-footer button.driver-popover-next-btn:hover {
+  @apply bg-primary/90;
+}
+
+/* Progress Bar */
+.roboscan-driver-popover .driver-popover-progress-text {
+  @apply text-muted-foreground font-mono text-xs;
+}
+
+/* The "Spotlight" area */
+.driver-active-element {
+  @apply ring-2 ring-primary ring-offset-4 ring-offset-background transition-all duration-300;
+}
