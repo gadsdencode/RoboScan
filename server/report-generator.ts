@@ -28,76 +28,169 @@ interface SEOImpact {
   aiVisibility: string;
 }
 
+interface QualityAnalysis {
+  scoreDeduced: number;
+  issues: string[];
+}
+
+// Helper to assess llms.txt quality
+function analyzeLlmsTxtQuality(content: string | null): QualityAnalysis {
+  if (!content) return { scoreDeduced: 0, issues: [] }; // Missing file handled elsewhere
+
+  let penalty = 0;
+  const issues: string[] = [];
+  const lowerContent = content.toLowerCase();
+
+  // Check 1: Substance (Is it just a placeholder?)
+  if (content.length < 200) {
+    penalty += 10;
+    issues.push("File is too short (<200 chars) to provide meaningful context to AI agents.");
+  }
+
+  // Check 2: Structure (Does it have Markdown headers?)
+  if (!content.includes('#')) {
+    penalty += 5;
+    issues.push("Lacks Markdown structure (headers), making it harder for agents to parse.");
+  }
+
+  // Check 3: Connectivity (Does it link to documentation/pages?)
+  if (!content.includes('https://')) {
+    penalty += 5;
+    issues.push("No external links found. AI agents need links to crawl your actual content.");
+  }
+
+  return { scoreDeduced: Math.min(penalty, 20), issues };
+}
+
+// Helper to assess robots.txt dangerous configurations
+function analyzeRobotsTxtQuality(content: string | null): QualityAnalysis {
+  if (!content) return { scoreDeduced: 0, issues: [] };
+
+  let penalty = 0;
+  const issues: string[] = [];
+  const lowerContent = content.toLowerCase();
+
+  // Check 1: The "Nuclear Option" (Disallow: / for everyone)
+  // We look for "User-agent: *" followed closely by "Disallow: /"
+  if (/user-agent:\s*\*\s*[\r\n]+\s*disallow:\s*\/\s*$/m.test(lowerContent)) {
+    penalty += 30;
+    issues.push("CRITICAL: You are blocking ALL crawlers from the entire site.");
+  }
+
+  // Check 2: High Crawl Delay
+  const crawlDelay = lowerContent.match(/crawl-delay:\s*(\d+)/);
+  if (crawlDelay && parseInt(crawlDelay[1]) > 5) {
+    penalty += 5;
+    issues.push("High crawl-delay detected. This may prevent content from being indexed fresh.");
+  }
+
+  return { scoreDeduced: penalty, issues };
+}
+
 export function generateOptimizationReport(scan: Scan): OptimizationReport {
   const recommendations: Recommendation[] = [];
   let score = 100;
 
-  // Analyze robots.txt
+  // --- 1. Robots.txt Analysis ---
   if (!scan.robotsTxtFound) {
-    score -= 30;
+    score -= 40; // Increased penalty
     recommendations.push({
       priority: 'high',
       category: 'Robots.txt',
-      title: 'Missing robots.txt file',
-      description: 'Your website does not have a robots.txt file, which means search engines and AI crawlers have no guidance on what to index.',
-      action: 'Create a robots.txt file to control crawler access and protect sensitive areas of your site.'
+      title: 'Missing robots.txt',
+      description: 'Your site lacks a robots.txt file, leaving crawler behavior undefined.',
+      action: 'Create a robots.txt file immediately.'
     });
-  } else if (scan.warnings && scan.warnings.some(w => w.includes('sitemap'))) {
-    score -= 15;
+  } else {
+    // Check for Sitemap
+    if (!scan.robotsTxtContent?.toLowerCase().includes('sitemap:')) {
+      score -= 10; // Reduced from 15
+      recommendations.push({
+        priority: 'medium',
+        category: 'Robots.txt',
+        title: 'Missing Sitemap Reference',
+        description: 'Search engines rely on the sitemap link in robots.txt to find pages.',
+        action: 'Add "Sitemap: https://yourdomain.com/sitemap.xml" to robots.txt.'
+      });
+    }
+
+    // Advanced Quality Check
+    const robotsQuality = analyzeRobotsTxtQuality(scan.robotsTxtContent);
+    score -= robotsQuality.scoreDeduced;
+    robotsQuality.issues.forEach(issue => {
+      recommendations.push({
+        priority: 'high',
+        category: 'Robots.txt',
+        title: 'Dangerous Configuration',
+        description: issue,
+        action: 'Review and relax your Disallow rules.'
+      });
+    });
+  }
+
+  // --- 2. LLMs.txt Analysis ---
+  if (!scan.llmsTxtFound) {
+    score -= 15; // Reduced from 25 to reflect it's "nice to have"
     recommendations.push({
       priority: 'medium',
-      category: 'Robots.txt',
-      title: 'Missing sitemap reference',
-      description: 'Your robots.txt exists but doesn\'t reference a sitemap, making it harder for search engines to discover all your content.',
-      action: 'Add a sitemap reference like "Sitemap: https://yourdomain.com/sitemap.xml" to your robots.txt.'
-    });
-  }
-
-  // Analyze llms.txt
-  if (!scan.llmsTxtFound) {
-    score -= 25;
-    recommendations.push({
-      priority: 'high',
       category: 'AI Optimization',
-      title: 'Missing llms.txt file',
-      description: 'The new llms.txt standard helps AI systems understand your content better. Without it, you\'re missing opportunities for AI-powered discovery.',
-      action: 'Create an llms.txt file to optimize how AI agents like ChatGPT and Claude understand and reference your content.'
+      title: 'Missing llms.txt',
+      description: 'You are missing opportunities for optimized AI discovery.',
+      action: 'Create an llms.txt file.'
+    });
+  } else {
+    // Content Quality Check
+    const llmsQuality = analyzeLlmsTxtQuality(scan.llmsTxtContent);
+    score -= llmsQuality.scoreDeduced;
+    llmsQuality.issues.forEach(issue => {
+      recommendations.push({
+        priority: 'medium',
+        category: 'LLMs.txt',
+        title: 'Low Quality llms.txt',
+        description: issue,
+        action: 'Enrich your llms.txt with summaries, key links, and markdown structure.'
+      });
     });
   }
 
-  // Analyze bot permissions
+  // --- 3. Bot Permission Granularity ---
   if (scan.botPermissions) {
     const restrictedBots = Object.entries(scan.botPermissions).filter(
       ([_, status]) => status.includes('Restricted') || status === 'Blocked'
     );
 
     if (restrictedBots.length > 0) {
-      const hasAIBots = restrictedBots.some(([bot]) => 
-        bot.toLowerCase().includes('gpt') || 
-        bot.toLowerCase().includes('claude') || 
-        bot.toLowerCase().includes('anthropic')
+      // Check if *major* AI bots are blocked
+      const crucialBots = ['GPTBot', 'Claude-Web', 'Google-Extended'];
+      const blockedCrucial = restrictedBots.some(([bot]) => 
+        crucialBots.some(cb => bot.toLowerCase().includes(cb.toLowerCase()))
       );
 
-      if (hasAIBots) {
+      if (blockedCrucial) {
         score -= 20;
         recommendations.push({
           priority: 'high',
           category: 'AI Visibility',
-          title: 'AI crawlers are restricted',
-          description: `${restrictedBots.length} bot(s) including AI agents are being blocked or restricted, limiting your visibility in AI search results.`,
-          action: 'Review your robots.txt rules to allow beneficial AI crawlers while blocking malicious bots.'
+          title: 'Major AI Bots Blocked',
+          description: 'You are blocking top-tier AI models (OpenAI, Anthropic, or Google).',
+          action: 'Allow GPTBot and Claude-Web if you want to be cited in AI answers.'
         });
       } else {
+        // Only minor/niche bots blocked
+        score -= 5;
         recommendations.push({
           priority: 'low',
           category: 'Crawler Management',
-          title: 'Some crawlers are restricted',
-          description: `${restrictedBots.length} crawler(s) have restrictions. Ensure this is intentional.`,
-          action: 'Verify that restricted crawlers align with your content strategy.'
+          title: 'Some Crawlers Restricted',
+          description: 'You have restricted some minor bots. This is likely fine but double-check.',
+          action: 'Verify your blocked list is intentional.'
         });
       }
     }
   }
+
+  // Ensure score doesn't go below 0
+  score = Math.max(0, score);
 
   // Generate optimized files
   const generatedFiles = generateOptimizedFiles(scan);
