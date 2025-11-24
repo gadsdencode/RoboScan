@@ -1,0 +1,197 @@
+Here are complete recommendations to enhance your scoring system in `server/report-generator.ts`. These changes move beyond simple "existence checks" to assessing the **quality and intent** of the configuration.
+
+### 1\. Revised Scoring Weight Distribution
+
+First, rebalance the points to reflect the "criticality" of each component. A missing `robots.txt` (which breaks all SEO) should be penalized more heavily than a missing `llms.txt` (which is an optimization).
+
+| Component | Issue | Current Penalty | **Recommended Penalty** |
+| :--- | :--- | :--- | :--- |
+| **Robots.txt** | Missing file | -30 | **-40** (Critical) |
+| | Missing Sitemap | -15 | **-10** (Important) |
+| | Wildcard Block (`Disallow: /`) | 0 (Not checked) | **-30** (Critical) |
+| **LLMs.txt** | Missing file | -25 | **-15** (Optimization) |
+| | Poor Quality (Empty/Short) | 0 | **-10** |
+| | Missing Structure (No links/headers) | 0 | **-5** |
+| **Permissions** | Blocking *All* AI Bots | -20 | **-20** |
+| | Blocking *Some* AI Bots | -20 | **-5** (Nuance) |
+
+### 2\. Enhanced Code Implementation
+
+Replace the logic in your `generateOptimizationReport` function with this more sophisticated version.
+
+#### A. Helper Functions for Quality Analysis
+
+Add these helper functions to `server/report-generator.ts` to analyze the *content* of the files.
+
+```typescript
+// Helper to assess llms.txt quality
+function analyzeLlmsTxtQuality(content: string | null): { scoreDeduced: number, issues: string[] } {
+  if (!content) return { scoreDeduced: 0, issues: [] }; // Missing file handled elsewhere
+
+  let penalty = 0;
+  const issues = [];
+  const lowerContent = content.toLowerCase();
+
+  // Check 1: Substance (Is it just a placeholder?)
+  if (content.length < 200) {
+    penalty += 10;
+    issues.push("File is too short (<200 chars) to provide meaningful context to AI agents.");
+  }
+
+  // Check 2: Structure (Does it have Markdown headers?)
+  if (!content.includes('#')) {
+    penalty += 5;
+    issues.push("Lacks Markdown structure (headers), making it harder for agents to parse.");
+  }
+
+  // Check 3: Connectivity (Does it link to documentation/pages?)
+  if (!content.includes('https://')) {
+    penalty += 5;
+    issues.push("No external links found. AI agents need links to crawl your actual content.");
+  }
+
+  return { scoreDeduced: Math.min(penalty, 20), issues };
+}
+
+// Helper to assess robots.txt dangerous configurations
+function analyzeRobotsTxtQuality(content: string | null): { scoreDeduced: number, issues: string[] } {
+  if (!content) return { scoreDeduced: 0, issues: [] };
+
+  let penalty = 0;
+  const issues = [];
+  const lowerContent = content.toLowerCase();
+
+  // Check 1: The "Nuclear Option" (Disallow: / for everyone)
+  // We look for "User-agent: *" followed closely by "Disallow: /"
+  if (/user-agent:\s*\*\s*[\r\n]+\s*disallow:\s*\/\s*$/m.test(lowerContent)) {
+    penalty += 30;
+    issues.push("CRITICAL: You are blocking ALL crawlers from the entire site.");
+  }
+
+  // Check 2: High Crawl Delay
+  const crawlDelay = lowerContent.match(/crawl-delay:\s*(\d+)/);
+  if (crawlDelay && parseInt(crawlDelay[1]) > 5) {
+    penalty += 5;
+    issues.push("High crawl-delay detected. This may prevent content from being indexed fresh.");
+  }
+
+  return { scoreDeduced: penalty, issues };
+}
+```
+
+#### B. Updated Main Logic
+
+Update `generateOptimizationReport` to use these new checks.
+
+```typescript
+export function generateOptimizationReport(scan: Scan): OptimizationReport {
+  const recommendations: Recommendation[] = [];
+  let score = 100;
+
+  // --- 1. Robots.txt Analysis ---
+  if (!scan.robotsTxtFound) {
+    score -= 40; // Increased penalty
+    recommendations.push({
+      priority: 'high',
+      category: 'Robots.txt',
+      title: 'Missing robots.txt',
+      description: 'Your site lacks a robots.txt file, leaving crawler behavior undefined.',
+      action: 'Create a robots.txt file immediately.'
+    });
+  } else {
+    // Check for Sitemap
+    if (!scan.robotsTxtContent?.toLowerCase().includes('sitemap:')) {
+      score -= 10; // Reduced from 15
+      recommendations.push({
+        priority: 'medium',
+        category: 'Robots.txt',
+        title: 'Missing Sitemap Reference',
+        description: 'Search engines rely on the sitemap link in robots.txt to find pages.',
+        action: 'Add "Sitemap: https://example.com/sitemap.xml" to robots.txt.'
+      });
+    }
+
+    // Advanced Quality Check
+    const robotsQuality = analyzeRobotsTxtQuality(scan.robotsTxtContent);
+    score -= robotsQuality.scoreDeduced;
+    robotsQuality.issues.forEach(issue => {
+      recommendations.push({
+        priority: 'high',
+        category: 'Robots.txt',
+        title: 'Dangerous Configuration',
+        description: issue,
+        action: 'Review and relax your Disallow rules.'
+      });
+    });
+  }
+
+  // --- 2. LLMs.txt Analysis ---
+  if (!scan.llmsTxtFound) {
+    score -= 15; // Reduced from 25 to reflect it's "nice to have"
+    recommendations.push({
+      priority: 'medium',
+      category: 'AI Optimization',
+      title: 'Missing llms.txt',
+      description: 'You are missing opportunities for optimized AI discovery.',
+      action: 'Create an llms.txt file.'
+    });
+  } else {
+    // Content Quality Check
+    const llmsQuality = analyzeLlmsTxtQuality(scan.llmsTxtContent);
+    score -= llmsQuality.scoreDeduced;
+    llmsQuality.issues.forEach(issue => {
+      recommendations.push({
+        priority: 'medium',
+        category: 'LLMs.txt',
+        title: 'Low Quality llms.txt',
+        description: issue,
+        action: 'Enrich your llms.txt with summaries, key links, and markdown structure.'
+      });
+    });
+  }
+
+  // --- 3. Bot Permission Granularity ---
+  if (scan.botPermissions) {
+    const restrictedBots = Object.entries(scan.botPermissions).filter(
+      ([_, status]) => status.includes('Restricted') || status === 'Blocked'
+    );
+
+    if (restrictedBots.length > 0) {
+      // Check if *major* AI bots are blocked
+      const crucialBots = ['GPTBot', 'Claude-Web', 'Google-Extended'];
+      const blockedCrucial = restrictedBots.some(([bot]) => crucialBots.some(cb => bot.toLowerCase().includes(cb.toLowerCase())));
+
+      if (blockedCrucial) {
+        score -= 20;
+        recommendations.push({
+          priority: 'high',
+          category: 'AI Visibility',
+          title: 'Major AI Bots Blocked',
+          description: 'You are blocking top-tier AI models (OpenAI, Anthropic, or Google).',
+          action: 'Allow GPTBot and Claude-Web if you want to be cited in AI answers.'
+        });
+      } else {
+        // Only minor/niche bots blocked
+        score -= 5; 
+        recommendations.push({
+          priority: 'low',
+          category: 'Crawler Management',
+          title: 'Some Crawlers Restricted',
+          description: 'You have restricted some minor bots. This is likely fine but double-check.',
+          action: 'Verify your blocked list is intentional.'
+        });
+      }
+    }
+  }
+
+  // Ensure score doesn't go below 0
+  score = Math.max(0, score);
+
+  // ... rest of your code (generateSummary, etc.)
+```
+
+### 3\. Summary of Improvements
+
+  * **Accuracy:** A site with an empty `llms.txt` will now receive a lower score than a site with a rich one, fixing the "quality blind spot."
+  * **Realism:** A missing `robots.txt` now effectively "fails" the test (Score \< 60), whereas a missing `llms.txt` just lowers the grade to a "B," which better reflects industry standards.
+  * **Safety:** The new logic catches the "Nuclear Option" (`Disallow: /`), which is the most dangerous SEO mistake a user can make.
