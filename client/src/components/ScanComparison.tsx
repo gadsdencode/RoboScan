@@ -1,345 +1,236 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { 
-  ArrowRight, 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle, 
-  TrendingUp, 
-  FileText, 
-  Bot, 
-  Lightbulb,
-  ChevronDown,
-  ChevronUp,
-  Calendar,
-  GitCompare
+  ArrowRight, CheckCircle2, XCircle, AlertTriangle, 
+  FileText, Bot, LayoutGrid, Scale 
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Scan } from "@shared/schema";
-import { 
-  compareScanResults, 
-  generateOptimizationRecommendations,
-  getDiffStats,
-  type ScanDifference,
-  type OptimizationRecommendation 
-} from "@/lib/scanComparison";
+import { getBotPermissionMatrix } from "@/lib/scanComparison";
 
 interface ScanComparisonProps {
-  oldScan: Scan;
-  newScan: Scan;
+  scanA: Scan;
+  scanB: Scan;
+  labels?: [string, string];
   onClose: () => void;
 }
 
-export function ScanComparison({ oldScan, newScan, onClose }: ScanComparisonProps) {
-  const differences = compareScanResults(oldScan, newScan);
-  const recommendations = generateOptimizationRecommendations(newScan);
-  const stats = getDiffStats(differences);
-  
-  const [showDifferences, setShowDifferences] = useState(true);
-  const [showRecommendations, setShowRecommendations] = useState(true);
-  const [expandedDiff, setExpandedDiff] = useState<number | null>(null);
+export function ScanComparison({ 
+  scanA, 
+  scanB, 
+  labels = ["Scan A", "Scan B"], 
+  onClose 
+}: ScanComparisonProps) {
+  const botMatrix = getBotPermissionMatrix(scanA, scanB);
+  const [activeTab, setActiveTab] = useState("overview");
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high':
-      case 'critical':
-        return 'text-red-400 bg-red-400/10 border-red-400/30';
-      case 'medium':
-      case 'important':
-        return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30';
-      case 'low':
-      case 'suggestion':
-        return 'text-blue-400 bg-blue-400/10 border-blue-400/30';
-      default:
-        return 'text-muted-foreground bg-muted/10 border-muted/30';
-    }
-  };
-
-  const getSeverityIcon = (severity: string) => {
-    switch (severity) {
-      case 'high':
-      case 'critical':
-        return <XCircle className="w-4 h-4" />;
-      case 'medium':
-      case 'important':
-        return <AlertTriangle className="w-4 h-4" />;
-      case 'low':
-      case 'suggestion':
-        return <CheckCircle2 className="w-4 h-4" />;
-      default:
-        return null;
-    }
-  };
-
-  const formatDate = (date: string | Date) => {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const getStatusColor = (found: boolean) => found ? "text-green-400" : "text-red-400";
+  const getStatusIcon = (found: boolean) => found ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
+    <div className="flex flex-col h-[80vh]">
+      <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2 mb-2">
-            <GitCompare className="w-6 h-6 text-primary" />
-            Scan Comparison & Analysis
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Scale className="w-6 h-6 text-primary" />
+            Comparison Analysis
           </h2>
           <p className="text-muted-foreground text-sm">
-            Comparing scans for <span className="font-mono text-foreground">{newScan.url}</span>
+            Comparing <span className="text-primary">{labels[0]}</span> vs <span className="text-primary">{labels[1]}</span>
           </p>
         </div>
-        <Button variant="ghost" onClick={onClose} data-testid="button-close-comparison">
-          Close
-        </Button>
+        <Button variant="outline" onClick={onClose} data-testid="button-close-comparison">Close</Button>
       </div>
 
-      {/* Scan Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4 bg-card border-white/5">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Previous Scan</span>
-          </div>
-          <p className="text-xs text-muted-foreground">{formatDate(oldScan.createdAt)}</p>
-          <div className="mt-3 flex gap-2">
-            <Badge variant="outline" className="text-xs">
-              {oldScan.robotsTxtFound ? '✓ robots.txt' : '✗ robots.txt'}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {oldScan.llmsTxtFound ? '✓ llms.txt' : '✗ llms.txt'}
-            </Badge>
-          </div>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="grid w-full grid-cols-3 mb-4 shrink-0">
+          <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="bots" data-testid="tab-bots">Bot Permissions</TabsTrigger>
+          <TabsTrigger value="files" data-testid="tab-files">File Content</TabsTrigger>
+        </TabsList>
 
-        <Card className="p-4 bg-card border-white/5">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold">Current Scan</span>
-          </div>
-          <p className="text-xs text-muted-foreground">{formatDate(newScan.createdAt)}</p>
-          <div className="mt-3 flex gap-2">
-            <Badge variant="outline" className="text-xs">
-              {newScan.robotsTxtFound ? '✓ robots.txt' : '✗ robots.txt'}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {newScan.llmsTxtFound ? '✓ llms.txt' : '✗ llms.txt'}
-            </Badge>
-          </div>
-        </Card>
-      </div>
-
-      {/* Stats Overview */}
-      {stats.total > 0 && (
-        <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold">Changes Detected</h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">Total Changes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-400">{stats.high}</div>
-              <div className="text-xs text-muted-foreground">High Priority</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-400">{stats.medium}</div>
-              <div className="text-xs text-muted-foreground">Medium Priority</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-400">{stats.low}</div>
-              <div className="text-xs text-muted-foreground">Low Priority</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{stats.byType.bot_permission}</div>
-              <div className="text-xs text-muted-foreground">Bot Changes</div>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Differences Section */}
-      <Card className="p-6 bg-card border-white/5">
-        <button
-          onClick={() => setShowDifferences(!showDifferences)}
-          className="w-full flex items-center justify-between mb-4"
-          data-testid="button-toggle-differences"
-        >
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">Detected Differences</h3>
-            <Badge variant="outline">{differences.length}</Badge>
-          </div>
-          {showDifferences ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </button>
-
-        {showDifferences && (
-          <div className="space-y-3">
-            {differences.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                <p className="text-muted-foreground">No differences detected between these scans</p>
-              </div>
-            ) : (
-              differences.map((diff, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`p-4 rounded-lg border ${getSeverityColor(diff.severity)}`}
-                  data-testid={`diff-item-${index}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        {getSeverityIcon(diff.severity)}
-                        <span className="font-semibold text-sm">{diff.description}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {diff.type.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      
-                      {(diff.type === 'robots_txt' || diff.type === 'llms_txt') && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setExpandedDiff(expandedDiff === index ? null : index)}
-                          className="mt-2"
-                          data-testid={`button-expand-diff-${index}`}
-                        >
-                          {expandedDiff === index ? 'Hide Details' : 'Show Details'}
-                        </Button>
-                      )}
-
-                      {expandedDiff === index && (
-                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold mb-2 text-muted-foreground">Previous Version</div>
-                            <pre className="p-3 bg-black/40 border border-white/10 rounded text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
-                              {diff.oldValue || 'Not found'}
-                            </pre>
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold mb-2 text-primary">Current Version</div>
-                            <pre className="p-3 bg-black/40 border border-primary/30 rounded text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
-                              {diff.newValue || 'Not found'}
-                            </pre>
-                          </div>
-                        </div>
-                      )}
-
-                      {diff.type === 'bot_permission' && (
-                        <div className="mt-2 flex items-center gap-3 text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">Previous:</span>
-                            <span className="font-mono">{diff.oldValue}</span>
-                          </div>
-                          <ArrowRight className="w-3 h-3" />
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">Current:</span>
-                            <span className="font-mono text-primary">{diff.newValue}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+        <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+          <TabsContent value="overview" className="mt-0 space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="p-4 bg-card/50 border-primary/20" data-testid="card-scan-a">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-lg" data-testid="text-label-a">{labels[0]}</h3>
+                  <Badge variant="outline" className="font-mono" data-testid="text-hostname-a">{new URL(scanA.url).hostname}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanA.robotsTxtFound)}`}>
+                    {getStatusIcon(scanA.robotsTxtFound)}
+                    <span className="text-sm font-medium">robots.txt</span>
                   </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* Optimization Recommendations */}
-      <Card className="p-6 bg-card border-white/5">
-        <button
-          onClick={() => setShowRecommendations(!showRecommendations)}
-          className="w-full flex items-center justify-between mb-4"
-          data-testid="button-toggle-recommendations"
-        >
-          <div className="flex items-center gap-2">
-            <Lightbulb className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold">Optimization Recommendations</h3>
-            <Badge variant="outline">{recommendations.length}</Badge>
-          </div>
-          {showRecommendations ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-        </button>
-
-        {showRecommendations && (
-          <div className="space-y-3">
-            {recommendations.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-3" />
-                <p className="text-muted-foreground">
-                  Great job! Your configuration follows best practices.
-                </p>
-              </div>
-            ) : (
-              recommendations.map((rec, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`p-4 rounded-lg border ${getSeverityColor(rec.severity)}`}
-                  data-testid={`recommendation-${index}`}
-                >
-                  <div className="flex items-start gap-3">
-                    {getSeverityIcon(rec.severity)}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-semibold">{rec.title}</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {rec.category.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <p className="text-sm mb-2">{rec.description}</p>
-                      
-                      <div className="mt-3 space-y-2">
-                        <div className="p-3 bg-background/50 rounded border border-white/5">
-                          <div className="text-xs font-semibold text-primary mb-1">
-                            💡 Recommendation
-                          </div>
-                          <p className="text-sm">{rec.recommendation}</p>
-                        </div>
-                        
-                        <div className="p-3 bg-background/50 rounded border border-white/5">
-                          <div className="text-xs font-semibold text-yellow-400 mb-1">
-                            ⚡ Impact
-                          </div>
-                          <p className="text-sm">{rec.impact}</p>
-                        </div>
-                      </div>
-                    </div>
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanA.llmsTxtFound)}`}>
+                    {getStatusIcon(scanA.llmsTxtFound)}
+                    <span className="text-sm font-medium">llms.txt</span>
                   </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-        )}
-      </Card>
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm">{scanA.warnings?.length || 0} Warnings</span>
+                  </div>
+                </div>
+              </Card>
 
-      <Separator />
+              <Card className="p-4 bg-card/50 border-primary/20" data-testid="card-scan-b">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-lg" data-testid="text-label-b">{labels[1]}</h3>
+                  <Badge variant="outline" className="font-mono" data-testid="text-hostname-b">{new URL(scanB.url).hostname}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanB.robotsTxtFound)}`}>
+                    {getStatusIcon(scanB.robotsTxtFound)}
+                    <span className="text-sm font-medium">robots.txt</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanB.llmsTxtFound)}`}>
+                    {getStatusIcon(scanB.llmsTxtFound)}
+                    <span className="text-sm font-medium">llms.txt</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm">{scanB.warnings?.length || 0} Warnings</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
 
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onClose} className="btn-hover-lift" data-testid="button-done">
-          Done
-        </Button>
-      </div>
+            <Card className="p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5 text-primary" />
+                Configuration Summary
+              </h3>
+              <div className="grid grid-cols-2 gap-8 text-sm">
+                <div>
+                  <span className="text-muted-foreground block mb-1">Key Differences</span>
+                  <ul className="list-disc list-inside space-y-1">
+                    {scanA.robotsTxtContent !== scanB.robotsTxtContent && <li>robots.txt content differs</li>}
+                    {scanA.llmsTxtContent !== scanB.llmsTxtContent && <li>llms.txt content differs</li>}
+                    {Object.keys(scanA.botPermissions || {}).length !== Object.keys(scanB.botPermissions || {}).length && (
+                      <li>Different number of explicitly handled bots</li>
+                    )}
+                    {scanA.robotsTxtContent === scanB.robotsTxtContent && 
+                     scanA.llmsTxtContent === scanB.llmsTxtContent && 
+                     Object.keys(scanA.botPermissions || {}).length === Object.keys(scanB.botPermissions || {}).length && (
+                      <li className="text-green-400">No major differences detected</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bots" className="mt-0">
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bot Agent</TableHead>
+                    <TableHead>{labels[0]}</TableHead>
+                    <TableHead>{labels[1]}</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {botMatrix.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No bot permissions found in either scan
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    botMatrix.map((row) => (
+                      <TableRow 
+                        key={row.bot} 
+                        className={row.status !== 'same' ? 'bg-muted/30' : ''}
+                        data-testid={`bot-row-${row.bot}`}
+                      >
+                        <TableCell className="font-medium font-mono">{row.bot}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={
+                            row.valA.includes('Allow') ? 'text-green-400 border-green-400/30' : 
+                            row.valA === '-' ? 'text-muted-foreground' : 'text-red-400 border-red-400/30'
+                          }>
+                            {row.valA}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={
+                            row.valB.includes('Allow') ? 'text-green-400 border-green-400/30' : 
+                            row.valB === '-' ? 'text-muted-foreground' : 'text-red-400 border-red-400/30'
+                          }>
+                            {row.valB}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.status !== 'same' && (
+                            <Badge variant="secondary">Difference</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="files" className="mt-0 space-y-6">
+            <div className="grid grid-cols-2 gap-4 h-[500px]">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-sm font-semibold">{labels[0]} (robots.txt)</span>
+                </div>
+                <ScrollArea className="flex-1 w-full rounded-md border bg-muted/30 p-4" data-testid="scroll-robots-a">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {scanA.robotsTxtContent || "File not found"}
+                  </pre>
+                </ScrollArea>
+              </div>
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-sm font-semibold">{labels[1]} (robots.txt)</span>
+                </div>
+                <ScrollArea className="flex-1 w-full rounded-md border bg-muted/30 p-4" data-testid="scroll-robots-b">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {scanB.robotsTxtContent || "File not found"}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-2 gap-4 h-[500px]">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-sm font-semibold">{labels[0]} (llms.txt)</span>
+                </div>
+                <ScrollArea className="flex-1 w-full rounded-md border bg-muted/30 p-4" data-testid="scroll-llms-a">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {scanA.llmsTxtContent || "File not found"}
+                  </pre>
+                </ScrollArea>
+              </div>
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-sm font-semibold">{labels[1]} (llms.txt)</span>
+                </div>
+                <ScrollArea className="flex-1 w-full rounded-md border bg-muted/30 p-4" data-testid="scroll-llms-b">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {scanB.llmsTxtContent || "File not found"}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </div>
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }
