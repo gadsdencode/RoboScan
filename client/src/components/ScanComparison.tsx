@@ -26,11 +26,29 @@ export function ScanComparison({
   labels = ["Scan A", "Scan B"], 
   onClose 
 }: ScanComparisonProps) {
+  if (!scanA || !scanB || !scanA.url || !scanB.url) {
+    return (
+      <div className="flex flex-col h-[80vh] items-center justify-center">
+        <XCircle className="w-12 h-12 text-red-400 mb-4" />
+        <p className="text-muted-foreground mb-4">Invalid scan data provided for comparison</p>
+        <Button variant="outline" onClick={onClose} data-testid="button-close-comparison">Close</Button>
+      </div>
+    );
+  }
+
   const botMatrix = getBotPermissionMatrix(scanA, scanB);
   const [activeTab, setActiveTab] = useState("overview");
 
   const getStatusColor = (found: boolean) => found ? "text-green-400" : "text-red-400";
   const getStatusIcon = (found: boolean) => found ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />;
+
+  const getHostname = (url: string) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  };
 
   return (
     <div className="flex flex-col h-[80vh]">
@@ -60,7 +78,7 @@ export function ScanComparison({
               <Card className="p-4 bg-card/50 border-primary/20" data-testid="card-scan-a">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg" data-testid="text-label-a">{labels[0]}</h3>
-                  <Badge variant="outline" className="font-mono" data-testid="text-hostname-a">{new URL(scanA.url).hostname}</Badge>
+                  <Badge variant="outline" className="font-mono" data-testid="text-hostname-a">{getHostname(scanA.url)}</Badge>
                 </div>
                 <div className="space-y-2">
                   <div className={`flex items-center gap-2 ${getStatusColor(scanA.robotsTxtFound)}`}>
@@ -81,7 +99,7 @@ export function ScanComparison({
               <Card className="p-4 bg-card/50 border-primary/20" data-testid="card-scan-b">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg" data-testid="text-label-b">{labels[1]}</h3>
-                  <Badge variant="outline" className="font-mono" data-testid="text-hostname-b">{new URL(scanB.url).hostname}</Badge>
+                  <Badge variant="outline" className="font-mono" data-testid="text-hostname-b">{getHostname(scanB.url)}</Badge>
                 </div>
                 <div className="space-y-2">
                   <div className={`flex items-center gap-2 ${getStatusColor(scanB.robotsTxtFound)}`}>

@@ -104,6 +104,14 @@ export default function Dashboard() {
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonOldScan, setComparisonOldScan] = useState<ScanWithPurchase | null>(null);
   const [comparisonNewScan, setComparisonNewScan] = useState<ScanWithPurchase | null>(null);
+  const [comparisonLabels, setComparisonLabels] = useState<[string, string]>(["Previous Scan", "Current Scan"]);
+
+  // Competitor comparison state
+  const [showCompetitorDialog, setShowCompetitorDialog] = useState(false);
+  const [competitorUrl, setCompetitorUrl] = useState("");
+  const [myUrlForCompare, setMyUrlForCompare] = useState("");
+  const [isAnalyzingCompetitor, setIsAnalyzingCompetitor] = useState(false);
+  const [competitorError, setCompetitorError] = useState<string | null>(null);
 
   // Tag management state
   const [allTags, setAllTags] = useState<string[]>([]);
@@ -483,10 +491,76 @@ export default function Dashboard() {
         
         setComparisonOldScan(oldScan);
         setComparisonNewScan(newScan);
+        setComparisonLabels(["Previous Scan", "Current Scan"]);
         setShowComparison(true);
         setComparisonMode(false);
         setSelectedScanForComparison(null);
       }
+    }
+  };
+
+  const handleCompetitorAnalysis = async () => {
+    if (!competitorUrl.trim() || !myUrlForCompare.trim()) return;
+    
+    setIsAnalyzingCompetitor(true);
+    setCompetitorError(null);
+    
+    try {
+      const resA = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: myUrlForCompare })
+      });
+
+      if (!resA.ok) {
+        const errorData = await resA.json().catch(() => ({ message: 'Failed to scan your website' }));
+        setCompetitorError(errorData.message || 'Failed to scan your website');
+        setIsAnalyzingCompetitor(false);
+        return;
+      }
+
+      const dataA = await resA.json();
+      if (!dataA || !dataA.url) {
+        setCompetitorError('Invalid response from your website scan');
+        setIsAnalyzingCompetitor(false);
+        return;
+      }
+
+      const resB = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: competitorUrl })
+      });
+
+      if (!resB.ok) {
+        const errorData = await resB.json().catch(() => ({ message: 'Failed to scan competitor website' }));
+        setCompetitorError(errorData.message || 'Failed to scan competitor website');
+        setIsAnalyzingCompetitor(false);
+        return;
+      }
+
+      const dataB = await resB.json();
+      if (!dataB || !dataB.url) {
+        setCompetitorError('Invalid response from competitor website scan');
+        setIsAnalyzingCompetitor(false);
+        return;
+      }
+
+      setComparisonOldScan(dataA);
+      setComparisonNewScan(dataB);
+      setComparisonLabels(["My Site", "Competitor"]);
+      setShowComparison(true);
+      setShowCompetitorDialog(false);
+      setCompetitorUrl("");
+      setMyUrlForCompare("");
+      setCompetitorError(null);
+      
+      fetchScans();
+    } catch (error) {
+      console.error("Comparison failed", error);
+      setCompetitorError(error instanceof Error ? error.message : 'Failed to compare websites. Please try again.');
+    } finally {
+      setIsAnalyzingCompetitor(false);
     }
   };
 
@@ -508,6 +582,7 @@ export default function Dashboard() {
       const previous = urlScans[1];
       setComparisonOldScan(previous);
       setComparisonNewScan(latest);
+      setComparisonLabels(["Previous Scan", "Current Scan"]);
       setShowComparison(true);
     }
   };
@@ -587,6 +662,18 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Compare Sites */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowCompetitorDialog(true)}
+              className="gap-2 btn-hover-scale"
+              data-testid="button-compare-sites"
+            >
+              <GitCompare className="w-4 h-4" />
+              Compare Sites
+            </Button>
+
             {/* llms.txt Builder */}
             <Link href="/tools/llms-builder">
               <Button 
@@ -1543,8 +1630,9 @@ export default function Dashboard() {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           {comparisonOldScan && comparisonNewScan && (
             <ScanComparison
-              oldScan={comparisonOldScan}
-              newScan={comparisonNewScan}
+              scanA={comparisonOldScan}
+              scanB={comparisonNewScan}
+              labels={comparisonLabels}
               onClose={() => {
                 setShowComparison(false);
                 setComparisonOldScan(null);
@@ -1552,6 +1640,82 @@ export default function Dashboard() {
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Competitor Comparison Dialog */}
+      <Dialog open={showCompetitorDialog} onOpenChange={setShowCompetitorDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitCompare className="w-5 h-5 text-primary" />
+              Compare Sites
+            </DialogTitle>
+            <DialogDescription>
+              Compare your website against a competitor to analyze differences in bot access configuration
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="my-url">Your Website URL</Label>
+              <Input
+                id="my-url"
+                type="url"
+                placeholder="example.com"
+                value={myUrlForCompare}
+                onChange={(e) => setMyUrlForCompare(e.target.value)}
+                data-testid="input-my-url"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="competitor-url">Competitor Website URL</Label>
+              <Input
+                id="competitor-url"
+                type="url"
+                placeholder="competitor.com"
+                value={competitorUrl}
+                onChange={(e) => setCompetitorUrl(e.target.value)}
+                data-testid="input-competitor-url"
+              />
+            </div>
+            {competitorError && (
+              <div className="text-sm text-red-400 flex items-center gap-2" data-testid="text-competitor-error">
+                <AlertCircle className="w-4 h-4" />
+                {competitorError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCompetitorDialog(false);
+                setCompetitorUrl("");
+                setMyUrlForCompare("");
+              }}
+              data-testid="button-cancel-competitor"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCompetitorAnalysis}
+              disabled={isAnalyzingCompetitor || !competitorUrl.trim() || !myUrlForCompare.trim()}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 btn-hover-lift"
+              data-testid="button-analyze-competitor"
+            >
+              {isAnalyzingCompetitor ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <GitCompare className="w-4 h-4 mr-2" />
+                  Compare
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
