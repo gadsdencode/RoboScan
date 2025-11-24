@@ -10,18 +10,23 @@ export interface ChangeDetectionResult {
   };
 }
 
+// Helper to normalize content for comparison (ignore whitespace/newlines)
+function normalize(content: string | null): string {
+  return (content || '').trim().replace(/\r\n/g, '\n');
+}
+
 export function detectChanges(previousScan: Scan, newScan: Scan): ChangeDetectionResult {
   const changes: ChangeDetectionResult['changes'] = {};
   let hasChanges = false;
 
-  // Check robots.txt changes
-  if (previousScan.robotsTxtContent !== newScan.robotsTxtContent) {
+  // Check robots.txt changes (Normalized)
+  if (normalize(previousScan.robotsTxtContent) !== normalize(newScan.robotsTxtContent)) {
     changes.robotsTxtChanged = true;
     hasChanges = true;
   }
 
-  // Check llms.txt changes
-  if (previousScan.llmsTxtContent !== newScan.llmsTxtContent) {
+  // Check llms.txt changes (Normalized)
+  if (normalize(previousScan.llmsTxtContent) !== normalize(newScan.llmsTxtContent)) {
     changes.llmsTxtChanged = true;
     hasChanges = true;
   }
@@ -32,23 +37,20 @@ export function detectChanges(previousScan: Scan, newScan: Scan): ChangeDetectio
   
   const botPermissionChanges: Record<string, { old: string; new: string }> = {};
   
-  // Check for changed or new bot permissions
-  Object.keys(newPermissions).forEach(bot => {
-    if (oldPermissions[bot] !== newPermissions[bot]) {
+  const allBots = new Set([...Object.keys(oldPermissions), ...Object.keys(newPermissions)]);
+
+  allBots.forEach(bot => {
+    const oldPerm = oldPermissions[bot];
+    const newPerm = newPermissions[bot];
+
+    // Only register if there is an actual difference in value
+    if (oldPerm !== newPerm) {
+      // If both are falsy (null/undefined/empty), skip
+      if (!oldPerm && !newPerm) return;
+
       botPermissionChanges[bot] = {
-        old: oldPermissions[bot] || 'Not found',
-        new: newPermissions[bot]
-      };
-      hasChanges = true;
-    }
-  });
-  
-  // Check for removed bot permissions
-  Object.keys(oldPermissions).forEach(bot => {
-    if (!(bot in newPermissions)) {
-      botPermissionChanges[bot] = {
-        old: oldPermissions[bot],
-        new: 'Removed'
+        old: oldPerm || 'Not set',
+        new: newPerm || 'Removed'
       };
       hasChanges = true;
     }
@@ -59,8 +61,10 @@ export function detectChanges(previousScan: Scan, newScan: Scan): ChangeDetectio
   }
 
   // Check for new errors
-  const oldErrors = previousScan.errors || [];
-  const newErrors = newScan.errors || [];
+  const oldErrors = (previousScan.errors as string[]) || [];
+  const newErrors = (newScan.errors as string[]) || [];
+  
+  // Find strictly NEW errors
   const addedErrors = newErrors.filter(err => !oldErrors.includes(err));
   
   if (addedErrors.length > 0) {

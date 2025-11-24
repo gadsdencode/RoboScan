@@ -53,56 +53,78 @@ async function processRecurringScan(recurringScanId: number) {
           const prefs = await storage.getNotificationPreferenceByRecurringScanId(recurringScanId);
           
           if (prefs) {
-            // Create notifications based on preferences
+            // 1. Detailed Robots.txt Message
             if (changeDetection.changes.robotsTxtChanged && prefs.notifyOnRobotsTxtChange) {
+              const oldSize = previousScan.robotsTxtContent?.length || 0;
+              const newSize = newScan.robotsTxtContent?.length || 0;
+              const diff = newSize - oldSize;
+              const sizeMsg = diff > 0 ? `(+${diff} chars)` : `(${diff} chars)`;
+              
               await storage.createNotification({
                 userId: recurringScan.userId,
                 recurringScanId: recurringScanId,
                 scanId: newScan.id,
                 type: 'robots_txt_change',
-                title: 'robots.txt Changed',
-                message: `Changes detected in robots.txt for ${recurringScan.url}`,
-                changes: { robotsTxtChanged: true } as Record<string, any>,
+                title: 'robots.txt Updated',
+                message: `robots.txt content changed ${sizeMsg} for ${recurringScan.url}`,
+                changes: { robotsTxtChanged: true, diff: diff } as Record<string, any>,
                 isRead: false,
               });
             }
 
+            // 2. Detailed LLMs.txt Message
             if (changeDetection.changes.llmsTxtChanged && prefs.notifyOnLlmsTxtChange) {
+              const exists = newScan.llmsTxtFound ? "found" : "removed";
               await storage.createNotification({
                 userId: recurringScan.userId,
                 recurringScanId: recurringScanId,
                 scanId: newScan.id,
                 type: 'llms_txt_change',
-                title: 'llms.txt Changed',
-                message: `Changes detected in llms.txt for ${recurringScan.url}`,
+                title: 'llms.txt Update',
+                message: `llms.txt is now ${exists} or modified on ${recurringScan.url}`,
                 changes: { llmsTxtChanged: true } as Record<string, any>,
                 isRead: false,
               });
             }
 
+            // 3. Detailed Bot Permissions Message (The most important one)
             if (changeDetection.changes.botPermissionsChanged && prefs.notifyOnBotPermissionChange) {
-              const changedBots = Object.keys(changeDetection.changes.botPermissionsChanged);
+              const changes = changeDetection.changes.botPermissionsChanged;
+              const botNames = Object.keys(changes);
+              
+              // Construct a readable summary: "GPTBot: Allowed -> Blocked"
+              const summary = botNames.slice(0, 2).map(bot => 
+                `${bot}: ${changes[bot].old} → ${changes[bot].new}`
+              ).join(', ');
+              
+              const extra = botNames.length > 2 ? ` (+${botNames.length - 2} more)` : '';
+
               await storage.createNotification({
                 userId: recurringScan.userId,
                 recurringScanId: recurringScanId,
                 scanId: newScan.id,
                 type: 'bot_permission_change',
                 title: 'Bot Permissions Changed',
-                message: `Bot permission changes detected for ${changedBots.length} bot(s) on ${recurringScan.url}`,
-                changes: changeDetection.changes.botPermissionsChanged as Record<string, any>,
+                message: `${summary}${extra} on ${recurringScan.url}`,
+                changes: changes as Record<string, any>,
                 isRead: false,
               });
             }
 
+            // 4. Detailed Error Message
             if (changeDetection.changes.newErrors && prefs.notifyOnNewErrors) {
+              const errors = changeDetection.changes.newErrors;
+              const firstError = errors[0];
+              const extra = errors.length > 1 ? ` (and ${errors.length - 1} others)` : '';
+
               await storage.createNotification({
                 userId: recurringScan.userId,
                 recurringScanId: recurringScanId,
                 scanId: newScan.id,
                 type: 'new_errors',
                 title: 'New Errors Detected',
-                message: `${changeDetection.changes.newErrors.length} new error(s) detected on ${recurringScan.url}`,
-                changes: { newErrors: changeDetection.changes.newErrors } as Record<string, any>,
+                message: `Error: "${firstError}"${extra} detected on ${recurringScan.url}`,
+                changes: { newErrors: errors } as Record<string, any>,
                 isRead: false,
               });
             }
