@@ -1,0 +1,202 @@
+This feature can be implemented by integrating **driver.js**, a lightweight, framework-agnostic library for feature tours, and customizing it to match the application's cyberpunk aesthetic.
+
+Here is the complete implementation plan.
+
+### 1\. Add Dependency
+
+First, add `driver.js` to your project to handle the tour overlay and navigation logic.
+
+**File:** `package.json`
+
+```json
+{
+  "dependencies": {
+    // ... existing dependencies
+    "driver.js": "^1.3.1"
+  }
+}
+```
+
+### 2\. Define Tour Configuration
+
+Create a dedicated configuration file for the tour steps. This keeps the `dashboard.tsx` file clean and makes it easier to update the tour content later. We will target elements using the existing `data-testid` attributes found in the dashboard.
+
+**File:** `client/src/lib/tour-config.ts` (New File)
+
+```typescript
+import { DriveStep } from "driver.js";
+
+export const dashboardTourSteps: DriveStep[] = [
+  {
+    element: '[data-testid="input-scan-url"]',
+    popover: {
+      title: "Scan a Website",
+      description: "Enter any URL here to analyze its robots.txt and llms.txt files for AI bot permissions.",
+      side: "bottom",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="button-create-recurring"]',
+    popover: {
+      title: "Monitor Automatically",
+      description: "Set up recurring scans to get notified immediately when a website's bot permissions change.",
+      side: "left",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-compare-sites"]',
+    popover: {
+      title: "Competitor Analysis",
+      description: "Compare your website against competitors to see how their AI strategies differ from yours.",
+      side: "bottom",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-llms-builder"]',
+    popover: {
+      title: "LLMs.txt Builder",
+      description: "Use our tool to generate a compliant llms.txt file to control how AI agents view your content.",
+      side: "bottom",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-notifications"]',
+    popover: {
+      title: "Stay Updated",
+      description: "Check here for alerts about scan changes, new errors, or permission updates.",
+      side: "left",
+      align: "start"
+    }
+  }
+];
+```
+
+### 3\. Integrate Tour into Dashboard
+
+Update the dashboard component to initialize the tour. We will add a "Help / Tour" button to the navbar and trigger the tour automatically for first-time users.
+
+**File:** `client/src/pages/dashboard.tsx`
+
+```typescript
+// ... existing imports
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import { dashboardTourSteps } from "@/lib/tour-config";
+import { HelpCircle } from "lucide-react"; // Add this icon
+
+// ... inside Dashboard component function
+export default function Dashboard() {
+  // ... existing state
+
+  // Tour Handler
+  const runTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      steps: dashboardTourSteps,
+      popoverClass: 'roboscan-driver-popover', // Custom class for styling
+      onDestroy: () => {
+        // Mark tour as seen in localStorage
+        localStorage.setItem('roboscan_tour_seen', 'true');
+      }
+    });
+    
+    driverObj.drive();
+  };
+
+  // Auto-start tour for new users
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem('roboscan_tour_seen');
+    if (!hasSeenTour && !loading && scans.length === 0) {
+      // Only show if data is loaded and user has no scans (likely new)
+      // Small timeout to ensure UI renders
+      setTimeout(runTour, 1000);
+    }
+  }, [loading, scans.length]);
+
+  // ... existing return (render)
+  
+  // Update the Navbar section (inside the <nav> block):
+  /*
+    <div className="flex items-center gap-4">
+      
+      {/* NEW: Help/Tour Button */}
+      <Button 
+        variant="ghost" 
+        size="icon"
+        onClick={runTour}
+        className="btn-hover-scale text-muted-foreground hover:text-primary"
+        title="Start Feature Tour"
+      >
+        <HelpCircle className="w-5 h-5" />
+      </Button>
+
+      {/* Existing Buttons */}
+      <Button 
+        variant="outline" 
+        size="sm"
+        onClick={() => setShowCompetitorDialog(true)}
+        // ...
+  */
+```
+
+### 4\. Apply Cyberpunk Styling
+
+The default `driver.js` popovers are white, which clashes with the dark, cyberpunk theme of Roboscan. Add these overrides to your global CSS to match the `shadcn/ui` and Tailwind theme.
+
+**File:** `client/src/index.css`
+
+```css
+/* ... existing styles ... */
+
+/* Driver.js Cyberpunk Theme Overrides */
+.roboscan-driver-popover.driver-popover {
+  @apply bg-card border border-primary/30 text-foreground rounded-xl shadow-2xl shadow-primary/10;
+}
+
+.roboscan-driver-popover .driver-popover-title {
+  @apply font-mono text-lg font-bold text-primary flex items-center gap-2;
+}
+
+.roboscan-driver-popover .driver-popover-description {
+  @apply text-muted-foreground text-sm mt-2 mb-4 font-sans leading-relaxed;
+}
+
+/* Navigation Buttons */
+.roboscan-driver-popover .driver-popover-footer button {
+  @apply bg-secondary text-secondary-foreground border border-white/10 rounded-md px-3 py-1 text-xs font-medium transition-colors;
+  text-shadow: none;
+}
+
+.roboscan-driver-popover .driver-popover-footer button:hover {
+  @apply bg-primary/20 text-primary border-primary/30;
+}
+
+.roboscan-driver-popover .driver-popover-footer button.driver-popover-next-btn {
+  @apply bg-primary text-primary-foreground font-bold;
+}
+
+.roboscan-driver-popover .driver-popover-footer button.driver-popover-next-btn:hover {
+  @apply bg-primary/90;
+}
+
+/* Progress Bar (optional if showProgress is true) */
+.roboscan-driver-popover .driver-popover-progress-text {
+  @apply text-muted-foreground font-mono text-xs;
+}
+
+/* The "Spotlight" area */
+.driver-active-element {
+  @apply ring-2 ring-primary ring-offset-4 ring-offset-background transition-all duration-300;
+}
+```
+
+### Summary of Changes
+
+1.  **`package.json`**: Added `driver.js`.
+2.  **`client/src/lib/tour-config.ts`**: Defined steps targeting key features like Scanning, Recurring Scans, and Comparison.
+3.  **`client/src/pages/dashboard.tsx`**: Integrated the tour execution logic and added a manual trigger button next to notifications.
+4.  **`client/src/index.css`**: Styled the tour popovers to use the app's "Cyan Neon" and dark background palette.
