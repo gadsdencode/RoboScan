@@ -1,5 +1,6 @@
 # robots.txt for ROBOSCAN
 # Optimized for SEO and AI/LLM Discovery
+# Powered by Overture Systems (https://overture-systems.com)
 
 # Allow all standard crawlers to access public pages
 User-agent: *
