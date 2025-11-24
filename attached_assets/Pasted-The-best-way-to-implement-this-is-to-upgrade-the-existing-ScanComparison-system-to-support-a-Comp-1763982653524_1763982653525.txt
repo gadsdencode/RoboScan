@@ -1,0 +1,342 @@
+The best way to implement this is to upgrade the existing `ScanComparison` system to support a "Competitor Mode" (Side-by-Side) alongside the existing "History Mode" (Diff). This requires a new "Competitor Analysis" workflow in the dashboard that can trigger scans on two URLs simultaneously and then present them in a revamped comparison view.
+
+Here is the implementation plan:
+
+1.  **Update `scanComparison.ts`**: Add logic to generate a "Bot Permission Matrix" to easily spot differences in bot access between two sites.
+2.  **Revamp `ScanComparison.tsx`**: Transform it into a tabbed interface (Summary, Bot Matrix, File Diff) that handles both "Previous vs Current" and "My Site vs Competitor" contexts.
+3.  **Update `dashboard.tsx`**: Add a "Compare Sites" feature that allows users to input two distinct URLs, scans them (if needed), and opens the comparison view.
+
+### 1\. Update Comparison Logic
+
+Add the matrix generation logic to the shared library.
+
+```typescript
+// client/src/lib/scanComparison.ts
+
+import type { Scan } from "@shared/schema";
+
+// ... existing interfaces ...
+
+export interface BotPermissionComparison {
+  bot: string;
+  valA: string;
+  valB: string;
+  status: 'same' | 'different' | 'unique_to_a' | 'unique_to_b';
+}
+
+export function getBotPermissionMatrix(scanA: Scan, scanB: Scan): BotPermissionComparison[] {
+  const permsA = (scanA.botPermissions as Record<string, string>) || {};
+  const permsB = (scanB.botPermissions as Record<string, string>) || {};
+  
+  const allBots = Array.from(new Set([...Object.keys(permsA), ...Object.keys(permsB)])).sort();
+  
+  return allBots.map(bot => {
+    const valA = permsA[bot];
+    const valB = permsB[bot];
+    
+    let status: BotPermissionComparison['status'] = 'same';
+    
+    if (valA !== valB) {
+      if (!valA) status = 'unique_to_b';
+      else if (!valB) status = 'unique_to_a';
+      else status = 'different';
+    }
+    
+    return { 
+      bot, 
+      valA: valA || '-', 
+      valB: valB || '-', 
+      status 
+    };
+  });
+}
+
+// ... keep existing functions ...
+```
+
+### 2\. Revamp Comparison UI
+
+Replace `client/src/components/ScanComparison.tsx` with this richer, tabbed interface.
+
+```tsx
+import { useState } from "react";
+import { 
+  ArrowRight, CheckCircle2, XCircle, AlertTriangle, 
+  FileText, Bot, LayoutGrid, Scale 
+} from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Scan } from "@shared/schema";
+import { getBotPermissionMatrix } from "@/lib/scanComparison";
+
+interface ScanComparisonProps {
+  scanA: Scan; // Left side (or Old)
+  scanB: Scan; // Right side (or New)
+  labels?: [string, string]; // ["My Site", "Competitor"] or ["Previous", "Current"]
+  onClose: () => void;
+}
+
+export function ScanComparison({ 
+  scanA, 
+  scanB, 
+  labels = ["Scan A", "Scan B"], 
+  onClose 
+}: ScanComparisonProps) {
+  const botMatrix = getBotPermissionMatrix(scanA, scanB);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const getStatusColor = (found: boolean) => found ? "text-green-400" : "text-red-400";
+  const getStatusIcon = (found: boolean) => found ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />;
+
+  return (
+    <div className="flex flex-col h-[80vh]">
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Scale className="w-6 h-6 text-primary" />
+            Comparison Analysis
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Comparing <span className="text-primary">{labels[0]}</span> vs <span className="text-primary">{labels[1]}</span>
+          </p>
+        </div>
+        <Button variant="outline" onClick={onClose}>Close</Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="grid w-full grid-cols-3 mb-4 shrink-0">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="bots">Bot Permissions</TabsTrigger>
+          <TabsTrigger value="files">File Content</TabsTrigger>
+        </TabsList>
+
+        <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+          {/* OVERVIEW TAB */}
+          <TabsContent value="overview" className="mt-0 space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Site A Card */}
+              <Card className="p-4 bg-card/50 border-primary/20">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-lg">{labels[0]}</h3>
+                  <Badge variant="outline" className="font-mono">{new URL(scanA.url).hostname}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanA.robotsTxtFound)}`}>
+                    {getStatusIcon(scanA.robotsTxtFound)}
+                    <span className="text-sm font-medium">robots.txt</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanA.llmsTxtFound)}`}>
+                    {getStatusIcon(scanA.llmsTxtFound)}
+                    <span className="text-sm font-medium">llms.txt</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm">{scanA.warnings?.length || 0} Warnings</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Site B Card */}
+              <Card className="p-4 bg-card/50 border-primary/20">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-lg">{labels[1]}</h3>
+                  <Badge variant="outline" className="font-mono">{new URL(scanB.url).hostname}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanB.robotsTxtFound)}`}>
+                    {getStatusIcon(scanB.robotsTxtFound)}
+                    <span className="text-sm font-medium">robots.txt</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${getStatusColor(scanB.llmsTxtFound)}`}>
+                    {getStatusIcon(scanB.llmsTxtFound)}
+                    <span className="text-sm font-medium">llms.txt</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm">{scanB.warnings?.length || 0} Warnings</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <Card className="p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5 text-primary" />
+                Configuration Summary
+              </h3>
+              <div className="grid grid-cols-2 gap-8 text-sm">
+                <div>
+                  <span className="text-muted-foreground block mb-1">Key Differences</span>
+                  <ul className="list-disc list-inside space-y-1">
+                    {scanA.robotsTxtContent !== scanB.robotsTxtContent && <li>robots.txt content differs</li>}
+                    {scanA.llmsTxtContent !== scanB.llmsTxtContent && <li>llms.txt content differs</li>}
+                    {Object.keys(scanA.botPermissions || {}).length !== Object.keys(scanB.botPermissions || {}).length && (
+                      <li>Different number of explicitly handled bots</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* BOTS TAB */}
+          <TabsContent value="bots" className="mt-0">
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Bot Agent</TableHead>
+                    <TableHead>{labels[0]}</TableHead>
+                    <TableHead>{labels[1]}</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {botMatrix.map((row) => (
+                    <TableRow key={row.bot} className={row.status !== 'same' ? 'bg-muted/30' : ''}>
+                      <TableCell className="font-medium font-mono">{row.bot}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={
+                          row.valA.includes('Allow') ? 'text-green-400 border-green-400/30' : 
+                          row.valA === '-' ? 'text-muted-foreground' : 'text-red-400 border-red-400/30'
+                        }>
+                          {row.valA}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={
+                          row.valB.includes('Allow') ? 'text-green-400 border-green-400/30' : 
+                          row.valB === '-' ? 'text-muted-foreground' : 'text-red-400 border-red-400/30'
+                        }>
+                          {row.valB}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.status !== 'same' && (
+                          <Badge variant="secondary">Difference</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+
+          {/* FILES TAB */}
+          <TabsContent value="files" className="mt-0 space-y-6">
+            <div className="grid grid-cols-2 gap-4 h-[500px]">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-sm font-semibold">{labels[0]} (robots.txt)</span>
+                </div>
+                <ScrollArea className="flex-1 w-full rounded-md border bg-muted/30 p-4">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {scanA.robotsTxtContent || "File not found"}
+                  </pre>
+                </ScrollArea>
+              </div>
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-sm font-semibold">{labels[1]} (robots.txt)</span>
+                </div>
+                <ScrollArea className="flex-1 w-full rounded-md border bg-muted/30 p-4">
+                  <pre className="text-xs font-mono whitespace-pre-wrap">
+                    {scanB.robotsTxtContent || "File not found"}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </div>
+          </TabsContent>
+        </div>
+      </Tabs>
+    </div>
+  );
+}
+```
+
+### 3\. Implement Comparison Flow in `dashboard.tsx`
+
+Add the logic to prompt for a competitor URL, run the scan on-the-fly, and open the comparison.
+
+```tsx
+// Add to client/src/pages/dashboard.tsx inside the Dashboard component
+
+// ... existing state ...
+const [showCompetitorDialog, setShowCompetitorDialog] = useState(false);
+const [competitorUrl, setCompetitorUrl] = useState("");
+const [myUrlForCompare, setMyUrlForCompare] = useState("");
+const [isAnalyzingCompetitor, setIsAnalyzingCompetitor] = useState(false);
+
+// Add this function
+const handleCompetitorAnalysis = async () => {
+  if (!competitorUrl.trim() || !myUrlForCompare.trim()) return;
+  
+  setIsAnalyzingCompetitor(true);
+  try {
+    // 1. Scan My Site (refresh or get new)
+    const resA = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: myUrlForCompare })
+    });
+    const dataA = await resA.json();
+
+    // 2. Scan Competitor
+    const resB = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: competitorUrl })
+    });
+    const dataB = await resB.json();
+
+    // 3. Open Comparison
+    setComparisonOldScan(dataA); // Treated as "My Site"
+    setComparisonNewScan(dataB); // Treated as "Competitor"
+    // We can use a state flag to tell ScanComparison to use specific labels
+    // For now, we can just open the existing dialog, but we might want to pass custom labels prop
+    setShowComparison(true);
+    setShowCompetitorDialog(false);
+    
+    // Refresh list to show these new scans
+    fetchScans();
+  } catch (error) {
+    console.error("Comparison failed", error);
+  } finally {
+    setIsAnalyzingCompetitor(false);
+  }
+};
+
+// Update the render of the dialog to pass custom labels
+// Inside DialogContent for ScanComparison:
+/*
+<ScanComparison
+  scanA={comparisonOldScan}
+  scanB={comparisonNewScan}
+  labels={
+    // Heuristic to check if this is a competitor comparison or historical
+    comparisonOldScan.url !== comparisonNewScan.url 
+      ? ["My Site", "Competitor"] 
+      : ["Previous Scan", "Current Scan"]
+  }
+  onClose={() => { ... }}
+/>
+*/
+
+// Add the button in the header area
+/*
+<Button 
+  variant="outline" 
+  onClick={() => setShowCompetitorDialog(true)}
+  className="gap-2"
+>
+  <GitCompare className="w-4 h-4" />
+  Compare Sites
+</Button>
+*/
+```
