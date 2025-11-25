@@ -28,6 +28,15 @@ const scanRequestSchema = z.object({
   url: z.string().min(1, "URL is required"),
 });
 
+function calculateLevel(totalXp: number): number {
+  // Curve: Level 1 starts at 0 XP.
+  // Level 2 = 100 XP
+  // Level 3 = 400 XP
+  // Level 4 = 900 XP
+  // Formula: Level = floor(sqrt(XP / 100)) + 1
+  return Math.floor(Math.sqrt(totalXp / 100)) + 1;
+}
+
 function parsePositiveInt(value: any, defaultValue: number, min: number = 1, max: number = 100): number {
   const parsed = parseInt(value);
   if (isNaN(parsed) || parsed < min) return defaultValue;
@@ -136,6 +145,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         warnings: result.warnings,
       });
 
+      // Gamification: XP Logic Injection
+      let gamificationUpdates = null;
+      
+      if (userId) {
+        const currentUser = await storage.getUser(userId);
+        
+        if (currentUser) {
+          // Base Reward: 10 XP for performing a scan
+          let xpGain = 10;
+
+          // Bonus Reward: +40 XP for a "Perfect Scan" (Total 50)
+          // Encourages users to fix their sites to see the green checkmarks
+          if (result.robotsTxtFound && result.llmsTxtFound) {
+            xpGain += 40; 
+          }
+
+          const currentXp = currentUser.xp || 0;
+          const newXp = currentXp + xpGain;
+          const newLevel = calculateLevel(newXp);
+          const oldLevel = currentUser.level || 1;
+
+          // Update Database
+          await storage.updateUserGamificationStats(userId, newXp, newLevel);
+
+          // Prepare data for frontend toast/notification
+          gamificationUpdates = {
+            xpGained: xpGain,
+            totalXp: newXp,
+            newLevel: newLevel,
+            levelUp: newLevel > oldLevel
+          };
+        }
+      }
+
       res.json({
         id: scan.id,
         url: scan.url,
@@ -146,6 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         botPermissions: scan.botPermissions,
         errors: scan.errors,
         warnings: scan.warnings,
+        gamification: gamificationUpdates,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
