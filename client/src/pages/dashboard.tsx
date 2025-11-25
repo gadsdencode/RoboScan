@@ -1910,6 +1910,7 @@ export default function Dashboard() {
           setShowPaymentModal(true);
           setShowScanDetailsModal(false);
         }}
+        isAdmin={user?.isAdmin}
       />
     </div>
   );
