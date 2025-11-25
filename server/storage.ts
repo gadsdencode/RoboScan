@@ -290,13 +290,30 @@ export class DatabaseStorage implements IStorage {
     const safeLimit = !limit || isNaN(limit) || limit < 1 ? 50 : Math.min(limit, 100);
     const safeOffset = !offset || isNaN(offset) || offset < 0 ? 0 : offset;
 
-    return await db
-      .select()
+    const results = await db
+      .select({
+        id: notifications.id,
+        userId: notifications.userId,
+        recurringScanId: notifications.recurringScanId,
+        scanId: notifications.scanId,
+        type: notifications.type,
+        title: notifications.title,
+        message: notifications.message,
+        changes: notifications.changes,
+        isRead: notifications.isRead,
+        createdAt: notifications.createdAt,
+      })
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt))
       .limit(safeLimit)
       .offset(safeOffset);
+    
+    // Convert Date to ISO string for JSON serialization
+    return results.map(row => ({
+      ...row,
+      createdAt: row.createdAt.toISOString() as any,
+    }));
   }
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
