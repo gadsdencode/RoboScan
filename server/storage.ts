@@ -8,6 +8,7 @@ import {
   notifications,
   achievements,
   userAchievements,
+  llmsFieldPurchases,
   type User,
   type UpsertUser,
   type Scan,
@@ -22,6 +23,8 @@ import {
   type InsertNotification,
   type Achievement,
   type UserAchievement,
+  type LlmsFieldPurchase,
+  type InsertLlmsFieldPurchase,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -80,6 +83,12 @@ export interface IStorage {
     xpReward: number;
     icon: string;
   }>>;
+  
+  // Premium LLMs Field operations
+  createLlmsFieldPurchase(purchase: InsertLlmsFieldPurchase): Promise<LlmsFieldPurchase>;
+  getUserLlmsFieldPurchases(userId: string): Promise<LlmsFieldPurchase[]>;
+  hasUserPurchasedField(userId: string, fieldKey: string): Promise<boolean>;
+  getLlmsFieldPurchaseByPaymentIntent(paymentIntentId: string): Promise<LlmsFieldPurchase | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -421,6 +430,38 @@ export class DatabaseStorage implements IStorage {
       xpReward: row.achievements.xpReward,
       icon: row.achievements.icon,
     }));
+  }
+
+  // Premium LLMs Field operations
+  async createLlmsFieldPurchase(purchase: InsertLlmsFieldPurchase): Promise<LlmsFieldPurchase> {
+    const [created] = await db.insert(llmsFieldPurchases).values(purchase).returning();
+    return created;
+  }
+
+  async getUserLlmsFieldPurchases(userId: string): Promise<LlmsFieldPurchase[]> {
+    return await db
+      .select()
+      .from(llmsFieldPurchases)
+      .where(eq(llmsFieldPurchases.userId, userId));
+  }
+
+  async hasUserPurchasedField(userId: string, fieldKey: string): Promise<boolean> {
+    const [result] = await db
+      .select()
+      .from(llmsFieldPurchases)
+      .where(and(
+        eq(llmsFieldPurchases.userId, userId),
+        eq(llmsFieldPurchases.fieldKey, fieldKey)
+      ));
+    return !!result;
+  }
+
+  async getLlmsFieldPurchaseByPaymentIntent(paymentIntentId: string): Promise<LlmsFieldPurchase | undefined> {
+    const [purchase] = await db
+      .select()
+      .from(llmsFieldPurchases)
+      .where(eq(llmsFieldPurchases.stripePaymentIntentId, paymentIntentId));
+    return purchase;
   }
 }
 

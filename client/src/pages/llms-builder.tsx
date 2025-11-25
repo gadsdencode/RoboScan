@@ -1,14 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { motion } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { useQueryClient } from "@tanstack/react-query";
+
+const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
+const stripePromise = loadStripe(PUBLISHABLE_KEY);
+
+// Icons mapping
+const iconMap: Record<string, any> = {
+  Package,
+  DollarSign,
+  Share2,
+  Code,
+  MessageSquare,
+  Users
+};
 
 interface LLMsTxtFormData {
   websiteName: string;
@@ -19,17 +38,122 @@ interface LLMsTxtFormData {
   keyAreas: string;
   contentGuidelines: string;
   contactEmail: string;
+  // Premium fields
+  products?: string;
+  pricing?: string;
+  socialMedia?: string;
+  apiEndpoints?: string;
+  brandVoice?: string;
+  targetAudience?: string;
+}
+
+interface PremiumField {
+  key: string;
+  name: string;
+  description: string;
+  price: number;
+  xpReward: number;
+  icon: string;
+  template: string;
+}
+
+interface PurchasedField {
+  id: number;
+  userId: string;
+  fieldKey: string;
+  purchasedAt: Date;
+}
+
+function PaymentForm({ 
+  clientSecret, 
+  onSuccess, 
+  onCancel,
+  fieldName
+}: { 
+  clientSecret: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+  fieldName: string;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+    });
+
+    if (error) {
+      toast({
+        title: "Payment Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+    } else {
+      onSuccess();
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Unlock <span className="text-foreground font-semibold">{fieldName}</span> to enhance your llms.txt file
+        </p>
+        <PaymentElement />
+      </div>
+      <div className="flex gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="flex-1 bg-primary"
+        >
+          {isProcessing ? "Processing..." : "Complete Purchase"}
+        </Button>
+      </div>
+    </form>
+  );
 }
 
 export default function LLMsBuilder() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
     errors: string[];
   } | null>(null);
 
-  const { register, watch } = useForm<LLMsTxtFormData>({
+  const [premiumFields, setPremiumFields] = useState<PremiumField[]>([]);
+  const [purchasedFields, setPurchasedFields] = useState<PurchasedField[]>([]);
+  const [selectedField, setSelectedField] = useState<PremiumField | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [clientSecret, setClientSecret] = useState("");
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+
+  const { register, watch, setValue } = useForm<LLMsTxtFormData>({
     defaultValues: {
       websiteName: "example.com",
       websiteUrl: "https://example.com",
@@ -52,10 +176,135 @@ export default function LLMsBuilder() {
 
   const formData = watch();
 
+  useEffect(() => {
+    loadPremiumFieldsConfig();
+    if (user) {
+      loadPurchasedFields();
+    }
+  }, [user]);
+
+  const loadPremiumFieldsConfig = async () => {
+    try {
+      const { PREMIUM_LLMS_FIELDS } = await import('@/../../shared/llms-fields');
+      const fields = Object.values(PREMIUM_LLMS_FIELDS).map((field: any) => ({
+        key: field.key,
+        name: field.name,
+        description: field.description,
+        price: field.price,
+        xpReward: field.xpReward,
+        icon: field.icon,
+        template: field.template
+      }));
+      setPremiumFields(fields);
+    } catch (error) {
+      console.error('Failed to load premium fields:', error);
+    }
+  };
+
+  const loadPurchasedFields = async () => {
+    try {
+      const response = await fetch('/api/llms-fields/purchases');
+      if (response.ok) {
+        const data = await response.json();
+        setPurchasedFields(data);
+      }
+    } catch (error) {
+      console.error('Failed to load purchased fields:', error);
+    }
+  };
+
+  const isPurchased = (fieldKey: string): boolean => {
+    return purchasedFields.some(p => p.fieldKey === fieldKey);
+  };
+
+  const handleUnlockField = async (field: PremiumField) => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to unlock premium fields.",
+        variant: "destructive",
+      });
+      window.location.href = "/api/login";
+      return;
+    }
+
+    setSelectedField(field);
+    setIsLoadingPayment(true);
+
+    try {
+      const response = await fetch('/api/llms-fields/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldKey: field.key
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create payment');
+      }
+
+      const data = await response.json();
+      setClientSecret(data.clientSecret);
+      setShowPaymentModal(true);
+    } catch (error) {
+      toast({
+        title: "Payment Error",
+        description: error instanceof Error ? error.message : 'Failed to initiate payment',
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingPayment(false);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    if (!clientSecret || !selectedField) return;
+
+    const paymentIntentId = clientSecret.split('_secret_')[0];
+
+    try {
+      const response = await fetch('/api/llms-fields/confirm-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentIntentId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to confirm payment');
+      }
+
+      toast({
+        title: `🎉 ${selectedField.name} Unlocked!`,
+        description: `You earned ${selectedField.xpReward} XP! The field is now available in your builder.`,
+        className: "border-green-500/50 bg-green-500/10",
+      });
+
+      // Populate the field with template
+      const fieldKey = selectedField.key.toLowerCase();
+      setValue(fieldKey as keyof LLMsTxtFormData, selectedField.template);
+
+      // Refresh purchased fields and user data
+      await loadPurchasedFields();
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+
+      setShowPaymentModal(false);
+      setSelectedField(null);
+      setClientSecret("");
+    } catch (error) {
+      toast({
+        title: "Confirmation Error",
+        description: "Payment succeeded but confirmation failed. Please contact support.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const generateLLMsTxt = (): string => {
     const currentDate = new Date().toISOString().split('T')[0];
     
-    return `# llms.txt - AI Agent Instructions
+    let content = `# llms.txt - AI Agent Instructions
 # Website: ${formData.websiteName}
 # Last updated: ${currentDate}
 
@@ -78,6 +327,28 @@ ${formData.contentGuidelines}
 # Contact
 For AI partnership inquiries: ${formData.contactEmail}
 `;
+
+    // Add premium fields if unlocked
+    if (formData.products && isPurchased('PRODUCTS')) {
+      content += `\n${formData.products}\n`;
+    }
+    if (formData.pricing && isPurchased('PRICING')) {
+      content += `\n${formData.pricing}\n`;
+    }
+    if (formData.socialMedia && isPurchased('SOCIAL_MEDIA')) {
+      content += `\n${formData.socialMedia}\n`;
+    }
+    if (formData.apiEndpoints && isPurchased('API_ENDPOINTS')) {
+      content += `\n${formData.apiEndpoints}\n`;
+    }
+    if (formData.brandVoice && isPurchased('BRAND_VOICE')) {
+      content += `\n${formData.brandVoice}\n`;
+    }
+    if (formData.targetAudience && isPurchased('TARGET_AUDIENCE')) {
+      content += `\n${formData.targetAudience}\n`;
+    }
+
+    return content;
   };
 
   const handleValidate = async () => {
@@ -105,7 +376,6 @@ For AI partnership inquiries: ${formData.contactEmail}
           description: "Your llms.txt file is properly formatted!",
         });
 
-        // [GAMIFICATION] Check for achievement
         if (result.gamification?.achievementUnlocked) {
           setTimeout(() => {
             toast({
@@ -113,6 +383,7 @@ For AI partnership inquiries: ${formData.contactEmail}
               description: `You earned the "${result.gamification.achievement.name}" badge and ${result.gamification.achievement.xpReward} XP!`,
               className: "border-yellow-500/50 bg-yellow-500/10",
             });
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           }, 500);
         }
       } else {
@@ -212,7 +483,7 @@ For AI partnership inquiries: ${formData.contactEmail}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Website Name */}
+                {/* Standard Fields */}
                 <div className="space-y-2">
                   <Label htmlFor="websiteName" data-testid="label-website-name">
                     Website/Domain Name *
@@ -223,12 +494,8 @@ For AI partnership inquiries: ${formData.contactEmail}
                     {...register("websiteName")}
                     data-testid="input-website-name"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Your website's domain or company name
-                  </p>
                 </div>
 
-                {/* Website URL */}
                 <div className="space-y-2">
                   <Label htmlFor="websiteUrl" data-testid="label-website-url">
                     Website URL *
@@ -240,14 +507,10 @@ For AI partnership inquiries: ${formData.contactEmail}
                     {...register("websiteUrl")}
                     data-testid="input-website-url"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    The full URL of your website
-                  </p>
                 </div>
 
                 <Separator />
 
-                {/* Content Description */}
                 <div className="space-y-2">
                   <Label htmlFor="contentDescription" data-testid="label-content-description">
                     Content Summary *
@@ -259,14 +522,10 @@ For AI partnership inquiries: ${formData.contactEmail}
                     className="min-h-[100px]"
                     data-testid="textarea-content-description"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    A brief description of your website's main purpose or offerings
-                  </p>
                 </div>
 
                 <Separator />
 
-                {/* Citation Format */}
                 <div className="space-y-2">
                   <Label htmlFor="citationFormat" data-testid="label-citation-format">
                     Preferred Citation Format *
@@ -277,14 +536,10 @@ For AI partnership inquiries: ${formData.contactEmail}
                     {...register("citationFormat")}
                     data-testid="input-citation-format"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    How AI agents should cite your content (e.g., include brackets for placeholders)
-                  </p>
                 </div>
 
                 <Separator />
 
-                {/* Allowed Bots */}
                 <div className="space-y-2">
                   <Label htmlFor="allowedBots" data-testid="label-allowed-bots">
                     Allowed Bots *
@@ -296,14 +551,10 @@ For AI partnership inquiries: ${formData.contactEmail}
                     className="min-h-[120px] font-mono text-sm"
                     data-testid="textarea-allowed-bots"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    List of AI crawlers and bots allowed to access your content (one per line)
-                  </p>
                 </div>
 
                 <Separator />
 
-                {/* Key Areas */}
                 <div className="space-y-2">
                   <Label htmlFor="keyAreas" data-testid="label-key-areas">
                     Key Areas
@@ -315,14 +566,10 @@ For AI partnership inquiries: ${formData.contactEmail}
                     className="min-h-[120px] font-mono text-sm"
                     data-testid="textarea-key-areas"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Important sections of your website (one per line, use bullet points)
-                  </p>
                 </div>
 
                 <Separator />
 
-                {/* Content Guidelines */}
                 <div className="space-y-2">
                   <Label htmlFor="contentGuidelines" data-testid="label-content-guidelines">
                     Content Guidelines
@@ -334,14 +581,10 @@ For AI partnership inquiries: ${formData.contactEmail}
                     className="min-h-[120px] font-mono text-sm"
                     data-testid="textarea-content-guidelines"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Usage policies and attribution requirements (one per line)
-                  </p>
                 </div>
 
                 <Separator />
 
-                {/* Contact Email */}
                 <div className="space-y-2">
                   <Label htmlFor="contactEmail" data-testid="label-contact-email">
                     Contact Email *
@@ -353,10 +596,96 @@ For AI partnership inquiries: ${formData.contactEmail}
                     {...register("contactEmail")}
                     data-testid="input-contact-email"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Email for AI partnership inquiries
-                  </p>
                 </div>
+
+                {/* Premium Fields Section */}
+                {premiumFields.length > 0 && (
+                  <>
+                    <Separator className="my-6" />
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                        <h3 className="text-lg font-semibold">Premium Fields</h3>
+                        <Badge variant="secondary" className="ml-auto">
+                          Enhance Your Profile
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Unlock additional fields to provide more context to AI agents and earn XP
+                      </p>
+
+                      <div className="grid gap-4">
+                        {premiumFields.map((field) => {
+                          const IconComponent = iconMap[field.icon] || Package;
+                          const purchased = isPurchased(field.key);
+                          const fieldKey = field.key.toLowerCase() as keyof LLMsTxtFormData;
+
+                          return (
+                            <Card
+                              key={field.key}
+                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-white/10'}`}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-start gap-4">
+                                  <div className={`p-2 rounded-lg ${purchased ? 'bg-primary/20' : 'bg-muted'}`}>
+                                    <IconComponent className={`w-5 h-5 ${purchased ? 'text-primary' : 'text-muted-foreground'}`} />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div>
+                                        <h4 className="font-semibold flex items-center gap-2">
+                                          {field.name}
+                                          {purchased ? (
+                                            <Badge variant="default" className="text-xs">
+                                              <Unlock className="w-3 h-3 mr-1" />
+                                              Unlocked
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="secondary" className="text-xs">
+                                              <Lock className="w-3 h-3 mr-1" />
+                                              Locked
+                                            </Badge>
+                                          )}
+                                        </h4>
+                                        <p className="text-sm text-muted-foreground mt-1">
+                                          {field.description}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {purchased ? (
+                                      <Textarea
+                                        {...register(fieldKey)}
+                                        className="min-h-[100px] font-mono text-sm mt-3"
+                                        placeholder={field.template}
+                                      />
+                                    ) : (
+                                      <div className="flex items-center gap-3 mt-3">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleUnlockField(field)}
+                                          disabled={isLoadingPayment}
+                                          className="bg-primary"
+                                        >
+                                          <DollarSign className="w-4 h-4 mr-1" />
+                                          Unlock for ${field.price}
+                                        </Button>
+                                        <Badge variant="outline" className="text-xs">
+                                          <Zap className="w-3 h-3 mr-1 text-yellow-500" />
+                                          +{field.xpReward} XP
+                                        </Badge>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -461,11 +790,11 @@ For AI partnership inquiries: ${formData.contactEmail}
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span>Update the file when your content structure changes</span>
+                      <span>Premium fields provide additional context for AI agents</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-primary">•</span>
-                      <span>Use clear citation formats to ensure proper attribution</span>
+                      <span>Unlock fields to earn XP and level up your expertise</span>
                     </li>
                   </ul>
                 </CardContent>
@@ -474,6 +803,40 @@ For AI partnership inquiries: ${formData.contactEmail}
           </div>
         </motion.div>
       </div>
+
+      {/* Payment Modal */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" />
+              Unlock Premium Field
+            </DialogTitle>
+            <DialogDescription>
+              {selectedField && (
+                <>
+                  Complete your purchase to unlock <strong>{selectedField.name}</strong> and earn <strong>{selectedField.xpReward} XP</strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {clientSecret && selectedField && (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <PaymentForm
+                clientSecret={clientSecret}
+                onSuccess={handlePaymentSuccess}
+                onCancel={() => {
+                  setShowPaymentModal(false);
+                  setSelectedField(null);
+                  setClientSecret("");
+                }}
+                fieldName={selectedField.name}
+              />
+            </Elements>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

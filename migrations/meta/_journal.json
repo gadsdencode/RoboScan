@@ -8,6 +8,13 @@
       "when": 1764087006863,
       "tag": "0000_sloppy_newton_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764092883170,
+      "tag": "0001_odd_energizer",
+      "breakpoints": true
     }
   ]
 }

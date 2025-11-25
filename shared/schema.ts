@@ -167,3 +167,23 @@ export const userAchievements = pgTable("user_achievements", {
 
 export type Achievement = typeof achievements.$inferSelect;
 export type UserAchievement = typeof userAchievements.$inferSelect;
+
+// Premium LLMs.txt Fields Purchases
+export const llmsFieldPurchases = pgTable("llms_field_purchases", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fieldKey: text("field_key").notNull(), // PRODUCTS, PRICING, etc.
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  amount: integer("amount").notNull(), // in cents
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("user_field_unique").on(table.userId, table.fieldKey)
+]);
+
+export const insertLlmsFieldPurchaseSchema = createInsertSchema(llmsFieldPurchases).omit({
+  id: true,
+  purchasedAt: true,
+});
+
+export type InsertLlmsFieldPurchase = z.infer<typeof insertLlmsFieldPurchaseSchema>;
+export type LlmsFieldPurchase = typeof llmsFieldPurchases.$inferSelect;
