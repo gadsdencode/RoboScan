@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock } from "lucide-react";
+import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock, Zap, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -57,7 +57,87 @@ const Navbar = () => {
   );
 };
 
-const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
+// New StepTracker Component
+type ScanStep = 'input' | 'scanning' | 'report';
+
+const StepTracker = ({ currentStep }: { currentStep: ScanStep }) => {
+  const steps = [
+    { id: 'input', label: 'Enter URL', number: 1 },
+    { id: 'scanning', label: 'Scanning', number: 2 },
+    { id: 'report', label: 'View Report', number: 3 }
+  ];
+
+  const getStepState = (stepId: string) => {
+    const stepIndex = steps.findIndex(s => s.id === stepId);
+    const currentIndex = steps.findIndex(s => s.id === currentStep);
+    
+    if (stepIndex < currentIndex) return 'completed';
+    if (stepIndex === currentIndex) return 'active';
+    return 'pending';
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-2 md:gap-4 mb-8">
+      {steps.map((step, index) => {
+        const state = getStepState(step.id);
+        
+        return (
+          <div key={step.id} className="flex items-center">
+            <motion.div 
+              className="flex items-center gap-2"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <div className={`
+                relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-sm transition-all
+                ${state === 'completed' ? 'bg-primary text-primary-foreground' : ''}
+                ${state === 'active' ? 'bg-primary text-primary-foreground ring-4 ring-primary/30' : ''}
+                ${state === 'pending' ? 'bg-white/5 text-muted-foreground border border-white/10' : ''}
+              `}>
+                {state === 'completed' ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : (
+                  <span>{step.number}</span>
+                )}
+                {state === 'active' && (
+                  <motion.div
+                    className="absolute inset-0 rounded-full bg-primary"
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                  />
+                )}
+              </div>
+              <span className={`hidden md:inline text-sm font-medium ${
+                state === 'active' ? 'text-foreground' : 'text-muted-foreground'
+              }`}>
+                {step.label}
+              </span>
+            </motion.div>
+            
+            {index < steps.length - 1 && (
+              <div className={`
+                w-8 md:w-16 h-0.5 mx-2 transition-all
+                ${state === 'completed' ? 'bg-primary' : 'bg-white/10'}
+              `} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Enhanced Hero Component with Wizard UI
+const Hero = ({ 
+  onScan, 
+  currentStep,
+  isScanning 
+}: { 
+  onScan: (url: string) => void;
+  currentStep: ScanStep;
+  isScanning: boolean;
+}) => {
   const [url, setUrl] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -100,29 +180,72 @@ const Hero = ({ onScan }: { onScan: (url: string) => void }) => {
             Generate, validate, and optimize <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">robots.txt</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">llms.txt</code> to ensure AI agents interact with your content exactly how you intend.
           </p>
 
-          <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 w-full max-w-md mx-auto">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input 
-                placeholder="example.com" 
-                className="pl-10 h-12 bg-background/50 backdrop-blur border-white/10 focus:border-primary/50 transition-colors"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                data-testid="input-url"
-              />
-            </div>
-            <Button 
-              type="submit" 
-              size="lg" 
-              className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
-              data-testid="button-scan"
-            >
-              Scan Now
-            </Button>
-          </form>
+          {/* Step Tracker */}
+          <StepTracker currentStep={currentStep} />
+
+          {/* Wizard-style Form */}
+          <motion.div
+            animate={{ 
+              scale: currentStep === 'input' ? 1 : 0.95,
+              opacity: currentStep === 'input' ? 1 : 0.7
+            }}
+            transition={{ duration: 0.3 }}
+          >
+            <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
+              <div className="bg-card/50 backdrop-blur border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Search className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="font-bold text-lg mb-1">Step 1: Enter Your Website</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Start your AI readiness analysis by entering your domain
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Input 
+                      placeholder="example.com" 
+                      className="h-12 bg-background/50 backdrop-blur border-white/10 focus:border-primary/50 transition-colors text-base"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      data-testid="input-url"
+                      disabled={isScanning}
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    size="lg" 
+                    className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
+                    data-testid="button-scan"
+                    disabled={isScanning || !url}
+                  >
+                    {isScanning ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                          className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
+                        />
+                        Scanning...
+                      </>
+                    ) : (
+                      <>
+                        Begin Analysis
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
           
-          <p className="mt-4 text-xs text-muted-foreground">
-            Free scan. No credit card required.
+          <p className="mt-6 text-xs text-muted-foreground">
+            Free scan • No credit card required • Instant results
           </p>
         </motion.div>
       </div>
@@ -145,12 +268,14 @@ const TerminalDemo = ({
   isScanning, 
   targetUrl, 
   onScanComplete,
-  onUnlockReport
+  onUnlockReport,
+  onScanError
 }: { 
   isScanning: boolean; 
   targetUrl: string;
   onScanComplete: (scanId: number) => void;
   onUnlockReport: () => void;
+  onScanError: () => void;
 }) => {
   const [lines, setLines] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -185,6 +310,7 @@ const TerminalDemo = ({
             `> [ERROR] Connection failed: ${error.message || 'Unknown error'}`,
             "> Scan aborted."
           ]);
+          onScanError();
           return;
         }
 
@@ -247,42 +373,92 @@ const TerminalDemo = ({
           `> [ERROR] Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           "> Scan aborted."
         ]);
+        onScanError();
       }
     };
 
     performScan();
-  }, [isScanning, targetUrl, onScanComplete]);
+  }, [isScanning, targetUrl, onScanComplete, onScanError]);
+
+  if (!isScanning && lines.length === 0) return null;
 
   return (
-    <section id="demo" className="py-20 bg-black/20 border-y border-white/5">
+    <motion.section 
+      id="terminal"
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className="py-12 md:py-20 bg-black/20 border-y border-white/5"
+    >
       <div className="container mx-auto px-6">
-        <div className="flex flex-col lg:flex-row gap-12 items-center">
-          <div className="flex-1 space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold">See What Robots See</h2>
-            <p className="text-muted-foreground text-lg">
-              Most AI agents respect standardized files. If you don't have them, you're leaving your content strategy to chance. Our scanner reveals exactly which bots can access your data.
-            </p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-center mb-8"
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-4">
+            <Zap className="w-3 h-3" />
+            Step 2: Live Analysis
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold">Real-Time Scan Results</h2>
+          <p className="text-muted-foreground mt-2">
+            Watch as we analyze your site's AI readiness
+          </p>
+        </motion.div>
+
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
+          <motion.div 
+            className="flex-1 space-y-6"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <h3 className="text-2xl font-bold">What We're Checking:</h3>
             
             <div className="grid gap-4">
               {[
-                { title: "Robots.txt Validation", desc: "Check for syntax errors and logic gaps." },
-                { title: "LLMs.txt Generation", desc: "Create the new standard for AI readability." },
-                { title: "Bot Permission Audit", desc: "See which specific AI crawlers are allowed." }
+                { 
+                  title: "1. Bot Identification", 
+                  desc: "Detecting which AI crawlers can access your site",
+                  icon: <Bot className="w-5 h-5" />
+                },
+                { 
+                  title: "2. Permission Validation", 
+                  desc: "Analyzing robots.txt rules and agent permissions",
+                  icon: <Shield className="w-5 h-5" />
+                },
+                { 
+                  title: "3. File Generation", 
+                  desc: "Preparing optimized configurations for AI agents",
+                  icon: <FileCode className="w-5 h-5" />
+                }
               ].map((item, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="mt-1 bg-primary/10 p-2 rounded-full h-fit">
-                    <CheckCircle className="w-4 h-4 text-primary" />
+                <motion.div 
+                  key={i} 
+                  className="flex gap-4 p-4 rounded-xl bg-card/30 border border-white/5"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 + (i * 0.1) }}
+                >
+                  <div className="mt-1 bg-primary/10 p-2 rounded-lg h-fit">
+                    {item.icon}
                   </div>
                   <div>
-                    <h3 className="font-bold">{item.title}</h3>
+                    <h4 className="font-bold text-primary">{item.title}</h4>
                     <p className="text-sm text-muted-foreground">{item.desc}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex-1 w-full space-y-4">
+          <motion.div 
+            className="flex-1 w-full space-y-4"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             <Card className="bg-[#0d1117] border-white/10 p-0 overflow-hidden shadow-2xl shadow-primary/5">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/5">
                 <div className="flex gap-1.5">
@@ -296,9 +472,9 @@ const TerminalDemo = ({
                 </div>
               </div>
               <div className="p-6 font-mono text-sm min-h-[300px] flex flex-col" data-testid="terminal-output">
-                {!isScanning && lines.length === 0 ? (
+                {lines.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground/50">
-                    Waiting for input...
+                    Initializing scan...
                   </div>
                 ) : (
                   lines.map((line, i) => {
@@ -335,6 +511,7 @@ const TerminalDemo = ({
                 <motion.div
                   initial={{ opacity: 0, y: 20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
                   className="p-6 bg-gradient-to-r from-primary/10 to-blue-500/10 border border-primary/20 rounded-xl"
                   data-testid="upgrade-cta"
                 >
@@ -343,7 +520,7 @@ const TerminalDemo = ({
                       <Sparkles className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold text-lg mb-2">Want the Full Report?</h3>
+                      <h3 className="font-bold text-lg mb-2">Scan Complete! Ready for Step 3?</h3>
                       <p className="text-sm text-muted-foreground mb-4">
                         Get actionable recommendations, optimized files ready to deploy, and SEO impact analysis for just <span className="text-primary font-bold">$9.99</span>
                       </p>
@@ -365,53 +542,95 @@ const TerminalDemo = ({
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </motion.div>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 };
 
-const Features = () => {
-  const features = [
+// Refactored How It Works Component (Sequential Flow)
+const HowItWorks = () => {
+  const steps = [
     {
-      icon: <Bot className="w-8 h-8 text-primary" />,
-      title: "Agent Identification",
-      desc: "Instantly identify which AI agents are crawling your site and what they are looking for."
+      number: "01",
+      icon: <Search className="w-10 h-10 text-primary" />,
+      title: "Enter Your URL",
+      desc: "Simply input your website domain to begin the analysis. Our scanner works with any public website.",
+      color: "from-cyan-500/20 to-blue-500/20"
     },
     {
-      icon: <FileCode className="w-8 h-8 text-primary" />,
-      title: "Smart File Generation",
-      desc: "Automatically generate optimized robots.txt and llms.txt files tailored to your content strategy."
+      number: "02",
+      icon: <FileSearch className="w-10 h-10 text-primary" />,
+      title: "We Scan & Analyze",
+      desc: "Our engine checks robots.txt, llms.txt, validates syntax, and identifies which AI agents can access your content.",
+      color: "from-blue-500/20 to-purple-500/20"
     },
     {
-      icon: <Shield className="w-8 h-8 text-primary" />,
-      title: "Content Protection",
-      desc: "Block unauthorized scrapers while allowing beneficial AI agents to index your content properly."
+      number: "03",
+      icon: <Sparkles className="w-10 h-10 text-primary" />,
+      title: "Get Optimized Files",
+      desc: "Receive ready-to-deploy configuration files, actionable insights, and a complete AI readiness report.",
+      color: "from-purple-500/20 to-pink-500/20"
     }
   ];
 
   return (
-    <section id="features" className="py-24 container mx-auto px-6">
+    <section id="how-it-works" className="py-24 container mx-auto px-6 relative">
+      {/* Background decoration */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
+      </div>
+
       <div className="text-center mb-16">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">Why You Need Roboscan</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          The web has changed. It's not just humans visiting your site anymore.
-        </p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">How It Works</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+            Three simple steps to complete AI readiness for your website
+          </p>
+        </motion.div>
       </div>
       
-      <div className="grid md:grid-cols-3 gap-8">
-        {features.map((f, i) => (
+      <div className="grid md:grid-cols-3 gap-8 md:gap-6 relative">
+        {/* Connection lines for desktop */}
+        <div className="hidden md:block absolute top-24 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+        
+        {steps.map((step, i) => (
           <motion.div
             key={i}
-            whileHover={{ y: -5 }}
-            className="p-6 rounded-2xl bg-card border border-white/5 hover:border-primary/30 transition-colors group"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: i * 0.2 }}
+            className="relative"
           >
-            <div className="mb-6 p-3 bg-primary/10 w-fit rounded-xl group-hover:bg-primary/20 transition-colors">
-              {f.icon}
+            <div className="relative p-8 rounded-2xl bg-card border border-white/5 hover:border-primary/30 transition-all group h-full">
+              {/* Step number badge */}
+              <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                {step.number}
+              </div>
+              
+              {/* Icon container */}
+              <div className={`mb-6 p-4 bg-gradient-to-br ${step.color} w-fit rounded-xl group-hover:scale-110 transition-transform`}>
+                {step.icon}
+              </div>
+              
+              <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
+              <p className="text-muted-foreground leading-relaxed">{step.desc}</p>
+              
+              {/* Arrow indicator */}
+              {i < steps.length - 1 && (
+                <div className="hidden md:block absolute -right-4 top-1/2 -translate-y-1/2 text-primary/30">
+                  <ArrowRight className="w-8 h-8" />
+                </div>
+              )}
             </div>
-            <h3 className="text-xl font-bold mb-3">{f.title}</h3>
-            <p className="text-muted-foreground leading-relaxed">{f.desc}</p>
           </motion.div>
         ))}
       </div>
@@ -446,20 +665,36 @@ export default function Home() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPremiumReport, setShowPremiumReport] = useState(false);
   const [premiumReportData, setPremiumReportData] = useState<any>(null);
+  const [currentStep, setCurrentStep] = useState<ScanStep>('input');
+  const terminalRef = useRef<HTMLDivElement>(null);
 
   const handleScan = (url: string) => {
     setTargetUrl(url);
     setIsScanning(true);
     setCurrentScanId(null);
     setShowPremiumReport(false);
-    const demoSection = document.getElementById("demo");
-    if (demoSection) {
-      demoSection.scrollIntoView({ behavior: "smooth" });
-    }
+    setCurrentStep('scanning');
+    
+    // Smooth scroll to terminal with offset for better UX
+    setTimeout(() => {
+      const terminalSection = document.getElementById("terminal");
+      if (terminalSection) {
+        const yOffset = -100; // Offset for navbar
+        const y = terminalSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+    }, 100);
   };
 
   const handleScanComplete = useCallback((scanId: number) => {
     setCurrentScanId(scanId);
+    setCurrentStep('report');
+    setIsScanning(false);
+  }, []);
+
+  const handleScanError = useCallback(() => {
+    setIsScanning(false);
+    setCurrentStep('input');
   }, []);
 
   const handleUnlockReport = useCallback(() => {
@@ -496,14 +731,27 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <Hero onScan={handleScan} />
-          <Features />
-          <TerminalDemo 
-            isScanning={isScanning} 
-            targetUrl={targetUrl} 
-            onScanComplete={handleScanComplete}
-            onUnlockReport={handleUnlockReport}
+          <Hero 
+            onScan={handleScan} 
+            currentStep={currentStep}
+            isScanning={isScanning}
           />
+          
+          {/* Terminal appears immediately after Hero when scanning */}
+          <div ref={terminalRef}>
+            <TerminalDemo 
+              isScanning={isScanning} 
+              targetUrl={targetUrl} 
+              onScanComplete={handleScanComplete}
+              onUnlockReport={handleUnlockReport}
+              onScanError={handleScanError}
+            />
+          </div>
+          
+          {/* How It Works section - shown before any scanning */}
+          {!isScanning && (
+            <HowItWorks />
+          )}
         </>
       )}
       <Footer />
