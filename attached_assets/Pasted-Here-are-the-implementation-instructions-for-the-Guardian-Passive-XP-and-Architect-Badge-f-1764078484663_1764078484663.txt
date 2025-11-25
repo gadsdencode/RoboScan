@@ -1,0 +1,251 @@
+Here are the implementation instructions for the **Guardian Passive XP** and **"Architect" Badge** features.
+
+This requires setting up the achievement system infrastructure first, then injecting the specific logic for both retention and achievement loops.
+
+### **Step 1: Infrastructure (Schema & Shared Logic)**
+
+We need tables to store achievements and a shared utility for level calculations to avoid code duplication.
+
+**A. Update Database Schema**
+**File:** `shared/schema.ts`
+
+Add the following table definitions:
+
+```typescript
+// ... existing imports
+
+// [GAMIFICATION] Achievements System
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(), // e.g., 'ARCHITECT'
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  xpReward: integer("xp_reward").notNull(),
+  icon: text("icon").notNull(), // Lucide icon name
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  achievementId: integer("achievement_id").notNull().references(() => achievements.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+});
+
+// ... existing exports
+export type Achievement = typeof achievements.$inferSelect;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+```
+
+> **Action Required:** Run `npm run db:push` to update the database.
+
+**B. Create Gamification Logic Helper**
+**File:** `server/gamification.ts` (New File)
+
+Move the level calculation logic here so both `routes.ts` and `scheduler.ts` can use it.
+
+```typescript
+export function calculateLevel(totalXp: number): number {
+  return Math.floor(Math.sqrt(totalXp / 100)) + 1;
+}
+
+export const ACHIEVEMENTS = {
+  ARCHITECT: {
+    key: 'ARCHITECT',
+    name: 'AI Architect',
+    description: 'Created a valid llms.txt file',
+    xpReward: 50,
+    icon: 'FileCode'
+  }
+};
+```
+
+**C. Update Storage**
+**File:** `server/storage.ts`
+
+Add methods to handle achievement unlocking.
+
+```typescript
+// Add to IStorage interface
+// ...
+getAchievementByKey(key: string): Promise<Achievement | undefined>;
+unlockAchievement(userId: string, achievementKey: string): Promise<{ unlocked: boolean, achievement?: Achievement }>;
+createAchievement(data: any): Promise<Achievement>; // For seeding
+
+// Add to DatabaseStorage class
+async getAchievementByKey(key: string): Promise<Achievement | undefined> {
+  const [achievement] = await db.select().from(achievements).where(eq(achievements.key, key));
+  return achievement;
+}
+
+async createAchievement(data: any): Promise<Achievement> {
+   const [achievement] = await db.insert(achievements).values(data).onConflictDoNothing().returning();
+   return achievement;
+}
+
+async unlockAchievement(userId: string, achievementKey: string): Promise<{ unlocked: boolean, achievement?: Achievement }> {
+  const achievement = await this.getAchievementByKey(achievementKey);
+  if (!achievement) return { unlocked: false };
+
+  // Check if already unlocked
+  const [existing] = await db.select()
+    .from(userAchievements)
+    .where(and(
+      eq(userAchievements.userId, userId),
+      eq(userAchievements.achievementId, achievement.id)
+    ));
+
+  if (existing) return { unlocked: false };
+
+  // Unlock it
+  await db.insert(userAchievements).values({
+    userId,
+    achievementId: achievement.id
+  });
+
+  // Award XP for the achievement
+  const user = await this.getUser(userId);
+  if (user) {
+    const newXp = (user.xp || 0) + achievement.xpReward;
+    // Use a simpler level calc here or import the helper if you moved it to shared/
+    const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1; 
+    await this.updateUserGamificationStats(userId, newXp, newLevel);
+  }
+
+  return { unlocked: true, achievement };
+}
+```
+
+-----
+
+### **Step 2: Implement "Guardian Passive XP" (Retention)**
+
+**File:** `server/scheduler.ts`
+
+We will modify the scheduler to award XP every time a scan runs successfully.
+
+```typescript
+// ... imports
+import { calculateLevel } from "./gamification"; // Import helper
+
+// Inside processRecurringScan function...
+// ... after `const newScan = await storage.createScan(...)`
+
+// [GAMIFICATION] Guardian Passive XP
+// Award XP simply for the scan running (retention mechanic)
+if (recurringScan.userId) {
+  const PASSIVE_XP_AMOUNT = 5;
+  
+  try {
+    const user = await storage.getUser(recurringScan.userId);
+    if (user) {
+      const newXp = (user.xp || 0) + PASSIVE_XP_AMOUNT;
+      const newLevel = calculateLevel(newXp);
+      
+      await storage.updateUserGamificationStats(recurringScan.userId, newXp, newLevel);
+
+      // Create a silent notification for the XP gain 
+      // (Or create a weekly digest logic later. For now, we log it to notifications so they see it in the feed)
+      await storage.createNotification({
+        userId: recurringScan.userId,
+        recurringScanId: recurringScanId,
+        scanId: newScan.id,
+        type: 'xp_gain',
+        title: 'Guardian XP Earned',
+        message: `+${PASSIVE_XP_AMOUNT} XP for keeping watch over ${recurringScan.url}`,
+        changes: { xpGained: PASSIVE_XP_AMOUNT } as Record<string, any>,
+        isRead: false,
+      });
+    }
+  } catch (err) {
+    console.error(`[Scheduler] Failed to award passive XP:`, err);
+  }
+}
+
+// ... rest of function
+```
+
+-----
+
+### **Step 3: Implement "Architect" Badge (Achievement)**
+
+**Part A: Backend Logic**
+**File:** `server/routes.ts`
+
+Seed the achievement on startup and trigger the unlock in the validation route.
+
+```typescript
+import { ACHIEVEMENTS } from "./gamification";
+
+// 1. SEED DATA (Add this inside registerRoutes, before returning app)
+// Ensure the achievement exists in the DB
+await storage.createAchievement(ACHIEVEMENTS.ARCHITECT);
+
+// 2. UPDATE ROUTE
+app.post("/api/validate-llms-txt", async (req: any, res) => {
+  // ... existing validation logic ...
+  
+  const isValid = errors.length === 0;
+  let achievementUnlocked = false;
+  let achievementDetails = null;
+
+  // [GAMIFICATION] Unlock Achievement if valid
+  if (isValid && req.isAuthenticated()) {
+    const userId = req.user.claims.sub;
+    const result = await storage.unlockAchievement(userId, ACHIEVEMENTS.ARCHITECT.key);
+    if (result.unlocked) {
+      achievementUnlocked = true;
+      achievementDetails = result.achievement;
+    }
+  }
+
+  res.json({
+    isValid,
+    errors,
+    // Pass this back to frontend
+    gamification: {
+      achievementUnlocked,
+      achievement: achievementDetails
+    }
+  });
+});
+```
+
+**Part B: Frontend Feedback**
+**File:** `client/src/pages/llms-builder.tsx`
+
+Update `handleValidate` to show the special toast.
+
+```tsx
+// ... imports
+import { Trophy } from "lucide-react"; // Import Trophy icon
+
+// Inside LLMsBuilder component
+const handleValidate = async () => {
+  // ... existing setup
+  try {
+    // ... fetch call
+    const result = await response.json();
+    setValidationResult(result);
+
+    if (result.isValid) {
+      toast({
+        title: "Validation Successful",
+        description: "Your llms.txt file is properly formatted!",
+      });
+
+      // [GAMIFICATION] Check for achievement
+      if (result.gamification?.achievementUnlocked) {
+        setTimeout(() => {
+          toast({
+            title: "🏆 Achievement Unlocked!",
+            description: `You earned the "${result.gamification.achievement.name}" badge and ${result.gamification.achievement.xpReward} XP!`,
+            className: "border-yellow-500/50 bg-yellow-500/10",
+          });
+        }, 500); // Slight delay for dramatic effect
+      }
+    } else {
+      // ... error handling
+    }
+  } // ... catch block
+};
+```

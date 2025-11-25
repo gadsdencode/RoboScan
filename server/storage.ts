@@ -6,6 +6,8 @@ import {
   recurringScans,
   notificationPreferences,
   notifications,
+  achievements,
+  userAchievements,
   type User,
   type UpsertUser,
   type Scan,
@@ -18,6 +20,8 @@ import {
   type InsertNotificationPreference,
   type Notification,
   type InsertNotification,
+  type Achievement,
+  type UserAchievement,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -59,6 +63,11 @@ export interface IStorage {
   getUnreadNotificationCount(userId: string): Promise<number>;
   markNotificationAsRead(id: number): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
+  
+  // Achievement operations
+  getAchievementByKey(key: string): Promise<Achievement | undefined>;
+  unlockAchievement(userId: string, achievementKey: string): Promise<{ unlocked: boolean, achievement?: Achievement }>;
+  createAchievement(data: any): Promise<Achievement>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -304,6 +313,44 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ isRead: true })
       .where(eq(notifications.userId, userId));
+  }
+
+  // Achievement operations
+  async getAchievementByKey(key: string): Promise<Achievement | undefined> {
+    const [achievement] = await db.select().from(achievements).where(eq(achievements.key, key));
+    return achievement;
+  }
+
+  async createAchievement(data: any): Promise<Achievement> {
+    const [achievement] = await db.insert(achievements).values(data).onConflictDoNothing().returning();
+    return achievement;
+  }
+
+  async unlockAchievement(userId: string, achievementKey: string): Promise<{ unlocked: boolean, achievement?: Achievement }> {
+    const achievement = await this.getAchievementByKey(achievementKey);
+    if (!achievement) return { unlocked: false };
+
+    // Try to insert the achievement (will fail silently if duplicate)
+    const [inserted] = await db.insert(userAchievements)
+      .values({
+        userId,
+        achievementId: achievement.id
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    // If no row was inserted, it means it was already unlocked
+    if (!inserted) return { unlocked: false };
+
+    // Award XP for the achievement
+    const user = await this.getUser(userId);
+    if (user) {
+      const newXp = (user.xp || 0) + achievement.xpReward;
+      const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
+      await this.updateUserGamificationStats(userId, newXp, newLevel);
+    }
+
+    return { unlocked: true, achievement };
   }
 }
 

@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { scanWebsite } from "./scanner";
 import { generateOptimizationReport } from "./report-generator";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { calculateLevel, ACHIEVEMENTS } from "./gamification";
 import { z } from "zod";
 import Stripe from "stripe";
 import { getBotUserAgent } from "@shared/bot-user-agents";
@@ -27,15 +28,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const scanRequestSchema = z.object({
   url: z.string().min(1, "URL is required"),
 });
-
-function calculateLevel(totalXp: number): number {
-  // Curve: Level 1 starts at 0 XP.
-  // Level 2 = 100 XP
-  // Level 3 = 400 XP
-  // Level 4 = 900 XP
-  // Formula: Level = floor(sqrt(XP / 100)) + 1
-  return Math.floor(Math.sqrt(totalXp / 100)) + 1;
-}
 
 function parsePositiveInt(value: any, defaultValue: number, min: number = 1, max: number = 100): number {
   const parsed = parseInt(value);
@@ -71,6 +63,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (!authInitialized) {
     await setupAuth(app);
     authInitialized = true;
+  }
+
+  // [GAMIFICATION] Seed achievements on startup
+  try {
+    await storage.createAchievement(ACHIEVEMENTS.ARCHITECT);
+  } catch (error) {
+    console.error('[Routes] Error seeding achievements:', error);
   }
 
   // Auth routes
@@ -688,10 +687,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const isValid = errors.length === 0;
+      let achievementUnlocked = false;
+      let achievementDetails = null;
+
+      // [GAMIFICATION] Unlock Achievement if valid
+      if (isValid && (req as any).isAuthenticated?.()) {
+        const userId = (req as any).user.claims.sub;
+        const result = await storage.unlockAchievement(userId, ACHIEVEMENTS.ARCHITECT.key);
+        if (result.unlocked) {
+          achievementUnlocked = true;
+          achievementDetails = result.achievement;
+        }
+      }
 
       res.json({
         isValid,
         errors,
+        gamification: {
+          achievementUnlocked,
+          achievement: achievementDetails
+        }
       });
     } catch (error) {
       console.error('Validation error:', error);

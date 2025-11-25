@@ -104,6 +104,17 @@ For AI partnership inquiries: ${formData.contactEmail}
           title: "Validation Successful",
           description: "Your llms.txt file is properly formatted!",
         });
+
+        // [GAMIFICATION] Check for achievement
+        if (result.gamification?.achievementUnlocked) {
+          setTimeout(() => {
+            toast({
+              title: "🏆 Achievement Unlocked!",
+              description: `You earned the "${result.gamification.achievement.name}" badge and ${result.gamification.achievement.xpReward} XP!`,
+              className: "border-yellow-500/50 bg-yellow-500/10",
+            });
+          }, 500);
+        }
       } else {
         toast({
           title: "Validation Issues Found",

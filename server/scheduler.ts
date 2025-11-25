@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { scanWebsite } from "./scanner";
 import { detectChanges } from "./change-detector";
+import { calculateLevel } from "./gamification";
 import pLimit from "p-limit";
 
 // Calculate next run time based on frequency
@@ -41,6 +42,36 @@ async function processRecurringScan(recurringScanId: number) {
       errors: scanResult.errors,
       warnings: scanResult.warnings,
     });
+
+    // [GAMIFICATION] Guardian Passive XP
+    // Award XP simply for the scan running (retention mechanic)
+    if (recurringScan.userId) {
+      const PASSIVE_XP_AMOUNT = 5;
+      
+      try {
+        const user = await storage.getUser(recurringScan.userId);
+        if (user) {
+          const newXp = (user.xp || 0) + PASSIVE_XP_AMOUNT;
+          const newLevel = calculateLevel(newXp);
+          
+          await storage.updateUserGamificationStats(recurringScan.userId, newXp, newLevel);
+
+          // Create a notification for the XP gain
+          await storage.createNotification({
+            userId: recurringScan.userId,
+            recurringScanId: recurringScanId,
+            scanId: newScan.id,
+            type: 'xp_gain',
+            title: 'Guardian XP Earned',
+            message: `+${PASSIVE_XP_AMOUNT} XP for keeping watch over ${recurringScan.url}`,
+            changes: { xpGained: PASSIVE_XP_AMOUNT } as Record<string, any>,
+            isRead: false,
+          });
+        }
+      } catch (err) {
+        console.error(`[Scheduler] Failed to award passive XP:`, err);
+      }
+    }
 
     // Check for changes if there was a previous scan
     if (recurringScan.lastScanId) {
