@@ -105,6 +105,9 @@ export interface IStorage {
   // Domain cooldown operations
   checkDomainCooldown(userId: string, domain: string): Promise<boolean>;
   upsertDomainCooldown(userId: string, domain: string): Promise<void>;
+  
+  // Score percentile operations
+  getScorePercentile(score: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -538,6 +541,25 @@ export class DatabaseStorage implements IStorage {
         target: [userDomainCooldowns.userId, userDomainCooldowns.domain],
         set: { lastScanAt: new Date() }
       });
+  }
+
+  async getScorePercentile(score: number): Promise<number> {
+    // Count scans with a lower score
+    const [lowerResult] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(scans)
+      .where(sql`${scans.score} < ${score}`);
+    
+    // Count total scans
+    const [totalResult] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(scans);
+
+    const totalCount = Number(totalResult.count);
+    if (totalCount === 0) return 100;
+
+    // Calculate percentile: (Scans Lower / Total Scans) * 100
+    return Math.round((Number(lowerResult.count) / totalCount) * 100);
   }
 }
 
