@@ -11,6 +11,9 @@ import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { PaymentModal } from "@/components/PaymentModal";
 import { ScanComparison } from "@/components/ScanComparison";
+import { CompactUserHUD } from "@/components/CompactUserHUD";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { 
   Dialog, 
   DialogContent, 
@@ -74,6 +77,7 @@ interface NotificationPreferences {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [scans, setScans] = useState<ScanWithPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScan, setSelectedScan] = useState<ScanWithPurchase | null>(null);
@@ -319,7 +323,37 @@ export default function Dashboard() {
         throw new Error('Failed to scan website');
       }
 
-      await response.json();
+      const data = await response.json();
+      
+      // Gamification: Show XP gained toast
+      if (data.gamification && user) {
+        const { xpGained, totalXp, newLevel, levelUp } = data.gamification;
+        
+        if (levelUp) {
+          // Level up celebration!
+          toast.success(`🎉 Level Up! You're now Level ${newLevel}!`, {
+            description: `You earned ${xpGained} XP and reached a new level! Keep scanning!`,
+            duration: 5000,
+          });
+        } else {
+          // Regular XP gain
+          const isPerfectScan = xpGained >= 50;
+          toast.success(
+            isPerfectScan 
+              ? `✨ Perfect Scan! +${xpGained} XP` 
+              : `+${xpGained} XP earned`,
+            {
+              description: isPerfectScan 
+                ? `Both robots.txt and llms.txt found! Total: ${totalXp} XP`
+                : `Total XP: ${totalXp}`,
+              duration: 3000,
+            }
+          );
+        }
+        
+        // Refresh user data to update the HUD
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      }
       
       await fetchScans();
       setScanUrl("");
@@ -687,6 +721,9 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Gamification HUD */}
+            {user && <CompactUserHUD />}
+            
             {/* Compare Sites */}
             <Button 
               variant="outline" 
