@@ -746,6 +746,19 @@ export default function Dashboard() {
               </Button>
             </Link>
 
+            {/* robots.txt Builder - Primary feature */}
+            <Link href="/robots-builder">
+              <Button 
+                variant="secondary" 
+                size="sm"
+                className="btn-hover-scale"
+                data-testid="button-robots-builder"
+              >
+                <Bot className="w-4 h-4 mr-2" />
+                robots.txt Builder
+              </Button>
+            </Link>
+
             {/* Compare Sites - Secondary tool */}
             <Button 
               variant="outline" 

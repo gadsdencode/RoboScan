@@ -187,3 +187,23 @@ export const insertLlmsFieldPurchaseSchema = createInsertSchema(llmsFieldPurchas
 
 export type InsertLlmsFieldPurchase = z.infer<typeof insertLlmsFieldPurchaseSchema>;
 export type LlmsFieldPurchase = typeof llmsFieldPurchases.$inferSelect;
+
+// Premium Robots.txt Fields Purchases
+export const robotsFieldPurchases = pgTable("robots_field_purchases", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  fieldKey: text("field_key").notNull(), // ADVANCED_CRAWL_DELAY, SITEMAP_RULES, etc.
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  amount: integer("amount").notNull(), // in cents
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("user_robots_field_unique").on(table.userId, table.fieldKey)
+]);
+
+export const insertRobotsFieldPurchaseSchema = createInsertSchema(robotsFieldPurchases).omit({
+  id: true,
+  purchasedAt: true,
+});
+
+export type InsertRobotsFieldPurchase = z.infer<typeof insertRobotsFieldPurchaseSchema>;
+export type RobotsFieldPurchase = typeof robotsFieldPurchases.$inferSelect;

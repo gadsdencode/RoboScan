@@ -9,6 +9,7 @@ import {
   achievements,
   userAchievements,
   llmsFieldPurchases,
+  robotsFieldPurchases,
   type User,
   type UpsertUser,
   type Scan,
@@ -25,6 +26,8 @@ import {
   type UserAchievement,
   type LlmsFieldPurchase,
   type InsertLlmsFieldPurchase,
+  type RobotsFieldPurchase,
+  type InsertRobotsFieldPurchase,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -89,6 +92,12 @@ export interface IStorage {
   getUserLlmsFieldPurchases(userId: string): Promise<LlmsFieldPurchase[]>;
   hasUserPurchasedField(userId: string, fieldKey: string): Promise<boolean>;
   getLlmsFieldPurchaseByPaymentIntent(paymentIntentId: string): Promise<LlmsFieldPurchase | undefined>;
+  
+  // Premium Robots Field operations
+  createRobotsFieldPurchase(purchase: InsertRobotsFieldPurchase): Promise<RobotsFieldPurchase>;
+  getUserRobotsFieldPurchases(userId: string): Promise<RobotsFieldPurchase[]>;
+  hasUserPurchasedRobotsField(userId: string, fieldKey: string): Promise<boolean>;
+  getRobotsFieldPurchaseByPaymentIntent(paymentIntentId: string): Promise<RobotsFieldPurchase | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -461,6 +470,38 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(llmsFieldPurchases)
       .where(eq(llmsFieldPurchases.stripePaymentIntentId, paymentIntentId));
+    return purchase;
+  }
+
+  // Premium Robots Field operations
+  async createRobotsFieldPurchase(purchase: InsertRobotsFieldPurchase): Promise<RobotsFieldPurchase> {
+    const [created] = await db.insert(robotsFieldPurchases).values(purchase).returning();
+    return created;
+  }
+
+  async getUserRobotsFieldPurchases(userId: string): Promise<RobotsFieldPurchase[]> {
+    return await db
+      .select()
+      .from(robotsFieldPurchases)
+      .where(eq(robotsFieldPurchases.userId, userId));
+  }
+
+  async hasUserPurchasedRobotsField(userId: string, fieldKey: string): Promise<boolean> {
+    const [result] = await db
+      .select()
+      .from(robotsFieldPurchases)
+      .where(and(
+        eq(robotsFieldPurchases.userId, userId),
+        eq(robotsFieldPurchases.fieldKey, fieldKey)
+      ));
+    return !!result;
+  }
+
+  async getRobotsFieldPurchaseByPaymentIntent(paymentIntentId: string): Promise<RobotsFieldPurchase | undefined> {
+    const [purchase] = await db
+      .select()
+      .from(robotsFieldPurchases)
+      .where(eq(robotsFieldPurchases.stripePaymentIntentId, paymentIntentId));
     return purchase;
   }
 }

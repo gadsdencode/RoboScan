@@ -211,3 +211,116 @@ export const builderTourSteps: DriveStep[] = [
     }
   }
 ];
+
+export const robotsBuilderTourSteps: DriveStep[] = [
+  {
+    popover: {
+      title: "🤖 Welcome to the Robots.txt Builder",
+      description: "This tool helps you create a professional robots.txt file to control how search engines and AI bots crawl your website. Let's explore each section!"
+    }
+  },
+  {
+    element: '[data-testid="input-website-url"]',
+    popover: {
+      title: "🌐 Website URL",
+      description: "Enter your website's main URL. This helps you generate proper sitemap references and verify your configuration.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="select-default-access"]',
+    popover: {
+      title: "🚦 Default Access Policy",
+      description: "Set the default access level for all bots. Choose 'Allow All' to permit full crawling, 'Block All' to prevent all bots, or 'Custom' to define specific rules.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="textarea-disallowed-paths"]',
+    popover: {
+      title: "🚫 Blocked Paths",
+      description: "List paths that bots should not access. For example, /admin/, /private/, or /api/. Each path should be on a new line.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="textarea-allowed-paths"]',
+    popover: {
+      title: "✅ Allowed Paths",
+      description: "Specify paths that should be explicitly allowed, even if blocked by other rules. This is useful for making exceptions to broader restrictions.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="input-crawl-delay"]',
+    popover: {
+      title: "⏱️ Crawl Delay",
+      description: "Set the number of seconds bots should wait between requests. This helps prevent server overload. A value of 0 means no delay.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="input-sitemap-url"]',
+    popover: {
+      title: "🗺️ Sitemap Location",
+      description: "Provide the URL to your XML sitemap. This helps search engines discover and index your pages more efficiently.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    popover: {
+      title: "✨ Premium Fields",
+      description: "Unlock advanced features for more precise bot control! Premium fields let you set bot-specific rules, advanced path patterns, multiple sitemaps, request rate limiting, and more. Each unlocked field earns you XP and gives you professional-grade crawl management.",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="textarea-preview"]',
+    popover: {
+      title: "👁️ Live Preview",
+      description: "See your robots.txt file in real-time! This preview updates automatically as you configure the rules, showing exactly what search engines will see.",
+      side: "left",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="button-validate"]',
+    popover: {
+      title: "✅ Validate Your File",
+      description: "Check if your robots.txt file follows best practices and has no syntax errors. This ensures search engines can properly read your directives.",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-copy"]',
+    popover: {
+      title: "📋 Copy to Clipboard",
+      description: "Quickly copy your robots.txt content to paste it into your website's root directory.",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-download"]',
+    popover: {
+      title: "💾 Download File",
+      description: "Download your robots.txt file and place it in your website's root directory at /robots.txt.",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    popover: {
+      title: "🎉 You're Ready to Go!",
+      description: "Configure your crawl rules, validate your file, and download it to control how bots access your site. Premium fields can be unlocked anytime for advanced bot management and extra XP!"
+    }
+  }
+];

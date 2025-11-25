@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import LLMsBuilder from "@/pages/llms-builder";
+import RobotsBuilder from "@/pages/robots-builder";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -22,6 +23,9 @@ function Router() {
         {isLoading || !isAuthenticated ? <Home /> : <Dashboard />}
       </Route>
       <Route path="/tools/llms-builder" component={LLMsBuilder} />
+      <Route path="/llms-builder" component={LLMsBuilder} />
+      <Route path="/tools/robots-builder" component={RobotsBuilder} />
+      <Route path="/robots-builder" component={RobotsBuilder} />
       <Route component={NotFound} />
     </Switch>
   );
