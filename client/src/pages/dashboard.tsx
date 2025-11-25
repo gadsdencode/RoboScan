@@ -1731,16 +1731,20 @@ export default function Dashboard() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={async () => {
-                                      const response = await fetch(`/api/scans/${notification.scanId}`);
-                                      if (response.ok) {
-                                        const scan = await response.json();
+                                    onClick={() => {
+                                      // Find the scan in the existing scans array
+                                      const scan = scans.find(s => s.id === notification.scanId);
+                                      if (scan) {
                                         setExpandedScan(scan.id);
                                         setShowNotificationsSheet(false);
+                                        // Mark notification as read
+                                        handleMarkNotificationRead(notification.id);
                                         // Scroll to scan
                                         setTimeout(() => {
                                           document.getElementById(`scan-${scan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                         }, 100);
+                                      } else {
+                                        toast.error("Scan not found. It may have been deleted.");
                                       }
                                     }}
                                     className="h-7 text-xs"
