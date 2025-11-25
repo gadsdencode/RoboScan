@@ -723,36 +723,9 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Gamification HUD */}
-            {user && <CompactUserHUD />}
+            {/* PRIMARY TOOLS - Most important actions come first */}
             
-            {/* Trophy Case */}
-            {user && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowTrophyCase(true)}
-                className="btn-hover-scale text-muted-foreground hover:text-yellow-400"
-                title="View Achievements"
-                data-testid="button-trophy-case"
-              >
-                <Trophy className="w-5 h-5" />
-              </Button>
-            )}
-            
-            {/* Compare Sites */}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowCompetitorDialog(true)}
-              className="gap-2 btn-hover-scale"
-              data-testid="button-compare-sites"
-            >
-              <GitCompare className="w-4 h-4" />
-              Compare Sites
-            </Button>
-
-            {/* llms.txt Builder */}
+            {/* llms.txt Builder - Primary feature */}
             <Link href="/tools/llms-builder">
               <Button 
                 variant="secondary" 
@@ -765,6 +738,36 @@ export default function Dashboard() {
               </Button>
             </Link>
 
+            {/* Compare Sites - Secondary tool */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowCompetitorDialog(true)}
+              className="gap-2 btn-hover-scale"
+              data-testid="button-compare-sites"
+            >
+              <GitCompare className="w-4 h-4" />
+              Compare Sites
+            </Button>
+
+            {/* ENGAGEMENT FEATURES */}
+            
+            {/* Trophy Case - Gamification */}
+            {user && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTrophyCase(true)}
+                className="btn-hover-scale text-muted-foreground hover:text-yellow-400"
+                title="View Achievements"
+                data-testid="button-trophy-case"
+              >
+                <Trophy className="w-5 h-5" />
+              </Button>
+            )}
+
+            {/* SUPPORT */}
+            
             {/* Help/Tour Button */}
             <Button 
               variant="ghost" 
@@ -777,6 +780,8 @@ export default function Dashboard() {
               <HelpCircle className="w-5 h-5" />
             </Button>
 
+            {/* USER-SPECIFIC ITEMS - Always on the right */}
+            
             {/* Notifications Bell */}
             <button
               onClick={() => setShowNotificationsSheet(true)}
@@ -791,6 +796,10 @@ export default function Dashboard() {
               )}
             </button>
 
+            {/* Gamification HUD - User progress */}
+            {user && <CompactUserHUD />}
+
+            {/* User Profile */}
             {user && (
               <div className="flex items-center gap-3">
                 {user.profileImageUrl && (
@@ -805,6 +814,8 @@ export default function Dashboard() {
                 </span>
               </div>
             )}
+            
+            {/* Logout - Account action */}
             <Button 
               variant="outline" 
               size="sm"
