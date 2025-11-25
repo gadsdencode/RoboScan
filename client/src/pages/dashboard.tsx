@@ -59,9 +59,13 @@ interface RecurringScan {
 
 interface Notification {
   id: number;
-  recurringScanId: number;
-  changeType: string;
-  changeDetails: string;
+  userId: string;
+  recurringScanId: number | null;
+  scanId: number | null;
+  type: string;
+  title: string;
+  message: string;
+  changes: Record<string, any> | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -1675,50 +1679,97 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 <AnimatePresence>
-                  {notifications.map((notification) => (
-                    <motion.div
-                      key={notification.id}
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className={`p-4 rounded-lg border transition-all ${
-                        notification.isRead 
-                          ? 'bg-background/30 border-white/5' 
-                          : 'bg-primary/10 border-primary/30'
-                      }`}
-                      data-testid={`notification-${notification.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="outline" className="text-xs">
-                              {notification.changeType}
-                            </Badge>
-                            {!notification.isRead && (
-                              <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
-                            )}
+                  {notifications.map((notification) => {
+                    const notificationIcon = notification.type === 'xp_gain' ? '🎮' : 
+                                           notification.type === 'robots_txt_change' ? '🤖' :
+                                           notification.type === 'llms_txt_change' ? '✨' :
+                                           notification.type === 'bot_permission_change' ? '⚠️' :
+                                           notification.type === 'new_errors' ? '❌' : '🔔';
+                    
+                    return (
+                      <motion.div
+                        key={notification.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className={`p-4 rounded-lg border transition-all ${
+                          notification.isRead 
+                            ? 'bg-background/30 border-white/5' 
+                            : 'bg-primary/10 border-primary/30'
+                        }`}
+                        data-testid={`notification-${notification.id}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Icon */}
+                          <div className="text-2xl flex-shrink-0" aria-label="notification-icon">
+                            {notificationIcon}
                           </div>
-                          <p className="text-sm text-foreground/90 break-words">
-                            {notification.changeDetails}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {formatRelativeTime(notification.createdAt)}
-                          </p>
+                          
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-sm text-foreground">
+                                {notification.title}
+                              </h4>
+                              {!notification.isRead && (
+                                <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                              )}
+                            </div>
+                            
+                            <p className="text-sm text-foreground/80 break-words mb-2">
+                              {notification.message}
+                            </p>
+                            
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                {formatRelativeTime(notification.createdAt)}
+                              </p>
+                              
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-2">
+                                {notification.scanId && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      const response = await fetch(`/api/scans/${notification.scanId}`);
+                                      if (response.ok) {
+                                        const scan = await response.json();
+                                        setExpandedScan(scan.id);
+                                        setShowNotificationsSheet(false);
+                                        // Scroll to scan
+                                        setTimeout(() => {
+                                          document.getElementById(`scan-${scan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        }, 100);
+                                      }
+                                    }}
+                                    className="h-7 text-xs"
+                                    data-testid={`button-view-scan-${notification.id}`}
+                                  >
+                                    <ArrowRight className="w-3 h-3 mr-1" />
+                                    View Scan
+                                  </Button>
+                                )}
+                                
+                                {!notification.isRead && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleMarkNotificationRead(notification.id)}
+                                    className="h-7 text-xs"
+                                    data-testid={`button-mark-read-${notification.id}`}
+                                  >
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    Mark Read
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        {!notification.isRead && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleMarkNotificationRead(notification.id)}
-                            className="flex-shrink-0"
-                            data-testid={`button-mark-read-${notification.id}`}
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             )}
