@@ -1,12 +1,13 @@
 import type { Scan } from "@shared/schema";
 
-interface OptimizationReport {
+export interface OptimizationReport {
   summary: string;
   score: number;
   recommendations: Recommendation[];
   generatedFiles: GeneratedFiles;
   competitorInsights: string[];
   seoImpact: SEOImpact;
+  percentileRank?: number;
 }
 
 interface Recommendation {
@@ -85,6 +86,56 @@ function analyzeRobotsTxtQuality(content: string | null): QualityAnalysis {
   }
 
   return { scoreDeduced: penalty, issues };
+}
+
+// Export the scoring calculation function separately
+export function calculateScanScore(scan: Scan): number {
+  let score = 100;
+  
+  // --- 1. Robots.txt Analysis ---
+  if (!scan.robotsTxtFound) {
+    score -= 40;
+  } else {
+    // Check for Sitemap
+    if (!scan.robotsTxtContent?.toLowerCase().includes('sitemap:')) {
+      score -= 10;
+    }
+
+    // Advanced Quality Check
+    const robotsQuality = analyzeRobotsTxtQuality(scan.robotsTxtContent);
+    score -= robotsQuality.scoreDeduced;
+  }
+
+  // --- 2. LLMs.txt Analysis ---
+  if (!scan.llmsTxtFound) {
+    score -= 15;
+  } else {
+    // Content Quality Check
+    const llmsQuality = analyzeLlmsTxtQuality(scan.llmsTxtContent);
+    score -= llmsQuality.scoreDeduced;
+  }
+
+  // --- 3. Bot Permission Granularity ---
+  if (scan.botPermissions) {
+    const restrictedBots = Object.entries(scan.botPermissions).filter(
+      ([_, status]) => status.includes('Restricted') || status === 'Blocked'
+    );
+
+    if (restrictedBots.length > 0) {
+      const crucialBots = ['GPTBot', 'Claude-Web', 'Google-Extended'];
+      const blockedCrucial = restrictedBots.some(([bot]) => 
+        crucialBots.some(cb => bot.toLowerCase().includes(cb.toLowerCase()))
+      );
+
+      if (blockedCrucial) {
+        score -= 20;
+      } else {
+        score -= 5;
+      }
+    }
+  }
+  
+  return Math.max(0, score);
 }
 
 export function generateOptimizationReport(scan: Scan): OptimizationReport {
