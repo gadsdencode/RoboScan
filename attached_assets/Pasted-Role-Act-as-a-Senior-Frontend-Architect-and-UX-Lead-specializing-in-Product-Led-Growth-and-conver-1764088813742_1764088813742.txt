@@ -1,0 +1,45 @@
+Role: Act as a Senior Frontend Architect and UX Lead specializing in "Product-Led Growth" and conversion design. You have deep expertise in React, Tailwind CSS, and Framer Motion.
+
+Context: We have a functional landing page in client/src/pages/home.tsx that features a Hero section, a Feature grid, and a Terminal demo. While visually strong (Cyberpunk aesthetic), the user journey is disjointed. It feels like a static brochure rather than an interactive tool.
+
+Objective: Refactor the landing page (home.tsx) to implement a "Progressive Disclosure" or "Three-Act Structure." The goal is to guide the user through a clear 1 (Scan) -> 2 (Analyze) -> 3 (Optimize) narrative without removing the existing cyberpunk aesthetic or functional components. The user should feel educated about the product while they are using it.
+
+Requirements:
+
+UX Audit & Restructuring (client/src/pages/home.tsx):
+
+The Hook (Step 1 - Hero): Analyze the current Hero component. Propose changes to make the URL input field feel like the start of a wizard process rather than just a search bar. Add visual cues (micro-copy or step indicators) that tell the user: "Enter URL to begin analysis."
+
+The Bridge (Step 2 - Education): Between the Hero and the Terminal, inject a new "How it Works" visual flow. This should utilize the existing icons from the Features component but arrange them sequentially (e.g., 1. Bot Identification -> 2. Permission Check -> 3. Generation) to educate the user on what the scanner is about to do.
+
+The Payoff (Step 3 - Terminal): The existing TerminalDemo is excellent but sits too low. Integrate it as the immediate visual response to the Step 1 action. When the user clicks "Scan," smooth-scroll or transition focus directly to the Terminal, treating it as the "Live Results" phase.
+
+Component Enhancement (Visuals & "Juice"):
+
+Progress Indicators: Suggest a way to add a visual "Step Tracker" (e.g., 1. Input > 2. Scanning > 3. Report) that persists or animates as the user interacts with the page.
+
+Micro-Interactions: Using framer-motion (already installed), provide code snippets to animate the transition between the Hero input and the Terminal output so it feels like one continuous workflow.
+
+Implementation Plan:
+
+Provide the specific code modifications required for client/src/pages/home.tsx.
+
+Reuse the existing Navbar, Footer, PaymentModal, and PremiumReport components.
+
+Ensure the "Cybernetic" background image and grid overlays remain intact.
+
+Deliverables:
+
+A revised component structure for Home.
+
+Code snippets for a new StepProcess component to replace or augment the current Features grid.
+
+Updated handleScan logic to visually link the input to the terminal (e.g., auto-scroll behavior).
+
+Constraints:
+
+Do not remove the TerminalDemo logic; it is a core value prop.
+
+Do not alter the backend routes.
+
+Maintain the current color palette (cyan, slate, dark backgrounds).
