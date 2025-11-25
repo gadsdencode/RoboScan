@@ -1,0 +1,181 @@
+Here are the complete instructions to implement the foundational **XP and Level System** for Roboscan.
+
+This implementation introduces a progression loop where users earn XP for every scan they perform, with bonuses for finding "perfect" configurations (both `robots.txt` and `llms.txt` present).
+
+### **Step 1: Update Database Schema**
+
+First, we need to modify the `users` table to store `xp` and `level`.
+
+**File:** `shared/schema.ts`
+
+Locate the `users` table definition and add the `xp` and `level` columns.
+
+```typescript
+// shared/schema.ts
+
+// ... imports
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  
+  // [GAMIFICATION] New Columns
+  xp: integer("xp").notNull().default(0),
+  level: integer("level").notNull().default(1),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ... rest of the file
+```
+
+> **Action Required:** After saving this file, run `npm run db:push` in your terminal to update your database schema.
+
+-----
+
+### **Step 2: Update Storage Layer**
+
+We need a dedicated method to update a user's stats efficiently without overwriting their profile data.
+
+**File:** `server/storage.ts`
+
+1.  Update the `IStorage` interface.
+2.  Implement the method in `DatabaseStorage`.
+
+<!-- end list -->
+
+```typescript
+// server/storage.ts
+
+export interface IStorage {
+  // ... existing methods
+  
+  // [GAMIFICATION] Add this method signature
+  updateUserGamificationStats(userId: string, xp: number, level: number): Promise<User>;
+}
+
+export class DatabaseStorage implements IStorage {
+  // ... existing methods
+
+  // [GAMIFICATION] Implement the method
+  async updateUserGamificationStats(userId: string, xp: number, level: number): Promise<User> {
+    const [updated] = await db
+      .update(users)
+      .set({ 
+        xp, 
+        level, 
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+      
+    if (!updated) throw new Error("User not found");
+    return updated;
+  }
+}
+```
+
+-----
+
+### **Step 3: Implement Game Logic**
+
+Now we inject the logic into the scan route. We will calculate XP based on the scan quality and determine if the user levels up.
+
+**File:** `server/routes.ts`
+
+Add the level calculation helper and update the `/api/scan` route.
+
+```typescript
+// server/routes.ts
+
+// 1. Add this helper function at the top of the file (outside any route)
+function calculateLevel(totalXp: number): number {
+  // Curve: Level 1 starts at 0 XP.
+  // Level 2 = 100 XP
+  // Level 3 = 400 XP
+  // Level 4 = 900 XP
+  // Formula: Level = floor(sqrt(XP / 100)) + 1
+  return Math.floor(Math.sqrt(totalXp / 100)) + 1;
+}
+
+// 2. Update the POST /api/scan route
+app.post("/api/scan", async (req: any, res) => {
+  try {
+    const { url } = scanRequestSchema.parse(req.body);
+    const result = await scanWebsite(url);
+    
+    const userId = req.isAuthenticated() ? req.user?.claims?.sub : undefined;
+
+    // ... (existing scan creation code: const scan = await storage.createScan({...})) ...
+    const scan = await storage.createScan({
+        // ... existing arguments ...
+        userId,
+        url,
+        robotsTxtFound: result.robotsTxtFound,
+        robotsTxtContent: result.robotsTxtContent,
+        llmsTxtFound: result.llmsTxtFound,
+        llmsTxtContent: result.llmsTxtContent,
+        botPermissions: result.botPermissions,
+        errors: result.errors,
+        warnings: result.warnings,
+    });
+
+    // [GAMIFICATION] XP Logic Injection
+    let gamificationUpdates = null;
+    
+    if (userId) {
+      const currentUser = await storage.getUser(userId);
+      
+      if (currentUser) {
+        // Base Reward: 10 XP for performing a scan
+        let xpGain = 10;
+
+        // Bonus Reward: +40 XP for a "Perfect Scan" (Total 50)
+        // Encourages users to fix their sites to see the green checkmarks
+        if (result.robotsTxtFound && result.llmsTxtFound) {
+          xpGain += 40; 
+        }
+
+        const currentXp = currentUser.xp || 0;
+        const newXp = currentXp + xpGain;
+        const newLevel = calculateLevel(newXp);
+        const oldLevel = currentUser.level || 1;
+
+        // Update Database
+        await storage.updateUserGamificationStats(userId, newXp, newLevel);
+
+        // Prepare data for frontend toast/notification
+        gamificationUpdates = {
+          xpGained: xpGain,
+          totalXp: newXp,
+          newLevel: newLevel,
+          levelUp: newLevel > oldLevel
+        };
+      }
+    }
+
+    // Return standard response + gamification data
+    res.json({
+      id: scan.id,
+      url: scan.url,
+      // ... existing response fields ...
+      robotsTxtFound: scan.robotsTxtFound,
+      // ...
+      gamification: gamificationUpdates // <--- Add this field
+    });
+
+  } catch (error) {
+    // ... existing error handling ...
+  }
+});
+```
+
+### **Summary of Impact**
+
+  * **Data:** Your `users` table now acts as a ledger for player progress.
+  * **Logic:** Every scan now carries intrinsic value ("I want those 50 XP points"), incentivizing users to not just scan, but to *fix* their sites to get the "Perfect Scan" bonus.
+  * **Scalability:** The `calculateLevel` function isolates the progression math, making it easy to tweak the difficulty curve later without database migrations.
