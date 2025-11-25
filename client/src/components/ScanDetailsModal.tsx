@@ -51,11 +51,11 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, isAdmin =
               {scan.warnings && scan.warnings.length > 0 && (
                 <div className="flex items-start gap-2 text-yellow-400 text-sm">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold">Warnings:</div>
                     <ul className="list-disc list-inside">
                       {scan.warnings.map((warning, i) => (
-                        <li key={i}>{warning}</li>
+                        <li key={i} className="break-words">{warning}</li>
                       ))}
                     </ul>
                   </div>
@@ -64,11 +64,11 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, isAdmin =
               {scan.errors && scan.errors.length > 0 && (
                 <div className="flex items-start gap-2 text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold">Errors:</div>
                     <ul className="list-disc list-inside">
                       {scan.errors.map((error, i) => (
-                        <li key={i}>{error}</li>
+                        <li key={i} className="break-words">{error}</li>
                       ))}
                     </ul>
                   </div>
@@ -166,7 +166,7 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, isAdmin =
                     <FileText className="w-4 h-4 text-primary" />
                     robots.txt Content
                   </h4>
-                  <pre className="bg-background/50 border border-white/5 rounded p-3 text-xs overflow-x-auto font-mono">
+                  <pre className="bg-background/50 border border-white/5 rounded p-3 text-xs font-mono max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all">
                     {scan.robotsTxtContent}
                   </pre>
                 </div>
@@ -177,7 +177,7 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, isAdmin =
                     <FileText className="w-4 h-4 text-primary" />
                     llms.txt Content
                   </h4>
-                  <pre className="bg-background/50 border border-white/5 rounded p-3 text-xs overflow-x-auto font-mono">
+                  <pre className="bg-background/50 border border-white/5 rounded p-3 text-xs font-mono max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all">
                     {scan.llmsTxtContent}
                   </pre>
                 </div>
