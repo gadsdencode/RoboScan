@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare, Tag, Filter, HelpCircle } from "lucide-react";
+import { Shield, LogOut, FileText, Lock, Download, CheckCircle2, AlertCircle, Calendar, Globe, Sparkles, Search, ArrowRight, Bot, Bell, Clock, Repeat, Settings, Trash2, Play, Pause, Plus, X, GitCompare, Tag, Filter, HelpCircle, Trophy } from "lucide-react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { dashboardTourSteps } from "@/lib/tour-config";
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PaymentModal } from "@/components/PaymentModal";
 import { ScanComparison } from "@/components/ScanComparison";
 import { CompactUserHUD } from "@/components/CompactUserHUD";
+import { TrophyCase } from "@/components/TrophyCase";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
@@ -82,6 +83,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedScan, setSelectedScan] = useState<ScanWithPurchase | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTrophyCase, setShowTrophyCase] = useState(false);
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
   const [scanUrl, setScanUrl] = useState("");
   const [isScanning, setIsScanning] = useState(false);
@@ -723,6 +725,20 @@ export default function Dashboard() {
           <div className="flex items-center gap-4">
             {/* Gamification HUD */}
             {user && <CompactUserHUD />}
+            
+            {/* Trophy Case */}
+            {user && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowTrophyCase(true)}
+                className="btn-hover-scale text-muted-foreground hover:text-yellow-400"
+                title="View Achievements"
+                data-testid="button-trophy-case"
+              >
+                <Trophy className="w-5 h-5" />
+              </Button>
+            )}
             
             {/* Compare Sites */}
             <Button 
@@ -1792,6 +1808,12 @@ export default function Dashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Trophy Case Modal */}
+      <TrophyCase 
+        open={showTrophyCase} 
+        onOpenChange={setShowTrophyCase} 
+      />
     </div>
   );
 }

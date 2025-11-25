@@ -632,6 +632,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/user/achievements", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const unlocked = await storage.getUserAchievements(userId);
+      res.json(unlocked);
+    } catch (error) {
+      console.error("Error fetching achievements:", error);
+      res.status(500).json({ message: "Failed to fetch achievements" });
+    }
+  });
+
   app.post("/api/validate-llms-txt", async (req, res) => {
     try {
       const { content } = z.object({

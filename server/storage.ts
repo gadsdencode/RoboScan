@@ -68,6 +68,17 @@ export interface IStorage {
   getAchievementByKey(key: string): Promise<Achievement | undefined>;
   unlockAchievement(userId: string, achievementKey: string): Promise<{ unlocked: boolean, achievement?: Achievement }>;
   createAchievement(data: any): Promise<Achievement>;
+  getUserAchievements(userId: string): Promise<Array<{
+    id: number;
+    userId: string;
+    achievementId: number;
+    unlockedAt: Date | null;
+    achievementKey: string;
+    achievementName: string;
+    achievementDescription: string;
+    xpReward: number;
+    icon: string;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -351,6 +362,37 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { unlocked: true, achievement };
+  }
+
+  async getUserAchievements(userId: string): Promise<Array<{
+    id: number;
+    userId: string;
+    achievementId: number;
+    unlockedAt: Date | null;
+    achievementKey: string;
+    achievementName: string;
+    achievementDescription: string;
+    xpReward: number;
+    icon: string;
+  }>> {
+    const results = await db
+      .select()
+      .from(userAchievements)
+      .innerJoin(achievements, eq(userAchievements.achievementId, achievements.id))
+      .where(eq(userAchievements.userId, userId));
+    
+    // Map to camelCase for frontend compatibility
+    return results.map(row => ({
+      id: row.user_achievements.id,
+      userId: row.user_achievements.userId,
+      achievementId: row.user_achievements.achievementId,
+      unlockedAt: row.user_achievements.unlockedAt,
+      achievementKey: row.achievements.key,
+      achievementName: row.achievements.name,
+      achievementDescription: row.achievements.description,
+      xpReward: row.achievements.xpReward,
+      icon: row.achievements.icon,
+    }));
   }
 }
 
