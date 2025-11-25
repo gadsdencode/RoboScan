@@ -151,30 +151,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentUser = await storage.getUser(userId);
         
         if (currentUser) {
-          // Base Reward: 10 XP for performing a scan
-          let xpGain = 10;
-
-          // Bonus Reward: +40 XP for a "Perfect Scan" (Total 50)
-          // Encourages users to fix their sites to see the green checkmarks
-          if (result.robotsTxtFound && result.llmsTxtFound) {
-            xpGain += 40; 
+          let normalizedUrl = url.trim();
+          if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+            normalizedUrl = 'https://' + normalizedUrl;
           }
+          
+          const domain = new URL(normalizedUrl).hostname;
+          
+          const isOnCooldown = await storage.checkDomainCooldown(userId, domain);
+          
+          if (!isOnCooldown) {
+            let xpGain = 10;
 
-          const currentXp = currentUser.xp || 0;
-          const newXp = currentXp + xpGain;
-          const newLevel = calculateLevel(newXp);
-          const oldLevel = currentUser.level || 1;
+            if (result.robotsTxtFound && result.llmsTxtFound) {
+              xpGain += 40; 
+            }
 
-          // Update Database
-          await storage.updateUserGamificationStats(userId, newXp, newLevel);
+            const currentXp = currentUser.xp || 0;
+            const newXp = currentXp + xpGain;
+            const newLevel = calculateLevel(newXp);
+            const oldLevel = currentUser.level || 1;
 
-          // Prepare data for frontend toast/notification
-          gamificationUpdates = {
-            xpGained: xpGain,
-            totalXp: newXp,
-            newLevel: newLevel,
-            levelUp: newLevel > oldLevel
-          };
+            await storage.updateUserGamificationStats(userId, newXp, newLevel);
+
+            await storage.upsertDomainCooldown(userId, domain);
+
+            gamificationUpdates = {
+              xpGained: xpGain,
+              totalXp: newXp,
+              newLevel: newLevel,
+              levelUp: newLevel > oldLevel
+            };
+          } else {
+            gamificationUpdates = {
+              xpGained: 0,
+              totalXp: currentUser.xp || 0,
+              newLevel: currentUser.level || 1,
+              levelUp: false,
+              cooldownActive: true
+            };
+          }
         }
       }
 
