@@ -28,6 +28,9 @@ export const users = pgTable("users", {
   xp: integer("xp").notNull().default(0),
   level: integer("level").notNull().default(1),
   
+  // Admin flag for god mode (bypasses all purchase requirements)
+  isAdmin: boolean("is_admin").notNull().default(false),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
