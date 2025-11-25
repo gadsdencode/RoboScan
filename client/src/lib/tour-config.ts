@@ -75,8 +75,8 @@ export const dashboardTourSteps: DriveStep[] = [
   },
   {
     popover: {
-      title: "🎮 Gamification System",
-      description: "ROBOSCAN now rewards you for every action! Scan sites to earn XP and level up. Unlock achievements by completing special tasks. Check your Trophy Case to see all available badges!"
+      title: "📈 Track Your Progress",
+      description: "As you use ROBOSCAN, you'll build expertise and unlock new milestones. Every scan contributes to your knowledge score, and completing different tasks reveals achievements in your Trophy Case. The more you explore AI bot permissions, the more you'll discover!"
     }
   }
 ];
