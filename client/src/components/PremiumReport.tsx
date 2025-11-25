@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Download, CheckCircle2, AlertTriangle, TrendingUp, FileCode, Sparkles, Award } from "lucide-react";
+import { Download, CheckCircle2, AlertTriangle, TrendingUp, FileCode, Sparkles, Award, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -29,6 +29,7 @@ interface OptimizationReport {
   generatedFiles: GeneratedFiles;
   competitorInsights: string[];
   seoImpact: SEOImpact;
+  percentileRank?: number;
 }
 
 interface PremiumReportProps {
@@ -76,6 +77,18 @@ export function PremiumReport({ report, url }: PremiumReportProps) {
         <p className="text-muted-foreground max-w-2xl mx-auto">
           Comprehensive analysis and actionable recommendations for <span className="text-primary font-mono">{url}</span>
         </p>
+        
+        {report.percentileRank !== undefined && report.percentileRank >= 90 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-4 py-1 mt-4 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 font-bold text-sm"
+            data-testid="badge-percentile"
+          >
+            <Trophy className="w-4 h-4" />
+            Top 10% of Scanned Sites
+          </motion.div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
