@@ -20,6 +20,15 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   },
   {
+    element: '[data-testid="button-robots-builder"]',
+    popover: {
+      title: "🤖 Robots.txt Builder",
+      description: "Create a professional robots.txt file to control how search engines and AI bots crawl your website. Set custom rules, crawl delays, and manage bot access with ease!",
+      side: "bottom",
+      align: "center"
+    }
+  },
+  {
     element: '[data-testid="button-compare-sites"]',
     popover: {
       title: "⚡ Competitor Analysis",
