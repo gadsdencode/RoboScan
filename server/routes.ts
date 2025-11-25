@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { scanWebsite } from "./scanner";
-import { generateOptimizationReport } from "./report-generator";
+import { generateOptimizationReport, calculateScanScore } from "./report-generator";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { calculateLevel, ACHIEVEMENTS } from "./gamification";
 import { normalizeDomainForCooldown } from "./domain-utils";
@@ -145,6 +145,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await scanWebsite(url);
 
+      // Calculate score immediately
+      const tempScanObj = { 
+        ...result, 
+        url,
+        id: 0,
+        userId,
+        createdAt: new Date(),
+        tags: [],
+        score: 0
+      };
+      const score = calculateScanScore(tempScanObj as any);
+
       const scan = await storage.createScan({
         userId,
         url,
@@ -155,6 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         botPermissions: result.botPermissions,
         errors: result.errors,
         warnings: result.warnings,
+        score,
       });
 
       let gamificationUpdates = null;
@@ -370,6 +383,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const report = generateOptimizationReport(scan);
+      
+      // Fetch and inject percentile
+      if (scan.score !== null && scan.score !== undefined) {
+        const percentile = await storage.getScorePercentile(scan.score);
+        report.percentileRank = percentile;
+      }
       
       res.json({
         scan,
