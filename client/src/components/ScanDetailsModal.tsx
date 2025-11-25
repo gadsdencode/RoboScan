@@ -13,9 +13,10 @@ interface ScanDetailsModalProps {
   onClose: () => void;
   scan: ScanWithPurchase | null;
   onUnlockClick?: (scan: ScanWithPurchase) => void;
+  isAdmin?: boolean;
 }
 
-export function ScanDetailsModal({ open, onClose, scan, onUnlockClick }: ScanDetailsModalProps) {
+export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, isAdmin = false }: ScanDetailsModalProps) {
   if (!scan) return null;
 
   const formatDate = (date: string) => {
@@ -134,7 +135,7 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick }: ScanDet
           </div>
 
           {/* Premium Report CTA */}
-          {!scan.isPurchased && (
+          {!scan.isPurchased && !isAdmin && (
             <div className="border border-primary/30 bg-primary/10 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <Lock className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
@@ -156,8 +157,8 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick }: ScanDet
             </div>
           )}
 
-          {/* Premium Content - Only shown if purchased */}
-          {scan.isPurchased && (
+          {/* Premium Content - Only shown if purchased or admin */}
+          {(scan.isPurchased || isAdmin) && (
             <div className="space-y-4">
               {scan.robotsTxtContent && (
                 <div>
