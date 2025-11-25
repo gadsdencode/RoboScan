@@ -80,3 +80,134 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   }
 ];
+
+export const builderTourSteps: DriveStep[] = [
+  {
+    popover: {
+      title: "🎯 Welcome to the LLMs.txt Builder",
+      description: "This tool helps you create a professional llms.txt file that guides AI agents on how to interact with your content. Let's walk through each section!"
+    }
+  },
+  {
+    element: '[data-testid="input-website-name"]',
+    popover: {
+      title: "🌐 Website Name",
+      description: "Enter your website's domain name. This helps AI agents identify your site when referencing your content.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="input-website-url"]',
+    popover: {
+      title: "🔗 Website URL",
+      description: "Provide your complete website URL. This ensures AI agents can properly link back to your content.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="textarea-content-description"]',
+    popover: {
+      title: "📝 Content Summary",
+      description: "Describe what your website is about. This gives AI agents context about your content, helping them provide accurate information to users.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="input-citation-format"]',
+    popover: {
+      title: "📚 Citation Format",
+      description: "Specify how you want AI agents to cite your content. This ensures proper attribution when your information is referenced.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="textarea-allowed-bots"]',
+    popover: {
+      title: "🤖 Allowed Bots",
+      description: "List which AI bots can access your content. You can allow specific bots like GPTBot, Claude-Web, or others based on your preferences.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="textarea-key-areas"]',
+    popover: {
+      title: "📍 Key Areas",
+      description: "Highlight important sections of your website. Point AI agents to documentation, blogs, or other valuable resources.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="textarea-content-guidelines"]',
+    popover: {
+      title: "📋 Content Guidelines",
+      description: "Set rules for how AI agents should use your content. Specify attribution requirements, usage restrictions, or licensing information.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="input-contact-email"]',
+    popover: {
+      title: "📧 Contact Email",
+      description: "Provide a contact email for AI partnership inquiries. This helps AI companies reach you for collaboration opportunities.",
+      side: "right",
+      align: "start"
+    }
+  },
+  {
+    popover: {
+      title: "✨ Premium Fields",
+      description: "Premium fields allow you to provide even more context to AI agents! You can unlock fields like Products & Services, Pricing Information, Brand Voice, and more through secure payment. Each unlocked field earns you XP and enhances your llms.txt profile.",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="textarea-preview"]',
+    popover: {
+      title: "👁️ Live Preview",
+      description: "See your llms.txt file in real-time! This preview updates automatically as you fill in the fields, showing exactly what your final file will look like.",
+      side: "left",
+      align: "start"
+    }
+  },
+  {
+    element: '[data-testid="button-validate"]',
+    popover: {
+      title: "✅ Validate Your File",
+      description: "Check if your llms.txt file is properly formatted. Validation ensures AI agents can read your file correctly and unlocks the 'Architect' achievement!",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-copy"]',
+    popover: {
+      title: "📋 Copy to Clipboard",
+      description: "Quickly copy your llms.txt content to paste it into your website's root directory.",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    element: '[data-testid="button-download"]',
+    popover: {
+      title: "💾 Download File",
+      description: "Download your llms.txt file and upload it to your website's root directory (alongside robots.txt).",
+      side: "top",
+      align: "center"
+    }
+  },
+  {
+    popover: {
+      title: "🎉 You're All Set!",
+      description: "Fill in your information, validate your file, and download it to help AI agents understand your content better. Premium fields can be unlocked anytime to enhance your profile and earn extra XP!"
+    }
+  }
+];

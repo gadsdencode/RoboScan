@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap } from "lucide-react";
+import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle } from "lucide-react";
+import { driver } from "driver.js";
+import "driver.js/dist/driver.css";
+import { builderTourSteps } from "@/lib/tour-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -176,12 +179,32 @@ export default function LLMsBuilder() {
 
   const formData = watch();
 
+  const runTour = () => {
+    const driverObj = driver({
+      showProgress: true,
+      steps: builderTourSteps,
+      popoverClass: 'roboscan-driver-popover',
+      onDestroyed: () => {
+        localStorage.setItem('roboscan_builder_tour_seen', 'true');
+      }
+    });
+    
+    driverObj.drive();
+  };
+
   useEffect(() => {
     loadPremiumFieldsConfig();
     if (user) {
       loadPurchasedFields();
     }
   }, [user]);
+
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem('roboscan_builder_tour_seen');
+    if (!hasSeenTour && premiumFields.length > 0) {
+      setTimeout(runTour, 1000);
+    }
+  }, [premiumFields.length]);
 
   const loadPremiumFieldsConfig = async () => {
     try {
@@ -441,6 +464,15 @@ For AI partnership inquiries: ${formData.contactEmail}
             <span>ROBOSCAN</span>
           </a>
           <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={runTour}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="button-builder-tour"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </Button>
             <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Dashboard
             </a>
