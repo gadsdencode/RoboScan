@@ -50,6 +50,7 @@ export const scans = pgTable("scans", {
   errors: jsonb("errors").$type<string[]>(),
   warnings: jsonb("warnings").$type<string[]>(),
   tags: text("tags").array().default(sql`'{}'::text[]`),
+  score: integer("score").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
