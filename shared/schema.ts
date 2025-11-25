@@ -207,3 +207,20 @@ export const insertRobotsFieldPurchaseSchema = createInsertSchema(robotsFieldPur
 
 export type InsertRobotsFieldPurchase = z.infer<typeof insertRobotsFieldPurchaseSchema>;
 export type RobotsFieldPurchase = typeof robotsFieldPurchases.$inferSelect;
+
+export const userDomainCooldowns = pgTable("user_domain_cooldowns", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  domain: text("domain").notNull(),
+  lastScanAt: timestamp("last_scan_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("user_domain_cooldown_unique").on(table.userId, table.domain)
+]);
+
+export const insertUserDomainCooldownSchema = createInsertSchema(userDomainCooldowns).omit({
+  id: true,
+  lastScanAt: true,
+});
+
+export type InsertUserDomainCooldown = z.infer<typeof insertUserDomainCooldownSchema>;
+export type UserDomainCooldown = typeof userDomainCooldowns.$inferSelect;
