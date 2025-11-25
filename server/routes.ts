@@ -632,6 +632,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get individual scan by ID with ownership check
+  app.get("/api/scans/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const scanId = parseInt(req.params.id);
+      
+      if (isNaN(scanId)) {
+        return res.status(400).json({ message: "Invalid scan ID" });
+      }
+
+      const scan = await storage.getScanById(scanId, userId);
+      
+      if (!scan) {
+        return res.status(404).json({ message: "Scan not found" });
+      }
+
+      // Check if purchased
+      const purchase = await storage.getPurchaseByScanId(scanId);
+      const scanWithPurchase = {
+        ...scan,
+        isPurchased: !!purchase
+      };
+
+      res.json(scanWithPurchase);
+    } catch (error) {
+      console.error('Get scan by ID error:', error);
+      res.status(500).json({ message: "Failed to get scan" });
+    }
+  });
+
   app.get("/api/user/achievements", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

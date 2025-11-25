@@ -13,6 +13,7 @@ import { PaymentModal } from "@/components/PaymentModal";
 import { ScanComparison } from "@/components/ScanComparison";
 import { CompactUserHUD } from "@/components/CompactUserHUD";
 import { TrophyCase } from "@/components/TrophyCase";
+import { ScanDetailsModal } from "@/components/ScanDetailsModal";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
@@ -88,6 +89,9 @@ export default function Dashboard() {
   const [selectedScan, setSelectedScan] = useState<ScanWithPurchase | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showTrophyCase, setShowTrophyCase] = useState(false);
+  const [showScanDetailsModal, setShowScanDetailsModal] = useState(false);
+  const [scanDetailsData, setScanDetailsData] = useState<ScanWithPurchase | null>(null);
+  const [loadingScanId, setLoadingScanId] = useState<number | null>(null);
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
   const [scanUrl, setScanUrl] = useState("");
   const [isScanning, setIsScanning] = useState(false);
@@ -1731,27 +1735,39 @@ export default function Dashboard() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => {
-                                      // Find the scan in the existing scans array
-                                      const scan = scans.find(s => s.id === notification.scanId);
-                                      if (scan) {
-                                        setExpandedScan(scan.id);
+                                    onClick={async () => {
+                                      try {
+                                        setLoadingScanId(notification.scanId);
+                                        const response = await fetch(`/api/scans/${notification.scanId}`);
+                                        
+                                        if (!response.ok) {
+                                          if (response.status === 404) {
+                                            toast.error("Scan not found. It may have been deleted.");
+                                          } else {
+                                            toast.error("Failed to load scan details");
+                                          }
+                                          return;
+                                        }
+
+                                        const scan = await response.json();
+                                        setScanDetailsData(scan);
+                                        setShowScanDetailsModal(true);
                                         setShowNotificationsSheet(false);
                                         // Mark notification as read
                                         handleMarkNotificationRead(notification.id);
-                                        // Scroll to scan
-                                        setTimeout(() => {
-                                          document.getElementById(`scan-${scan.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                        }, 100);
-                                      } else {
-                                        toast.error("Scan not found. It may have been deleted.");
+                                      } catch (error) {
+                                        console.error('Failed to fetch scan:', error);
+                                        toast.error("Failed to load scan details");
+                                      } finally {
+                                        setLoadingScanId(null);
                                       }
                                     }}
+                                    disabled={loadingScanId === notification.scanId}
                                     className="h-7 text-xs"
                                     data-testid={`button-view-scan-${notification.id}`}
                                   >
                                     <ArrowRight className="w-3 h-3 mr-1" />
-                                    View Scan
+                                    {loadingScanId === notification.scanId ? 'Loading...' : 'View Scan'}
                                   </Button>
                                 )}
                                 
@@ -1879,6 +1895,21 @@ export default function Dashboard() {
       <TrophyCase 
         open={showTrophyCase} 
         onOpenChange={setShowTrophyCase} 
+      />
+
+      {/* Scan Details Modal */}
+      <ScanDetailsModal
+        open={showScanDetailsModal}
+        onClose={() => {
+          setShowScanDetailsModal(false);
+          setScanDetailsData(null);
+        }}
+        scan={scanDetailsData}
+        onUnlockClick={(scan) => {
+          setSelectedScan(scan);
+          setShowPaymentModal(true);
+          setShowScanDetailsModal(false);
+        }}
       />
     </div>
   );

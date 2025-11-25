@@ -36,6 +36,7 @@ export interface IStorage {
   createScan(scan: InsertScan): Promise<Scan>;
   getScan(id: number): Promise<Scan | undefined>;
   getUserScans(userId: string, tagFilter?: string[], limit?: number, offset?: number): Promise<Scan[]>;
+  getScanById(scanId: number, userId: string): Promise<Scan | null>;
   updateScanTags(id: number, tags: string[]): Promise<Scan>;
   getAllUserTags(userId: string): Promise<string[]>;
   
@@ -149,6 +150,16 @@ export class DatabaseStorage implements IStorage {
           .orderBy(desc(scans.createdAt));
 
     return await query.limit(safeLimit).offset(safeOffset);
+  }
+
+  async getScanById(scanId: number, userId: string): Promise<Scan | null> {
+    const [scan] = await db
+      .select()
+      .from(scans)
+      .where(and(eq(scans.id, scanId), eq(scans.userId, userId)))
+      .limit(1);
+    
+    return scan || null;
   }
 
   async updateScanTags(id: number, tags: string[]): Promise<Scan> {
