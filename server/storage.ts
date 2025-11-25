@@ -10,6 +10,7 @@ import {
   userAchievements,
   llmsFieldPurchases,
   robotsFieldPurchases,
+  userDomainCooldowns,
   type User,
   type UpsertUser,
   type Scan,
@@ -28,6 +29,8 @@ import {
   type InsertLlmsFieldPurchase,
   type RobotsFieldPurchase,
   type InsertRobotsFieldPurchase,
+  type UserDomainCooldown,
+  type InsertUserDomainCooldown,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -98,6 +101,10 @@ export interface IStorage {
   getUserRobotsFieldPurchases(userId: string): Promise<RobotsFieldPurchase[]>;
   hasUserPurchasedRobotsField(userId: string, fieldKey: string): Promise<boolean>;
   getRobotsFieldPurchaseByPaymentIntent(paymentIntentId: string): Promise<RobotsFieldPurchase | undefined>;
+  
+  // Domain cooldown operations
+  checkDomainCooldown(userId: string, domain: string): Promise<boolean>;
+  upsertDomainCooldown(userId: string, domain: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -503,6 +510,34 @@ export class DatabaseStorage implements IStorage {
       .from(robotsFieldPurchases)
       .where(eq(robotsFieldPurchases.stripePaymentIntentId, paymentIntentId));
     return purchase;
+  }
+
+  async checkDomainCooldown(userId: string, domain: string): Promise<boolean> {
+    const [cooldown] = await db
+      .select()
+      .from(userDomainCooldowns)
+      .where(and(
+        eq(userDomainCooldowns.userId, userId),
+        eq(userDomainCooldowns.domain, domain)
+      ));
+
+    if (!cooldown) return false;
+
+    const now = new Date();
+    const cooldownPeriod = 24 * 60 * 60 * 1000;
+    const timeSinceLastScan = now.getTime() - cooldown.lastScanAt.getTime();
+
+    return timeSinceLastScan < cooldownPeriod;
+  }
+
+  async upsertDomainCooldown(userId: string, domain: string): Promise<void> {
+    await db
+      .insert(userDomainCooldowns)
+      .values({ userId, domain })
+      .onConflictDoUpdate({
+        target: [userDomainCooldowns.userId, userDomainCooldowns.domain],
+        set: { lastScanAt: new Date() }
+      });
   }
 }
 
