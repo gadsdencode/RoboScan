@@ -6,6 +6,7 @@ import { scanWebsite } from "./scanner";
 import { generateOptimizationReport } from "./report-generator";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { calculateLevel, ACHIEVEMENTS } from "./gamification";
+import { normalizeDomainForCooldown } from "./domain-utils";
 import { z } from "zod";
 import Stripe from "stripe";
 import { getBotUserAgent } from "@shared/bot-user-agents";
@@ -127,10 +128,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { url } = scanRequestSchema.parse(req.body);
 
-      const result = await scanWebsite(url);
-
-      // Attach userId if user is authenticated
       const userId = req.isAuthenticated() ? req.user?.claims?.sub : undefined;
+
+      const canonicalDomain = normalizeDomainForCooldown(url);
+      if (!canonicalDomain) {
+        return res.status(400).json({
+          message: "Invalid URL format",
+          error: "Could not parse domain from URL"
+        });
+      }
+
+      let isOnCooldown = false;
+      if (userId) {
+        isOnCooldown = await storage.checkDomainCooldown(userId, canonicalDomain);
+      }
+
+      const result = await scanWebsite(url);
 
       const scan = await storage.createScan({
         userId,
@@ -144,22 +157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         warnings: result.warnings,
       });
 
-      // Gamification: XP Logic Injection
       let gamificationUpdates = null;
       
       if (userId) {
         const currentUser = await storage.getUser(userId);
         
         if (currentUser) {
-          let normalizedUrl = url.trim();
-          if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
-            normalizedUrl = 'https://' + normalizedUrl;
-          }
-          
-          const domain = new URL(normalizedUrl).hostname;
-          
-          const isOnCooldown = await storage.checkDomainCooldown(userId, domain);
-          
           if (!isOnCooldown) {
             let xpGain = 10;
 
@@ -174,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             await storage.updateUserGamificationStats(userId, newXp, newLevel);
 
-            await storage.upsertDomainCooldown(userId, domain);
+            await storage.upsertDomainCooldown(userId, canonicalDomain);
 
             gamificationUpdates = {
               xpGained: xpGain,

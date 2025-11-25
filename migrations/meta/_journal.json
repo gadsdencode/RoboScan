@@ -15,6 +15,13 @@
       "when": 1764092883170,
       "tag": "0001_odd_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764102338740,
+      "tag": "0002_broken_spot",
+      "breakpoints": true
     }
   ]
 }

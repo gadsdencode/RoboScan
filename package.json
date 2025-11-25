@@ -70,6 +70,7 @@
     "p-limit": "^7.2.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "psl": "^1.15.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.11.1",
     "react-dom": "^19.2.0",
