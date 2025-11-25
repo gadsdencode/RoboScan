@@ -56,7 +56,7 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   },
   {
-    element: '[data-testid="user-hud"]',
+    element: '[data-testid="hud-level-display"]',
     popover: {
       title: "📊 Your Progress",
       description: "Track your level and XP! Earn 10 XP per scan, +40 bonus for perfect scans, and 5 XP for each recurring scan that runs automatically.",
