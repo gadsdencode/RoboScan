@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { useScan } from "@/hooks/useScan";
 import { PaymentModal } from "@/components/PaymentModal";
 import { ScanComparison } from "@/components/ScanComparison";
 import { CompactUserHUD } from "@/components/CompactUserHUD";
@@ -84,6 +85,7 @@ interface NotificationPreferences {
 export default function Dashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { mutate: scanUrl, isPending: isScanningMutation } = useScan();
   const [scans, setScans] = useState<ScanWithPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScan, setSelectedScan] = useState<ScanWithPurchase | null>(null);
@@ -93,8 +95,7 @@ export default function Dashboard() {
   const [scanDetailsData, setScanDetailsData] = useState<ScanWithPurchase | null>(null);
   const [loadingScanId, setLoadingScanId] = useState<number | null>(null);
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
-  const [scanUrl, setScanUrl] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
+  const [scanUrlInput, setScanUrlInput] = useState("");
   const [scanError, setScanError] = useState<string | null>(null);
 
   // Recurring scans state
@@ -314,65 +315,51 @@ export default function Dashboard() {
     }
   };
 
-  const handleScan = async () => {
-    if (!scanUrl.trim()) return;
-
-    setIsScanning(true);
+  const handleScan = () => {
+    if (!scanUrlInput.trim()) return;
     setScanError(null);
 
-    try {
-      const response = await fetch('/api/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: scanUrl }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to scan website');
-      }
-
-      const data = await response.json();
-      
-      // Gamification: Show XP gained toast
-      if (data.gamification && user) {
-        const { xpGained, totalXp, newLevel, levelUp } = data.gamification;
-        
-        if (levelUp) {
-          // Level up celebration!
-          toast.success(`🎉 Level Up! You're now Level ${newLevel}!`, {
-            description: `You earned ${xpGained} XP and reached a new level! Keep scanning!`,
-            duration: 5000,
-          });
-        } else {
-          // Regular XP gain
-          const isPerfectScan = xpGained >= 50;
-          toast.success(
-            isPerfectScan 
-              ? `✨ Perfect Scan! +${xpGained} XP` 
-              : `+${xpGained} XP earned`,
-            {
-              description: isPerfectScan 
-                ? `Both robots.txt and llms.txt found! Total: ${totalXp} XP`
-                : `Total XP: ${totalXp}`,
+    scanUrl(scanUrlInput, {
+      onSuccess: (data) => {
+        // Gamification: Show XP gained toast
+        if (data.gamification && user) {
+          const { xpGained, totalXp, newLevel, levelUp, cooldownActive } = data.gamification;
+          
+          if (cooldownActive) {
+            toast.info('Domain cooldown active', {
+              description: 'You\'ve already scanned this domain recently. No XP awarded this time.',
               duration: 3000,
-            }
-          );
+            });
+          } else if (levelUp) {
+            // Level up celebration!
+            toast.success(`🎉 Level Up! You're now Level ${newLevel}!`, {
+              description: `You earned ${xpGained} XP and reached a new level! Keep scanning!`,
+              duration: 5000,
+            });
+          } else {
+            // Regular XP gain
+            const isPerfectScan = xpGained >= 50;
+            toast.success(
+              isPerfectScan 
+                ? `✨ Perfect Scan! +${xpGained} XP` 
+                : `+${xpGained} XP earned`,
+              {
+                description: isPerfectScan 
+                  ? `Both robots.txt and llms.txt found! Total: ${totalXp} XP`
+                  : `Total XP: ${totalXp}`,
+                duration: 3000,
+              }
+            );
+          }
         }
         
-        // Refresh user data to update the HUD
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        fetchScans();
+        setScanUrlInput("");
+      },
+      onError: (error) => {
+        setScanError(error instanceof Error ? error.message : 'Failed to scan website');
       }
-      
-      await fetchScans();
-      setScanUrl("");
-    } catch (error) {
-      console.error('Scan error:', error);
-      setScanError(error instanceof Error ? error.message : 'Failed to scan website');
-    } finally {
-      setIsScanning(false);
-    }
+    });
   };
 
   const handleCreateRecurringScan = async () => {
@@ -872,20 +859,20 @@ export default function Dashboard() {
             <Input
               type="url"
               placeholder="Enter website URL (e.g., example.com)"
-              value={scanUrl}
-              onChange={(e) => setScanUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !isScanning && handleScan()}
-              disabled={isScanning}
+              value={scanUrlInput}
+              onChange={(e) => setScanUrlInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !isScanningMutation && handleScan()}
+              disabled={isScanningMutation}
               className="flex-1 bg-background border-white/10 focus:border-primary"
               data-testid="input-scan-url"
             />
             <Button
               onClick={handleScan}
-              disabled={isScanning || !scanUrl.trim()}
+              disabled={isScanningMutation || !scanUrlInput.trim()}
               className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 btn-hover-glow btn-hover-lift"
               data-testid="button-scan"
             >
-              {isScanning ? (
+              {isScanningMutation ? (
                 <>
                   <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
                   Scanning...
