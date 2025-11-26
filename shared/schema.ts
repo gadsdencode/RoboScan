@@ -3,8 +3,7 @@ import { pgTable, text, varchar, serial, timestamp, boolean, jsonb, integer, dec
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
-// Reference: blueprint:javascript_log_in_with_replit
+// Session storage table - compatible with both Replit Auth and NextAuth
 export const sessions = pgTable(
   "sessions",
   {
@@ -14,6 +13,31 @@ export const sessions = pgTable(
   },
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
+
+// NextAuth.js tables
+export const accounts = pgTable("accounts", {
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type").notNull(),
+  provider: varchar("provider").notNull(),
+  providerAccountId: varchar("provider_account_id").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: varchar("token_type"),
+  scope: varchar("scope"),
+  id_token: text("id_token"),
+  session_state: varchar("session_state"),
+}, (table) => [
+  uniqueIndex("provider_account_unique").on(table.provider, table.providerAccountId)
+]);
+
+export const verificationTokens = pgTable("verification_tokens", {
+  identifier: varchar("identifier").notNull(),
+  token: varchar("token").notNull(),
+  expires: timestamp("expires").notNull(),
+}, (table) => [
+  uniqueIndex("identifier_token_unique").on(table.identifier, table.token)
+]);
 
 // User storage table for Replit Auth
 // Reference: blueprint:javascript_log_in_with_replit

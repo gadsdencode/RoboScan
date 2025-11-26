@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { startScheduler } from "./scheduler";
+// Scheduler is now handled by Vercel Cron Jobs (api/cron/scheduler.ts)
 
 const app = express();
 
@@ -79,7 +79,11 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
     
-    // Start the recurring scan scheduler
-    startScheduler();
+    // Scheduler is handled by Vercel Cron Jobs in production
+    // For local development, you can manually trigger the scheduler
+    if (process.env.NODE_ENV === "development" && process.env.RUN_SCHEDULER === "true") {
+      const { startScheduler } = await import("./scheduler");
+      startScheduler();
+    }
   });
 })();
