@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
-import { serveStatic } from "../server/vite";
+import { registerRoutes } from "../server/routes.js";
+import { serveStatic } from "../server/vite.js";
 
 // Create Express app instance
 const app = express();

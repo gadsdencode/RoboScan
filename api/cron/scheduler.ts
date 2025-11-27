@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { runScheduler } from '../../server/scheduler';
+import { runScheduler } from '../../server/scheduler.js';
 
 export default async function handler(
   req: VercelRequest,
