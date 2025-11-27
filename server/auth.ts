@@ -4,9 +4,6 @@ import { getToken } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { db } from "./db";
-import { users, accounts, verificationTokens } from "@shared/schema";
 import { storage } from "./storage";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -56,13 +53,9 @@ export function getSession() {
 }
 
 // NextAuth configuration
-// Note: We'll use JWT strategy instead of database sessions for better Express compatibility
+// Note: We use JWT strategy without database adapter for Express/Vercel compatibility
+// User persistence is handled manually in the signIn callback
 const authOptions: NextAuthOptions = {
-  adapter: DrizzleAdapter(db, {
-    usersTable: users,
-    accountsTable: accounts,
-    verificationTokensTable: verificationTokens,
-  }),
   providers: [
     GoogleProvider({
       clientId: process.env.NEXTAUTH_GOOGLE_CLIENT_ID || "",
@@ -103,14 +96,23 @@ const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       if (user?.email) {
+        // Generate a consistent user ID from the provider account
+        // This ensures the same user always gets the same ID
+        const uniqueId = account?.providerAccountId 
+          ? `${account.provider}_${account.providerAccountId}`
+          : user.id || user.email;
+        
         // Upsert user in our storage
         await storage.upsertUser({
-          id: user.id,
+          id: uniqueId,
           email: user.email,
-          firstName: profile?.given_name || user.name?.split(" ")[0] || null,
-          lastName: profile?.family_name || user.name?.split(" ").slice(1).join(" ") || null,
+          firstName: (profile as any)?.given_name || user.name?.split(" ")[0] || null,
+          lastName: (profile as any)?.family_name || user.name?.split(" ").slice(1).join(" ") || null,
           profileImageUrl: user.image || null,
         });
+        
+        // Store the ID for the JWT callback
+        user.id = uniqueId;
       }
       return true;
     },
@@ -123,6 +125,10 @@ const authOptions: NextAuthOptions = {
     async jwt({ token, user, account }) {
       if (user) {
         token.sub = user.id;
+      }
+      // Also store email in token for the isAuthenticated middleware
+      if (account) {
+        token.email = user?.email;
       }
       return token;
     },
