@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import NextAuth, { type NextAuthOptions } from "next-auth";
+import { getToken } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -145,6 +146,29 @@ const authOptions: NextAuthOptions = {
 // Setup NextAuth with Express
 let nextAuthHandler: any = null;
 
+// Helper to adapt Express request to NextAuth format
+function adaptRequestForNextAuth(req: any): any {
+  // Extract the NextAuth path segments from the URL
+  // /api/auth/signin/google -> ['signin', 'google']
+  const path = req.path || req.url?.split('?')[0] || '';
+  const nextauthPath = path.replace(/^\/api\/auth\/?/, '').split('/').filter(Boolean);
+  
+  // Create a NextAuth-compatible request object
+  const adaptedReq = {
+    ...req,
+    query: {
+      ...req.query,
+      nextauth: nextauthPath,
+    },
+    body: req.body,
+    headers: req.headers,
+    method: req.method,
+    cookies: req.cookies || {},
+  };
+  
+  return adaptedReq;
+}
+
 export async function setupAuth(app: Express) {
   try {
     app.set("trust proxy", 1);
@@ -157,7 +181,9 @@ export async function setupAuth(app: Express) {
     // Mount NextAuth routes
     app.all("/api/auth/*", async (req, res, next) => {
       try {
-        await nextAuthHandler(req, res);
+        // Adapt the Express request to NextAuth format
+        const adaptedReq = adaptRequestForNextAuth(req);
+        await nextAuthHandler(adaptedReq, res);
       } catch (error) {
         console.error("NextAuth route error:", error);
         if (!res.headersSent) {
@@ -200,39 +226,25 @@ export async function setupAuth(app: Express) {
   }
 }
 
-// Authentication middleware
+// Authentication middleware using JWT token
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   try {
-    if (!nextAuthHandler) {
-      console.error("Auth middleware: nextAuthHandler not initialized");
-      return res.status(401).json({ message: "Auth not initialized" });
-    }
+    // Use getToken from next-auth/jwt to decode the session token
+    const token = await getToken({
+      req: req as any,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-    // Get session using NextAuth
-    // NextAuth expects req/res in Next.js format, so we need to adapt
-    let session;
-    try {
-      session = await nextAuthHandler.getSession({ 
-        req: {
-          headers: req.headers,
-          cookies: (req as any).cookies || {},
-        } as any
-      });
-    } catch (sessionError) {
-      console.error("Error getting session:", sessionError);
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    if (!session || !session.user) {
+    if (!token) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
     // Attach user to request in the format expected by routes
     (req as any).user = {
       claims: {
-        sub: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
+        sub: token.sub,
+        email: token.email,
+        name: token.name,
       },
     };
     (req as any).isAuthenticated = () => true;

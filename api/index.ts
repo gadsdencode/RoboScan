@@ -118,8 +118,10 @@ export default async function handler(
       expressReq.cookies = req.cookies || {};
     }
     expressReq.hostname = req.headers.host?.split(':')[0] || '';
-    expressReq.protocol = req.headers['x-forwarded-proto'] || 'https';
-    expressReq.ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || '';
+    const proto = req.headers['x-forwarded-proto'];
+    expressReq.protocol = (Array.isArray(proto) ? proto[0] : proto) || 'https';
+    const forwardedFor = req.headers['x-forwarded-for'];
+    expressReq.ip = (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)?.split(',')[0] || req.socket?.remoteAddress || '';
 
     const expressRes = Object.create(res);
     let responseEnded = false;
