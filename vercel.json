@@ -6,10 +6,12 @@
   "framework": null,
   "functions": {
     "api/index.ts": {
-      "includeFiles": "server/**"
+      "runtime": "nodejs20.x",
+      "includeFiles": ["server/**", "shared/**"]
     },
     "api/cron/scheduler.ts": {
-      "includeFiles": "server/**"
+      "runtime": "nodejs20.x",
+      "includeFiles": ["server/**", "shared/**"]
     }
   },
   "rewrites": [
