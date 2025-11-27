@@ -113,11 +113,17 @@ const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async session({ session, token }) {
+      if (session.user && token?.sub) {
+        session.user.id = token.sub as string;
       }
       return session;
+    },
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.sub = user.id;
+      }
+      return token;
     },
   },
   pages: {
@@ -129,47 +135,101 @@ const authOptions: NextAuthOptions = {
     maxAge: 7 * 24 * 60 * 60, // 1 week
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // Set the base URL for NextAuth callbacks
+  ...(process.env.NEXTAUTH_URL && { 
+    basePath: "/api/auth",
+    url: process.env.NEXTAUTH_URL 
+  }),
 };
 
 // Setup NextAuth with Express
 let nextAuthHandler: any = null;
 
 export async function setupAuth(app: Express) {
-  app.set("trust proxy", 1);
-  app.use(cookieParser());
-  app.use(getSession());
+  try {
+    app.set("trust proxy", 1);
+    app.use(cookieParser());
+    app.use(getSession());
 
-  // Initialize NextAuth handler
-  nextAuthHandler = NextAuth(authOptions);
-  
-  // Mount NextAuth routes
-  app.all("/api/auth/*", async (req, res) => {
-    return await nextAuthHandler(req, res);
-  });
-
-  // Login route redirect
-  app.get("/api/login", (req, res) => {
-    res.redirect("/api/auth/signin");
-  });
-
-  // Logout route
-  app.get("/api/logout", async (req, res) => {
-    // Clear session
-    req.session?.destroy(() => {
-      res.redirect("/");
+    // Initialize NextAuth handler
+    nextAuthHandler = NextAuth(authOptions);
+    
+    // Mount NextAuth routes
+    app.all("/api/auth/*", async (req, res, next) => {
+      try {
+        await nextAuthHandler(req, res);
+      } catch (error) {
+        console.error("NextAuth route error:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ 
+            message: "Authentication error",
+            error: process.env.NODE_ENV === 'development' ? String(error) : undefined
+          });
+        }
+      }
     });
-  });
+
+    // Login route redirect
+    app.get("/api/login", (req, res) => {
+      try {
+        res.redirect("/api/auth/signin");
+      } catch (error) {
+        console.error("Login redirect error:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Failed to redirect to login" });
+        }
+      }
+    });
+
+    // Logout route
+    app.get("/api/logout", async (req, res) => {
+      try {
+        // Clear session
+        if (req.session) {
+          req.session.destroy((err) => {
+            if (err) {
+              console.error("Session destroy error:", err);
+            }
+            res.redirect("/");
+          });
+        } else {
+          res.redirect("/");
+        }
+      } catch (error) {
+        console.error("Logout error:", error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Failed to logout" });
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Auth setup error:", error);
+    throw error;
+  }
 }
 
 // Authentication middleware
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   try {
     if (!nextAuthHandler) {
+      console.error("Auth middleware: nextAuthHandler not initialized");
       return res.status(401).json({ message: "Auth not initialized" });
     }
 
     // Get session using NextAuth
-    const session = await nextAuthHandler.getSession({ req } as any);
+    // NextAuth expects req/res in Next.js format, so we need to adapt
+    let session;
+    try {
+      session = await nextAuthHandler.getSession({ 
+        req: {
+          headers: req.headers,
+          cookies: (req as any).cookies || {},
+        } as any
+      });
+    } catch (sessionError) {
+      console.error("Error getting session:", sessionError);
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     if (!session || !session.user) {
       return res.status(401).json({ message: "Unauthorized" });

@@ -104,7 +104,19 @@ export default async function handler(
       const header = req.headers[name.toLowerCase()];
       return Array.isArray(header) ? header[0] : header;
     };
-    expressReq.cookies = req.cookies || {};
+    // Parse cookies from headers if not already parsed
+    if (!req.cookies && req.headers.cookie) {
+      const cookies: Record<string, string> = {};
+      req.headers.cookie.split(';').forEach(cookie => {
+        const [name, value] = cookie.trim().split('=');
+        if (name && value) {
+          cookies[name] = decodeURIComponent(value);
+        }
+      });
+      expressReq.cookies = cookies;
+    } else {
+      expressReq.cookies = req.cookies || {};
+    }
     expressReq.hostname = req.headers.host?.split(':')[0] || '';
     expressReq.protocol = req.headers['x-forwarded-proto'] || 'https';
     expressReq.ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || '';
@@ -154,18 +166,53 @@ export default async function handler(
       return expressRes;
     };
     
+    expressRes.header = (name: string, value: string | string[]) => {
+      res.setHeader(name, value);
+      return expressRes;
+    };
+    
+    expressRes.redirect = (statusOrUrl: number | string, url?: string) => {
+      if (!responseEnded) {
+        if (typeof statusOrUrl === 'string') {
+          res.redirect(statusOrUrl);
+        } else {
+          res.redirect(statusOrUrl, url!);
+        }
+        responseEnded = true;
+        resolve();
+      }
+      return expressRes;
+    };
+    
+    expressRes.cookie = (name: string, value: string, options?: any) => {
+      res.setHeader('Set-Cookie', `${name}=${value}; ${options?.httpOnly ? 'HttpOnly; ' : ''}${options?.secure ? 'Secure; ' : ''}${options?.sameSite ? `SameSite=${options.sameSite}; ` : ''}${options?.maxAge ? `Max-Age=${options.maxAge}; ` : ''}Path=${options?.path || '/'}`);
+      return expressRes;
+    };
+    
+    expressRes.clearCookie = (name: string, options?: any) => {
+      res.setHeader('Set-Cookie', `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=${options?.path || '/'}`);
+      return expressRes;
+    };
+    
     expressRes.on = (event: string, callback: (...args: any[]) => void) => {
       if (event === 'finish' && responseEnded) {
         callback();
       }
       return expressRes;
     };
+    
+    // Add session property for express-session compatibility
+    expressReq.session = (expressReq as any).session || null;
 
     // Handle the request through Express
     expressApp(expressReq, expressRes, (err: any) => {
       if (err) {
+        console.error('Express handler error:', err);
         if (!responseEnded) {
-          res.status(500).json({ message: err.message || 'Internal Server Error' });
+          res.status(500).json({ 
+            message: err.message || 'Internal Server Error',
+            error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+          });
           responseEnded = true;
         }
         reject(err);
