@@ -127,8 +127,8 @@ const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/api/auth/signin",
-    error: "/api/auth/error",
+    signIn: "/login",
+    error: "/login?error=AuthenticationError",
   },
   session: {
     strategy: "jwt",
@@ -169,10 +169,10 @@ export async function setupAuth(app: Express) {
       }
     });
 
-    // Login route redirect
+    // Login route redirect to frontend login page
     app.get("/api/login", (req, res) => {
       try {
-        res.redirect("/api/auth/signin");
+        res.redirect("/login");
       } catch (error) {
         console.error("Login redirect error:", error);
         if (!res.headersSent) {
@@ -181,20 +181,12 @@ export async function setupAuth(app: Express) {
       }
     });
 
-    // Logout route
+    // Logout route - use NextAuth signout
     app.get("/api/logout", async (req, res) => {
       try {
-        // Clear session
-        if (req.session) {
-          req.session.destroy((err) => {
-            if (err) {
-              console.error("Session destroy error:", err);
-            }
-            res.redirect("/");
-          });
-        } else {
-          res.redirect("/");
-        }
+        // Use NextAuth signout endpoint
+        const callbackUrl = `${req.protocol}://${req.get("host")}/`;
+        res.redirect(`/api/auth/signout?callbackUrl=${encodeURIComponent(callbackUrl)}`);
       } catch (error) {
         console.error("Logout error:", error);
         if (!res.headersSent) {

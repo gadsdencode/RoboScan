@@ -22,7 +22,7 @@ const Navbar = () => {
         <div className="hidden md:flex items-center gap-8">
           <Button 
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
-            onClick={() => window.location.href = '/api/login'}
+            onClick={() => window.location.href = '/login'}
             data-testid="button-login"
           >
             Login
@@ -45,7 +45,7 @@ const Navbar = () => {
             <div className="flex flex-col p-6 gap-4">
               <Button 
                 className="w-full bg-primary text-primary-foreground"
-                onClick={() => window.location.href = '/api/login'}
+                onClick={() => window.location.href = '/login'}
               >
                 Login
               </Button>
