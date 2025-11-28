@@ -20,10 +20,6 @@ if (!process.env.SESSION_SECRET) {
   throw new Error('Missing required environment variable: SESSION_SECRET');
 }
 
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error('Missing required environment variable: NEXTAUTH_SECRET');
-}
-
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const scanRequestSchema = z.object({

@@ -1,256 +1,178 @@
 import type { Express, RequestHandler } from "express";
-import NextAuth, { type NextAuthOptions } from "next-auth";
-import { getToken } from "next-auth/jwt";
-import GoogleProvider from "next-auth/providers/google";
-import GitHubProvider from "next-auth/providers/github";
-import CredentialsProvider from "next-auth/providers/credentials";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
-import session from "express-session";
-import connectPg from "connect-pg-simple";
 import cookieParser from "cookie-parser";
 
-// Extend NextAuth types to include our user fields
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      email: string;
-      name?: string | null;
-      image?: string | null;
-    };
-  }
-  
-  interface User {
-    id: string;
-    email: string;
-    name?: string | null;
-    image?: string | null;
+const JWT_SECRET = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || "dev-secret-change-me";
+const COOKIE_NAME = "auth_token";
+const TOKEN_EXPIRY = "7d";
+
+interface JWTPayload {
+  userId: string;
+  email: string;
+  name?: string;
+  iat?: number;
+  exp?: number;
+}
+
+// Create a signed JWT token
+function createToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+}
+
+// Verify and decode a JWT token
+function verifyToken(token: string): JWTPayload | null {
+  try {
+    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+  } catch {
+    return null;
   }
 }
 
-// Get session middleware for Express
-export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
-  return session({
-    secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: sessionTtl,
-      sameSite: "lax",
-    },
+// Set auth cookie
+function setAuthCookie(res: any, token: string) {
+  const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge,
+    path: "/",
   });
 }
 
-// NextAuth configuration
-// Note: We use JWT strategy without database adapter for Express/Vercel compatibility
-// User persistence is handled manually in the signIn callback
-const authOptions: NextAuthOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.NEXTAUTH_GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.NEXTAUTH_GOOGLE_CLIENT_SECRET || "",
-    }),
-    GitHubProvider({
-      clientId: process.env.NEXTAUTH_GITHUB_CLIENT_ID || "",
-      clientSecret: process.env.NEXTAUTH_GITHUB_CLIENT_SECRET || "",
-    }),
-    // Email/Password provider (optional, for development)
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        // For now, this is a placeholder - implement your own auth logic
-        // You might want to add a password field to the users table
-        if (!credentials?.email) return null;
-        
-        // Check if user exists
-        const user = await storage.getUser(credentials.email);
-        if (!user) return null;
-        
-        // For now, allow any password (you should implement proper password hashing)
-        return {
-          id: user.id,
-          email: user.email || "",
-          name: user.firstName && user.lastName 
-            ? `${user.firstName} ${user.lastName}` 
-            : user.email || null,
-          image: user.profileImageUrl || null,
-        };
-      },
-    }),
-  ],
-  callbacks: {
-    async signIn({ user, account, profile }) {
-      if (user?.email) {
-        // Generate a consistent user ID from the provider account
-        // This ensures the same user always gets the same ID
-        const uniqueId = account?.providerAccountId 
-          ? `${account.provider}_${account.providerAccountId}`
-          : user.id || user.email;
-        
-        // Upsert user in our storage
-        await storage.upsertUser({
-          id: uniqueId,
-          email: user.email,
-          firstName: (profile as any)?.given_name || user.name?.split(" ")[0] || null,
-          lastName: (profile as any)?.family_name || user.name?.split(" ").slice(1).join(" ") || null,
-          profileImageUrl: user.image || null,
-        });
-        
-        // Store the ID for the JWT callback
-        user.id = uniqueId;
-      }
-      return true;
-    },
-    async session({ session, token }) {
-      if (session.user && token?.sub) {
-        session.user.id = token.sub as string;
-      }
-      return session;
-    },
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.sub = user.id;
-      }
-      // Also store email in token for the isAuthenticated middleware
-      if (account) {
-        token.email = user?.email;
-      }
-      return token;
-    },
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login?error=AuthenticationError",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 7 * 24 * 60 * 60, // 1 week
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  // Set the base URL for NextAuth callbacks
-  ...(process.env.NEXTAUTH_URL && { 
-    basePath: "/api/auth",
-    url: process.env.NEXTAUTH_URL 
-  }),
-};
-
-// Setup NextAuth with Express
-let nextAuthHandler: any = null;
-
-// Helper to adapt Express request to NextAuth format
-function adaptRequestForNextAuth(req: any): any {
-  // Extract the NextAuth path segments from the URL
-  // /api/auth/signin/google -> ['signin', 'google']
-  const path = req.path || req.url?.split('?')[0] || '';
-  const nextauthPath = path.replace(/^\/api\/auth\/?/, '').split('/').filter(Boolean);
-  
-  // Create a NextAuth-compatible request object
-  const adaptedReq = {
-    ...req,
-    query: {
-      ...req.query,
-      nextauth: nextauthPath,
-    },
-    body: req.body,
-    headers: req.headers,
-    method: req.method,
-    cookies: req.cookies || {},
-  };
-  
-  return adaptedReq;
+// Clear auth cookie
+function clearAuthCookie(res: any) {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
 }
 
 export async function setupAuth(app: Express) {
-  try {
-    app.set("trust proxy", 1);
-    app.use(cookieParser());
-    app.use(getSession());
+  app.use(cookieParser());
 
-    // Initialize NextAuth handler
-    nextAuthHandler = NextAuth(authOptions);
-    
-    // Mount NextAuth routes
-    app.all("/api/auth/*", async (req, res, next) => {
-      try {
-        // Adapt the Express request to NextAuth format
-        const adaptedReq = adaptRequestForNextAuth(req);
-        await nextAuthHandler(adaptedReq, res);
-      } catch (error) {
-        console.error("NextAuth route error:", error);
-        if (!res.headersSent) {
-          res.status(500).json({ 
-            message: "Authentication error",
-            error: process.env.NODE_ENV === 'development' ? String(error) : undefined
-          });
-        }
+  // Simple email login - creates or gets user
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email is required" });
       }
-    });
 
-    // Login route redirect to frontend login page
-    app.get("/api/login", (req, res) => {
-      try {
-        res.redirect("/login");
-      } catch (error) {
-        console.error("Login redirect error:", error);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Failed to redirect to login" });
-        }
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Get or create user
+      let user = await storage.getUser(normalizedEmail);
+      
+      if (!user) {
+        user = await storage.upsertUser({
+          id: normalizedEmail,
+          email: normalizedEmail,
+          firstName: null,
+          lastName: null,
+          profileImageUrl: null,
+        });
       }
-    });
 
-    // Logout route - use NextAuth signout
-    app.get("/api/logout", async (req, res) => {
-      try {
-        // Use NextAuth signout endpoint
-        const callbackUrl = `${req.protocol}://${req.get("host")}/`;
-        res.redirect(`/api/auth/signout?callbackUrl=${encodeURIComponent(callbackUrl)}`);
-      } catch (error) {
-        console.error("Logout error:", error);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Failed to logout" });
-        }
+      if (!user) {
+        return res.status(500).json({ message: "Failed to create user" });
       }
-    });
-  } catch (error) {
-    console.error("Auth setup error:", error);
-    throw error;
-  }
+
+      // Create JWT token
+      const token = createToken({
+        userId: user.id,
+        email: user.email || normalizedEmail,
+        name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
+      });
+
+      // Set cookie
+      setAuthCookie(res, token);
+
+      res.json({ 
+        success: true, 
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Get current user from JWT
+  app.get("/api/auth/user", async (req, res) => {
+    try {
+      const token = req.cookies?.[COOKIE_NAME];
+      
+      if (!token) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const payload = verifyToken(token);
+      if (!payload) {
+        clearAuthCookie(res);
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      const user = await storage.getUser(payload.userId);
+      if (!user) {
+        clearAuthCookie(res);
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      res.json(user);
+    } catch (error) {
+      console.error("Get user error:", error);
+      res.status(500).json({ message: "Failed to get user" });
+    }
+  });
+
+  // Logout - clear cookie
+  app.post("/api/auth/logout", (req, res) => {
+    clearAuthCookie(res);
+    res.json({ success: true });
+  });
+
+  // GET logout for redirects
+  app.get("/api/logout", (req, res) => {
+    clearAuthCookie(res);
+    res.redirect("/");
+  });
+
+  // Redirect /api/login to login page
+  app.get("/api/login", (req, res) => {
+    res.redirect("/login");
+  });
 }
 
-// Authentication middleware using JWT token
+// Authentication middleware - verifies JWT from cookie
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   try {
-    // Use getToken from next-auth/jwt to decode the session token
-    const token = await getToken({
-      req: req as any,
-      secret: process.env.NEXTAUTH_SECRET,
-    });
-
+    const token = req.cookies?.[COOKIE_NAME];
+    
     if (!token) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Attach user to request in the format expected by routes
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+
+    // Attach user info to request
     (req as any).user = {
       claims: {
-        sub: token.sub,
-        email: token.email,
-        name: token.name,
+        sub: payload.userId,
+        email: payload.email,
+        name: payload.name,
       },
     };
     (req as any).isAuthenticated = () => true;
@@ -261,4 +183,3 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 };
-
