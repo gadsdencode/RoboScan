@@ -11,16 +11,23 @@ import { z } from "zod";
 import Stripe from "stripe";
 import { getBotUserAgent } from "@shared/bot-user-agents";
 
-// Validate required environment variables
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
+// Lazy Stripe initialization - don't throw at module load time
+let stripeInstance: Stripe | null = null;
 
-if (!process.env.SESSION_SECRET) {
-  throw new Error('Missing required environment variable: SESSION_SECRET');
+/**
+ * Get the Stripe client lazily.
+ * This defers the environment variable check until Stripe is actually needed,
+ * preventing serverless function crashes during cold start.
+ */
+function getStripe(): Stripe {
+  if (!stripeInstance) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+    }
+    stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+  }
+  return stripeInstance;
 }
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const scanRequestSchema = z.object({
   url: z.string().min(1, "URL is required"),
@@ -56,6 +63,20 @@ function isAdmin(req: any): boolean {
 let authInitialized = false;
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Validate required environment variables at runtime (not module load)
+  // This allows the serverless function to start and return proper errors
+  if (!process.env.SESSION_SECRET) {
+    console.error('Missing required environment variable: SESSION_SECRET');
+    // Add a fallback route that returns a clear error
+    app.use('/api/*', (req, res) => {
+      res.status(500).json({ 
+        message: 'Server configuration error: SESSION_SECRET not set',
+        error: 'MISSING_ENV_VAR'
+      });
+    });
+    return createServer(app);
+  }
+
   // Setup authentication only once
   if (!authInitialized) {
     await setupAuth(app);
@@ -273,7 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata.userId = req.user.claims.sub;
       }
 
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: 999,
         currency: "usd",
         metadata,
@@ -309,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentIntentId: z.string(),
       }).parse(req.body);
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
       
       // For authenticated users, verify they own the payment
       if (req.isAuthenticated() && paymentIntent.metadata.userId) {
@@ -829,7 +850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const amountInCents = Math.round(field.price * 100);
 
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: amountInCents,
         currency: "usd",
         metadata: {
@@ -863,7 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = req.user.claims.sub;
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
       
       if (paymentIntent.status !== "succeeded") {
         return res.status(400).json({ message: "Payment not completed" });
@@ -973,7 +994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const amountInCents = Math.round(field.price * 100);
 
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: amountInCents,
         currency: "usd",
         metadata: {
@@ -1007,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = req.user.claims.sub;
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
       
       if (paymentIntent.status !== "succeeded") {
         return res.status(400).json({ message: "Payment not completed" });
