@@ -1,4 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "../server/routes.js";
 import { serveStatic } from "../server/vite.js";
@@ -22,6 +21,7 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -54,222 +54,73 @@ app.use((req, res, next) => {
 
 // Initialize app (only once, cached across invocations)
 let appInitialized = false;
-let appPromise: Promise<express.Express> | null = null;
+let initPromise: Promise<void> | null = null;
 
-async function initializeApp(): Promise<express.Express> {
-  if (appInitialized) return app;
-  if (appPromise) return appPromise;
+async function initializeApp(): Promise<void> {
+  if (appInitialized) return;
+  if (initPromise) return initPromise;
 
-  appPromise = (async () => {
-    await registerRoutes(app);
+  initPromise = (async () => {
+    try {
+      console.log('[Vercel] Starting app initialization...');
+      
+      console.log('[Vercel] Registering routes...');
+      await registerRoutes(app);
+      console.log('[Vercel] Routes registered successfully');
 
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
+      // Error handling middleware
+      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+        console.error('[Vercel] Express error:', err);
+        res.status(status).json({ message });
+      });
 
-      res.status(status).json({ message });
-      throw err;
-    });
+      // In production on Vercel, serve static files
+      if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+        console.log('[Vercel] Setting up static file serving...');
+        serveStatic(app);
+        console.log('[Vercel] Static file serving configured');
+      }
 
-    // In production on Vercel, serve static files
-    if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-      serveStatic(app);
+      appInitialized = true;
+      console.log('[Vercel] App initialization complete');
+    } catch (error) {
+      console.error('[Vercel] FATAL: App initialization failed:', error);
+      // Reset promise so initialization can be retried
+      initPromise = null;
+      throw error;
     }
-
-    appInitialized = true;
-    return app;
   })();
 
-  return appPromise;
+  return initPromise;
 }
 
-// Helper to serialize cookie with proper attributes for Vercel
-function serializeCookie(name: string, value: string, options: {
-  httpOnly?: boolean;
-  secure?: boolean;
-  sameSite?: 'strict' | 'lax' | 'none';
-  maxAge?: number;
-  path?: string;
-  expires?: Date;
-} = {}): string {
-  const parts = [`${encodeURIComponent(name)}=${encodeURIComponent(value)}`];
-  
-  if (options.path) parts.push(`Path=${options.path}`);
-  if (options.maxAge !== undefined) parts.push(`Max-Age=${Math.floor(options.maxAge / 1000)}`);
-  if (options.expires) parts.push(`Expires=${options.expires.toUTCString()}`);
-  if (options.httpOnly) parts.push('HttpOnly');
-  if (options.secure) parts.push('Secure');
-  if (options.sameSite) parts.push(`SameSite=${options.sameSite.charAt(0).toUpperCase() + options.sameSite.slice(1)}`);
-  
-  return parts.join('; ');
-}
+// Initialize immediately (this runs at cold start)
+// The promise will be awaited on first request if not complete
+const initPromiseResult = initializeApp().catch(err => {
+  console.error('[Vercel] Background init failed:', err);
+});
 
-// Vercel serverless function handler
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  // Ensure app is initialized
-  const expressApp = await initializeApp();
-
-  // Use Vercel's built-in Express support
-  // Vercel automatically handles Express apps when exported as default
-  return new Promise<void>((resolve, reject) => {
-    // Create a proper Express request/response wrapper
-    const expressReq = Object.create(req);
-    expressReq.method = req.method || 'GET';
-    expressReq.url = req.url || '/';
-    expressReq.originalUrl = req.url || '/';
-    expressReq.path = req.url?.split('?')[0] || '/';
-    expressReq.query = req.query || {};
-    expressReq.body = req.body;
-    expressReq.headers = req.headers;
-    expressReq.get = (name: string) => {
-      const header = req.headers[name.toLowerCase()];
-      return Array.isArray(header) ? header[0] : header;
-    };
-    // Parse cookies from headers if not already parsed
-    if (!req.cookies && req.headers.cookie) {
-      const cookies: Record<string, string> = {};
-      req.headers.cookie.split(';').forEach(cookie => {
-        const [name, value] = cookie.trim().split('=');
-        if (name && value) {
-          cookies[name] = decodeURIComponent(value);
-        }
-      });
-      expressReq.cookies = cookies;
-    } else {
-      expressReq.cookies = req.cookies || {};
+// Export the Express app - Vercel handles the rest automatically
+// Using a wrapper to ensure initialization is complete before handling requests
+export default async function handler(req: any, res: any) {
+  try {
+    // Wait for initialization to complete
+    await initPromiseResult;
+    
+    // If initialization failed, try again
+    if (!appInitialized) {
+      await initializeApp();
     }
-    expressReq.hostname = req.headers.host?.split(':')[0] || '';
-    const proto = req.headers['x-forwarded-proto'];
-    expressReq.protocol = (Array.isArray(proto) ? proto[0] : proto) || 'https';
-    const forwardedFor = req.headers['x-forwarded-for'];
-    expressReq.ip = (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)?.split(',')[0] || req.socket?.remoteAddress || '';
-
-    const expressRes = Object.create(res);
-    let responseEnded = false;
     
-    expressRes.status = (code: number) => {
-      res.status(code);
-      return expressRes;
-    };
-    
-    expressRes.json = (body: any) => {
-      if (!responseEnded) {
-        res.json(body);
-        responseEnded = true;
-        resolve();
-      }
-      return expressRes;
-    };
-    
-    expressRes.send = (body: any) => {
-      if (!responseEnded) {
-        res.send(body);
-        responseEnded = true;
-        resolve();
-      }
-      return expressRes;
-    };
-    
-    expressRes.end = (body?: any) => {
-      if (!responseEnded) {
-        res.end(body);
-        responseEnded = true;
-        resolve();
-      }
-      return expressRes;
-    };
-    
-    expressRes.setHeader = (name: string, value: string | string[]) => {
-      res.setHeader(name, value);
-      return expressRes;
-    };
-    
-    expressRes.set = (name: string, value: string | string[]) => {
-      res.setHeader(name, value);
-      return expressRes;
-    };
-    
-    expressRes.header = (name: string, value: string | string[]) => {
-      res.setHeader(name, value);
-      return expressRes;
-    };
-    
-    expressRes.redirect = (statusOrUrl: number | string, url?: string) => {
-      if (!responseEnded) {
-        if (typeof statusOrUrl === 'string') {
-          res.redirect(statusOrUrl);
-        } else {
-          res.redirect(statusOrUrl, url!);
-        }
-        responseEnded = true;
-        resolve();
-      }
-      return expressRes;
-    };
-    
-    // Track cookies to set (supports multiple cookies)
-    const cookiesToSet: string[] = [];
-    
-    expressRes.cookie = (name: string, value: string, options?: any) => {
-      const cookieString = serializeCookie(name, value, {
-        httpOnly: options?.httpOnly,
-        secure: options?.secure !== false, // Default to true for Vercel HTTPS
-        sameSite: options?.sameSite || 'lax',
-        maxAge: options?.maxAge,
-        path: options?.path || '/',
-        expires: options?.expires,
-      });
-      cookiesToSet.push(cookieString);
-      // Set all cookies as array (Vercel handles multiple Set-Cookie headers this way)
-      res.setHeader('Set-Cookie', cookiesToSet);
-      return expressRes;
-    };
-    
-    expressRes.clearCookie = (name: string, options?: any) => {
-      const cookieString = serializeCookie(name, '', {
-        path: options?.path || '/',
-        expires: new Date(0),
-        httpOnly: options?.httpOnly,
-        secure: options?.secure !== false,
-        sameSite: options?.sameSite || 'lax',
-      });
-      cookiesToSet.push(cookieString);
-      res.setHeader('Set-Cookie', cookiesToSet);
-      return expressRes;
-    };
-    
-    expressRes.on = (event: string, callback: (...args: any[]) => void) => {
-      if (event === 'finish' && responseEnded) {
-        callback();
-      }
-      return expressRes;
-    };
-    
-    // Add session property for express-session compatibility
-    expressReq.session = (expressReq as any).session || null;
-
-    // Handle the request through Express
-    expressApp(expressReq, expressRes, (err: any) => {
-      if (err) {
-        console.error('Express handler error:', err);
-        if (!responseEnded) {
-          res.status(500).json({ 
-            message: err.message || 'Internal Server Error',
-            error: process.env.NODE_ENV === 'development' ? err.stack : undefined
-          });
-          responseEnded = true;
-        }
-        reject(err);
-      } else if (!responseEnded) {
-        // If Express didn't send a response, send a 404
-        res.status(404).json({ message: 'Not Found' });
-        responseEnded = true;
-        resolve();
-      }
+    // Let Express handle the request
+    return app(req, res);
+  } catch (error) {
+    console.error('[Vercel] Handler error:', error);
+    res.status(500).json({
+      message: 'Server initialization failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
-  });
+  }
 }
-

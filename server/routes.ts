@@ -63,12 +63,14 @@ function isAdmin(req: any): boolean {
 let authInitialized = false;
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  console.log('[Routes] Starting route registration...');
+  
   // Validate required environment variables at runtime (not module load)
   // This allows the serverless function to start and return proper errors
   if (!process.env.SESSION_SECRET) {
-    console.error('Missing required environment variable: SESSION_SECRET');
-    // Add a fallback route that returns a clear error
-    app.use('/api/*', (req, res) => {
+    console.error('[Routes] FATAL: Missing required environment variable: SESSION_SECRET');
+    // Add a fallback route that returns a clear error for ALL routes
+    app.all('*', (req, res) => {
       res.status(500).json({ 
         message: 'Server configuration error: SESSION_SECRET not set',
         error: 'MISSING_ENV_VAR'
@@ -76,18 +78,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     return createServer(app);
   }
+  
+  console.log('[Routes] Environment variables validated');
 
   // Setup authentication only once
   if (!authInitialized) {
+    console.log('[Routes] Setting up authentication...');
     await setupAuth(app);
     authInitialized = true;
+    console.log('[Routes] Authentication setup complete');
   }
 
   // [GAMIFICATION] Seed achievements on startup
   try {
+    console.log('[Routes] Seeding achievements...');
     await storage.createAchievement(ACHIEVEMENTS.ARCHITECT);
+    console.log('[Routes] Achievements seeded');
   } catch (error) {
     console.error('[Routes] Error seeding achievements:', error);
+    // Don't fail startup for achievement seeding errors
   }
 
   // Auth routes
@@ -1174,5 +1183,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
+  console.log('[Routes] All routes registered successfully');
   return httpServer;
 }

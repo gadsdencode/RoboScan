@@ -26,6 +26,12 @@ export function getDb(): NeonHttpDatabase<typeof schema> {
 // WARNING: Using this directly will throw if DATABASE_URL is not set
 export const db = new Proxy({} as NeonHttpDatabase<typeof schema>, {
   get(_, prop) {
-    return (getDb() as any)[prop];
+    const realDb = getDb();
+    const value = (realDb as any)[prop];
+    // If it's a function, bind it to the real db instance
+    if (typeof value === 'function') {
+      return value.bind(realDb);
+    }
+    return value;
   },
 });
