@@ -11,6 +11,7 @@ export function useScan() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Scan failed");
       return res.json();

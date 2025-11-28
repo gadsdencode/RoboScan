@@ -85,6 +85,7 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
+          credentials: "include",
         });
 
         if (response.ok) {
@@ -155,6 +156,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scanId }),
+      credentials: "include",
     })
       .then(res => res.json())
       .then(data => {

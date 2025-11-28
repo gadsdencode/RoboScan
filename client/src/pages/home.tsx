@@ -301,6 +301,7 @@ const TerminalDemo = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: targetUrl }),
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -708,7 +709,7 @@ export default function Home() {
     
     if (currentScanId) {
       try {
-        const response = await fetch(`/api/optimization-report/${currentScanId}`);
+        const response = await fetch(`/api/optimization-report/${currentScanId}`, { credentials: "include" });
         if (response.ok) {
           const data = await response.json();
           setPremiumReportData(data);

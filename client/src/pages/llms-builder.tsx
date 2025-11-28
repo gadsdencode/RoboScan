@@ -226,7 +226,7 @@ export default function LLMsBuilder() {
 
   const loadPurchasedFields = async () => {
     try {
-      const response = await fetch('/api/llms-fields/purchases');
+      const response = await fetch('/api/llms-fields/purchases', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setPurchasedFields(data);
@@ -261,6 +261,7 @@ export default function LLMsBuilder() {
         body: JSON.stringify({
           fieldKey: field.key
         }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -292,6 +293,7 @@ export default function LLMsBuilder() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentIntentId }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -384,6 +386,7 @@ For AI partnership inquiries: ${formData.contactEmail}
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: llmsTxtContent }),
+        credentials: "include",
       });
 
       if (!response.ok) {

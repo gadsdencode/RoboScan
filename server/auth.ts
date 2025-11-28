@@ -7,6 +7,9 @@ const JWT_SECRET = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || 
 const COOKIE_NAME = "auth_token";
 const TOKEN_EXPIRY = "7d";
 
+// Detect production environment (Vercel always uses HTTPS)
+const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+
 interface JWTPayload {
   userId: string;
   email: string;
@@ -29,23 +32,24 @@ function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-// Set auth cookie
+// Set auth cookie with proper attributes for Vercel deployment
 function setAuthCookie(res: any, token: string) {
   const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction, // Always true on Vercel (HTTPS)
+    sameSite: "lax", // Lax is secure and works for same-site navigation
     maxAge,
     path: "/",
+    // Note: Don't set 'domain' - let the browser infer it from the request
   });
 }
 
-// Clear auth cookie
+// Clear auth cookie with matching attributes
 function clearAuthCookie(res: any) {
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     sameSite: "lax",
     path: "/",
   });

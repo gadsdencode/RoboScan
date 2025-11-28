@@ -189,7 +189,7 @@ export default function Dashboard() {
       const queryString = params.toString();
       const url = queryString ? `/api/user/scans?${queryString}` : '/api/user/scans';
       
-      const response = await fetch(url);
+      const response = await fetch(url, { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setScans(data);
@@ -203,7 +203,7 @@ export default function Dashboard() {
 
   const fetchAllTags = async () => {
     try {
-      const response = await fetch('/api/user/tags');
+      const response = await fetch('/api/user/tags', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setAllTags(data);
@@ -215,7 +215,7 @@ export default function Dashboard() {
 
   const fetchRecurringScans = async () => {
     try {
-      const response = await fetch('/api/recurring-scans');
+      const response = await fetch('/api/recurring-scans', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setRecurringScans(data);
@@ -227,7 +227,7 @@ export default function Dashboard() {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('/api/notifications');
+      const response = await fetch('/api/notifications', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);
@@ -239,7 +239,7 @@ export default function Dashboard() {
 
   const fetchUnreadCount = async () => {
     try {
-      const response = await fetch('/api/notifications/unread-count');
+      const response = await fetch('/api/notifications/unread-count', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setUnreadCount(data.count);
@@ -283,6 +283,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url: scanUrl, botName }),
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -377,6 +378,7 @@ export default function Dashboard() {
           url: newRecurringUrl, 
           frequency: newRecurringFrequency 
         }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -402,6 +404,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ isActive: !currentlyActive }),
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -420,6 +423,7 @@ export default function Dashboard() {
     try {
       const response = await fetch(`/api/recurring-scans/${id}`, {
         method: 'DELETE',
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -434,6 +438,7 @@ export default function Dashboard() {
     try {
       const response = await fetch(`/api/notifications/${id}/read`, {
         method: 'PATCH',
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -449,6 +454,7 @@ export default function Dashboard() {
     try {
       const response = await fetch('/api/notifications/mark-all-read', {
         method: 'POST',
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -464,7 +470,7 @@ export default function Dashboard() {
     setSelectedRecurringScan(scan);
     
     try {
-      const response = await fetch(`/api/recurring-scans/${scan.id}/preferences`);
+      const response = await fetch(`/api/recurring-scans/${scan.id}/preferences`, { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setPreferences(data);
@@ -493,6 +499,7 @@ export default function Dashboard() {
           notifyOnNewErrors: preferences.notifyOnNewErrors,
           notificationMethod: preferences.notificationMethod,
         }),
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -565,7 +572,8 @@ export default function Dashboard() {
       const resA = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: myUrlForCompare })
+        body: JSON.stringify({ url: myUrlForCompare }),
+        credentials: "include",
       });
 
       if (!resA.ok) {
@@ -585,7 +593,8 @@ export default function Dashboard() {
       const resB = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: competitorUrl })
+        body: JSON.stringify({ url: competitorUrl }),
+        credentials: "include",
       });
 
       if (!resB.ok) {
@@ -673,6 +682,7 @@ export default function Dashboard() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags: updatedTags }),
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -696,6 +706,7 @@ export default function Dashboard() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags: updatedTags }),
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -1738,7 +1749,7 @@ export default function Dashboard() {
                                     onClick={async () => {
                                       try {
                                         setLoadingScanId(notification.scanId);
-                                        const response = await fetch(`/api/scans/${notification.scanId}`);
+                                        const response = await fetch(`/api/scans/${notification.scanId}`, { credentials: "include" });
                                         
                                         if (!response.ok) {
                                           if (response.status === 404) {

@@ -6,6 +6,9 @@ import { serveStatic } from "../server/vite.js";
 // Create Express app instance
 const app = express();
 
+// Trust proxy for Vercel (required for secure cookies behind proxy)
+app.set('trust proxy', 1);
+
 declare module 'http' {
   interface IncomingMessage {
     rawBody: unknown
@@ -78,6 +81,27 @@ async function initializeApp(): Promise<express.Express> {
   })();
 
   return appPromise;
+}
+
+// Helper to serialize cookie with proper attributes for Vercel
+function serializeCookie(name: string, value: string, options: {
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'strict' | 'lax' | 'none';
+  maxAge?: number;
+  path?: string;
+  expires?: Date;
+} = {}): string {
+  const parts = [`${encodeURIComponent(name)}=${encodeURIComponent(value)}`];
+  
+  if (options.path) parts.push(`Path=${options.path}`);
+  if (options.maxAge !== undefined) parts.push(`Max-Age=${Math.floor(options.maxAge / 1000)}`);
+  if (options.expires) parts.push(`Expires=${options.expires.toUTCString()}`);
+  if (options.httpOnly) parts.push('HttpOnly');
+  if (options.secure) parts.push('Secure');
+  if (options.sameSite) parts.push(`SameSite=${options.sameSite.charAt(0).toUpperCase() + options.sameSite.slice(1)}`);
+  
+  return parts.join('; ');
 }
 
 // Vercel serverless function handler
@@ -186,13 +210,34 @@ export default async function handler(
       return expressRes;
     };
     
+    // Track cookies to set (supports multiple cookies)
+    const cookiesToSet: string[] = [];
+    
     expressRes.cookie = (name: string, value: string, options?: any) => {
-      res.setHeader('Set-Cookie', `${name}=${value}; ${options?.httpOnly ? 'HttpOnly; ' : ''}${options?.secure ? 'Secure; ' : ''}${options?.sameSite ? `SameSite=${options.sameSite}; ` : ''}${options?.maxAge ? `Max-Age=${options.maxAge}; ` : ''}Path=${options?.path || '/'}`);
+      const cookieString = serializeCookie(name, value, {
+        httpOnly: options?.httpOnly,
+        secure: options?.secure !== false, // Default to true for Vercel HTTPS
+        sameSite: options?.sameSite || 'lax',
+        maxAge: options?.maxAge,
+        path: options?.path || '/',
+        expires: options?.expires,
+      });
+      cookiesToSet.push(cookieString);
+      // Set all cookies as array (Vercel handles multiple Set-Cookie headers this way)
+      res.setHeader('Set-Cookie', cookiesToSet);
       return expressRes;
     };
     
     expressRes.clearCookie = (name: string, options?: any) => {
-      res.setHeader('Set-Cookie', `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=${options?.path || '/'}`);
+      const cookieString = serializeCookie(name, '', {
+        path: options?.path || '/',
+        expires: new Date(0),
+        httpOnly: options?.httpOnly,
+        secure: options?.secure !== false,
+        sameSite: options?.sameSite || 'lax',
+      });
+      cookiesToSet.push(cookieString);
+      res.setHeader('Set-Cookie', cookiesToSet);
       return expressRes;
     };
     

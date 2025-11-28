@@ -218,7 +218,7 @@ export default function RobotsBuilder() {
 
   const loadPurchasedFields = async () => {
     try {
-      const response = await fetch('/api/robots-fields/purchases');
+      const response = await fetch('/api/robots-fields/purchases', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
         setPurchasedFields(data);
@@ -253,6 +253,7 @@ export default function RobotsBuilder() {
         body: JSON.stringify({
           fieldKey: field.key
         }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -284,6 +285,7 @@ export default function RobotsBuilder() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentIntentId }),
+        credentials: "include",
       });
 
       if (!response.ok) {

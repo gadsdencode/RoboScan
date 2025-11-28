@@ -18,7 +18,9 @@ export default function Login() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("/api/auth/user");
+        const response = await fetch("/api/auth/user", {
+          credentials: "include", // Include cookies in auth check
+        });
         if (response.ok) {
           setLocation("/dashboard");
         }
@@ -41,11 +43,16 @@ export default function Login() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ email }),
+        credentials: "include", // Important: Include cookies in the request/response
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Invalidate auth query to refetch user data with new cookie
+        const { queryClient } = await import("@/lib/queryClient");
+        await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        
         toast({
           title: "Welcome!",
           description: "You've been signed in successfully.",
