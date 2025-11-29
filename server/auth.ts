@@ -62,54 +62,111 @@ export async function setupAuth(app: Express) {
 
   // Simple email login - creates or gets user
   app.post("/api/auth/login", async (req, res) => {
+    // Ensure response is always sent, even if error occurs
+    let responseSent = false;
+    const sendError = (status: number, message: string, error?: any): void => {
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        console.error(`[Auth] Login error (${status}):`, message, error);
+        try {
+          res.status(status).json({ 
+            message,
+            ...(process.env.NODE_ENV === "development" && error ? { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } : {})
+          });
+        } catch (sendErr) {
+          console.error("[Auth] Failed to send error response:", sendErr);
+        }
+      }
+    };
+
     try {
       const { email } = req.body;
       
       if (!email || typeof email !== "string") {
-        return res.status(400).json({ message: "Email is required" });
+        sendError(400, "Email is required");
+        return;
       }
 
       const normalizedEmail = email.toLowerCase().trim();
       
+      console.log(`[Auth] Attempting login for: ${normalizedEmail}`);
+      
       // Get or create user
-      let user = await storage.getUser(normalizedEmail);
+      let user: any;
+      try {
+        user = await storage.getUser(normalizedEmail);
+        console.log(`[Auth] getUser result:`, user ? "found" : "not found");
+      } catch (dbError) {
+        console.error("[Auth] Database error in getUser:", dbError);
+        sendError(500, "Database connection failed", dbError);
+        return;
+      }
       
       if (!user) {
-        user = await storage.upsertUser({
-          id: normalizedEmail,
-          email: normalizedEmail,
-          firstName: null,
-          lastName: null,
-          profileImageUrl: null,
-        });
+        try {
+          console.log(`[Auth] Creating new user: ${normalizedEmail}`);
+          user = await storage.upsertUser({
+            id: normalizedEmail,
+            email: normalizedEmail,
+            firstName: null,
+            lastName: null,
+            profileImageUrl: null,
+          });
+          console.log(`[Auth] User created successfully`);
+        } catch (dbError) {
+          console.error("[Auth] Database error in upsertUser:", dbError);
+          sendError(500, "Failed to create user account", dbError);
+          return;
+        }
       }
 
       if (!user) {
-        return res.status(500).json({ message: "Failed to create user" });
+        sendError(500, "Failed to create user");
+        return;
       }
 
       // Create JWT token
-      const token = createToken({
-        userId: user.id,
-        email: user.email || normalizedEmail,
-        name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
-      });
+      let token: string;
+      try {
+        token = createToken({
+          userId: user.id,
+          email: user.email || normalizedEmail,
+          name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
+        });
+      } catch (tokenError) {
+        console.error("[Auth] Token creation error:", tokenError);
+        sendError(500, "Failed to create authentication token", tokenError);
+        return;
+      }
 
       // Set cookie
-      setAuthCookie(res, token);
+      try {
+        setAuthCookie(res, token);
+      } catch (cookieError) {
+        console.error("[Auth] Cookie setting error:", cookieError);
+        sendError(500, "Failed to set authentication cookie", cookieError);
+        return;
+      }
 
-      res.json({ 
-        success: true, 
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        try {
+          res.json({ 
+            success: true, 
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+            }
+          });
+        } catch (sendErr) {
+          console.error("[Auth] Failed to send success response:", sendErr);
         }
-      });
+      }
     } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Login failed" });
+      console.error("[Auth] Unexpected login error:", error);
+      sendError(500, "Login failed", error);
     }
   });
 

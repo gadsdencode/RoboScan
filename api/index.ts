@@ -111,16 +111,24 @@ export default async function handler(req: any, res: any) {
     
     // If initialization failed, try again
     if (!appInitialized) {
+      console.log('[Vercel] Retrying initialization...');
       await initializeApp();
     }
     
-    // Let Express handle the request
-    return app(req, res);
+    // Ensure response hasn't been sent
+    if (!res.headersSent) {
+      // Let Express handle the request
+      return app(req, res);
+    }
   } catch (error) {
     console.error('[Vercel] Handler error:', error);
-    res.status(500).json({
-      message: 'Server initialization failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    // Only send response if not already sent
+    if (!res.headersSent) {
+      res.status(500).json({
+        message: 'Server initialization failed',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        ...(process.env.NODE_ENV === "development" && error instanceof Error ? { stack: error.stack } : {})
+      });
+    }
   }
 }
