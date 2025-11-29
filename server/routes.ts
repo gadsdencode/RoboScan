@@ -9,7 +9,7 @@ import { calculateLevel, ACHIEVEMENTS } from "./gamification.js";
 import { normalizeDomainForCooldown } from "./domain-utils.js";
 import { z } from "zod";
 import Stripe from "stripe";
-import { getBotUserAgent } from "@shared/bot-user-agents";
+import { getBotUserAgent } from "../shared/bot-user-agents.js";
 
 // Lazy Stripe initialization - don't throw at module load time
 let stripeInstance: Stripe | null = null;
@@ -838,7 +838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // SECURITY: Look up authoritative pricing from server-side configuration
-      const { PREMIUM_LLMS_FIELDS } = await import('@shared/llms-fields');
+      const { PREMIUM_LLMS_FIELDS } = await import('../shared/llms-fields.js');
       const field = PREMIUM_LLMS_FIELDS[fieldKey as keyof typeof PREMIUM_LLMS_FIELDS];
       
       if (!field) {
@@ -904,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // SECURITY: Verify pricing against authoritative configuration
-      const { PREMIUM_LLMS_FIELDS } = await import('@shared/llms-fields');
+      const { PREMIUM_LLMS_FIELDS } = await import('../shared/llms-fields.js');
       const field = PREMIUM_LLMS_FIELDS[fieldKey as keyof typeof PREMIUM_LLMS_FIELDS];
       
       if (!field) {
@@ -982,7 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // SECURITY: Look up authoritative pricing from server-side configuration
-      const { PREMIUM_ROBOTS_FIELDS } = await import('@shared/robots-fields');
+      const { PREMIUM_ROBOTS_FIELDS } = await import('../shared/robots-fields.js');
       const field = PREMIUM_ROBOTS_FIELDS[fieldKey as keyof typeof PREMIUM_ROBOTS_FIELDS];
       
       if (!field) {
@@ -1048,7 +1048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // SECURITY: Verify pricing against authoritative configuration
-      const { PREMIUM_ROBOTS_FIELDS } = await import('@shared/robots-fields');
+      const { PREMIUM_ROBOTS_FIELDS } = await import('../shared/robots-fields.js');
       const field = PREMIUM_ROBOTS_FIELDS[fieldKey as keyof typeof PREMIUM_ROBOTS_FIELDS];
       
       if (!field) {

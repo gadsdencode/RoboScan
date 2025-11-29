@@ -31,7 +31,7 @@ import {
   type InsertRobotsFieldPurchase,
   type UserDomainCooldown,
   type InsertUserDomainCooldown,
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
 

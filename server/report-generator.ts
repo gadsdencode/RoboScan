@@ -1,4 +1,4 @@
-import type { Scan } from "@shared/schema";
+import type { Scan } from "../shared/schema.js";
 
 export interface OptimizationReport {
   summary: string;

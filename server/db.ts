@@ -1,6 +1,6 @@
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
-import * as schema from "@shared/schema";
+import * as schema from "../shared/schema.js";
 
 // Lazy initialization - don't throw at module load time
 let dbInstance: NeonHttpDatabase<typeof schema> | null = null;
