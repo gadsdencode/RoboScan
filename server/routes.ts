@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { scanWebsite } from "./scanner.js";
 import { generateOptimizationReport, calculateScanScore } from "./report-generator.js";
-import { setupAuth, isAuthenticated } from "./auth.js";
+import { setupAuth, isAuthenticated, checkAuthentication } from "./auth.js";
 import { calculateLevel, ACHIEVEMENTS } from "./gamification.js";
 import { normalizeDomainForCooldown } from "./domain-utils.js";
 import { z } from "zod";
@@ -55,7 +55,7 @@ const createPaymentSchema = z.object({
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
 
 function isAdmin(req: any): boolean {
-  if (!req.isAuthenticated() || !req.user?.claims?.email) return false;
+  if (!checkAuthentication(req) || !req.user?.claims?.email) return false;
   return ADMIN_EMAILS.includes(req.user.claims.email.toLowerCase());
 }
 
@@ -142,7 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { url } = scanRequestSchema.parse(req.body);
 
-      const userId = req.isAuthenticated() ? req.user?.claims?.sub : undefined;
+      // Safely check authentication without requiring middleware
+      const isAuth = checkAuthentication(req);
+      const userId = isAuth ? req.user?.claims?.sub : undefined;
 
       const canonicalDomain = normalizeDomainForCooldown(url);
       if (!canonicalDomain) {
@@ -292,7 +294,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For authenticated users, verify they own the scan
-      if (req.isAuthenticated() && scan.userId) {
+      const isAuth = checkAuthentication(req);
+      if (isAuth && scan.userId) {
         const userId = req.user.claims.sub;
         if (scan.userId !== userId) {
           return res.status(403).json({ 
@@ -316,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Add userId to metadata if user is authenticated
-      if (req.isAuthenticated()) {
+      if (isAuth) {
         metadata.userId = req.user.claims.sub;
       }
 
@@ -359,7 +362,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
       
       // For authenticated users, verify they own the payment
-      if (req.isAuthenticated() && paymentIntent.metadata.userId) {
+      const isAuth = checkAuthentication(req);
+      if (isAuth && paymentIntent.metadata.userId) {
         const userId = req.user.claims.sub;
         if (paymentIntent.metadata.userId !== userId) {
           return res.status(403).json({ 
@@ -406,7 +410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For authenticated users with owned scans, verify ownership
-      if (req.isAuthenticated() && scan.userId) {
+      const isAuth = checkAuthentication(req);
+      if (isAuth && scan.userId) {
         const userId = req.user.claims.sub;
         if (scan.userId !== userId) {
           return res.status(403).json({ 
@@ -813,8 +818,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let achievementDetails = null;
 
       // [GAMIFICATION] Unlock Achievement if valid
-      if (isValid && (req as any).isAuthenticated?.()) {
-        const userId = (req as any).user.claims.sub;
+      if (isValid && checkAuthentication(req)) {
+        const userId = req.user.claims.sub;
         const result = await storage.unlockAchievement(userId, ACHIEVEMENTS.ARCHITECT.key);
         if (result.unlocked) {
           achievementUnlocked = true;

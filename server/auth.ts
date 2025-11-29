@@ -216,6 +216,41 @@ export async function setupAuth(app: Express) {
   });
 }
 
+/**
+ * Helper function to safely check if a request is authenticated
+ * This can be used in routes that don't require authentication but want to check if user is logged in
+ * @param req Express request object
+ * @returns true if authenticated, false otherwise
+ */
+export function checkAuthentication(req: any): boolean {
+  try {
+    const token = req.cookies?.[COOKIE_NAME];
+    if (!token) {
+      return false;
+    }
+
+    const payload = verifyToken(token);
+    if (!payload) {
+      return false;
+    }
+
+    // Attach user info to request if not already set
+    if (!req.user) {
+      req.user = {
+        claims: {
+          sub: payload.userId,
+          email: payload.email,
+          name: payload.name,
+        },
+      };
+    }
+
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 // Authentication middleware - verifies JWT from cookie
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   try {
