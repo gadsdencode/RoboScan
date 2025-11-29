@@ -10,6 +10,93 @@ interface ScanResult {
   warnings: string[];
 }
 
+/**
+ * Categorizes and formats fetch errors into user-friendly messages
+ */
+function categorizeFetchError(error: unknown, url: string): { message: string; isCritical: boolean } {
+  if (!(error instanceof Error)) {
+    return { message: 'Unknown error occurred', isCritical: true };
+  }
+
+  const errorMessage = error.message.toLowerCase();
+  const errorName = error.name.toLowerCase();
+  const cause = (error as any).cause;
+
+  // Check for DNS resolution errors
+  if (
+    errorMessage.includes('dns') ||
+    errorMessage.includes('enotfound') ||
+    errorMessage.includes('getaddrinfo') ||
+    errorName.includes('dns') ||
+    (cause && (cause.code === 'ENOTFOUND' || cause.code === 'EAI_AGAIN'))
+  ) {
+    return {
+      message: `DNS resolution failed: Unable to resolve the domain name. Please check if the website URL is correct.`,
+      isCritical: true,
+    };
+  }
+
+  // Check for connection timeout errors
+  if (
+    errorMessage.includes('timeout') ||
+    errorMessage.includes('aborted') ||
+    errorName.includes('timeout') ||
+    errorName.includes('abort') ||
+    (cause && (cause.code === 'UND_ERR_CONNECT_TIMEOUT' || cause.code === 'ETIMEDOUT'))
+  ) {
+    return {
+      message: `Connection timeout: The website did not respond within 10 seconds. The server may be down or unreachable.`,
+      isCritical: true,
+    };
+  }
+
+  // Check for connection refused errors
+  if (
+    errorMessage.includes('refused') ||
+    errorMessage.includes('econnrefused') ||
+    errorMessage.includes('connection refused') ||
+    (cause && cause.code === 'ECONNREFUSED')
+  ) {
+    return {
+      message: `Connection refused: The website server is not accepting connections. The server may be down or blocking requests.`,
+      isCritical: true,
+    };
+  }
+
+  // Check for SSL/TLS certificate errors
+  if (
+    errorMessage.includes('certificate') ||
+    errorMessage.includes('ssl') ||
+    errorMessage.includes('tls') ||
+    errorMessage.includes('unable to verify') ||
+    (cause && (cause.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || cause.code === 'CERT_HAS_EXPIRED'))
+  ) {
+    return {
+      message: `SSL/TLS certificate error: Unable to establish a secure connection. The website's certificate may be invalid or expired.`,
+      isCritical: true,
+    };
+  }
+
+  // Check for network errors
+  if (
+    errorMessage.includes('network') ||
+    errorMessage.includes('fetch failed') ||
+    errorMessage.includes('networkerror') ||
+    (cause && cause.code === 'ENETUNREACH')
+  ) {
+    return {
+      message: `Network error: Unable to reach the website. Please check your internet connection and try again.`,
+      isCritical: true,
+    };
+  }
+
+  // Generic error
+  return {
+    message: `Connection failed: ${error.message}`,
+    isCritical: true,
+  };
+}
+
 function getBotPermissionStatus(
   botName: string, 
   robotsUrl: string, 
@@ -100,7 +187,7 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
         'Accept': 'text/html,*/*'
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000), // Increased timeout for initial connection
     });
     
     if (initialResponse.ok) {
@@ -121,9 +208,26 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
       console.log(`[Scanner] Canonical origin: ${canonicalOrigin}, path: ${canonicalBasePath || '/'}`);
     } else {
       console.log(`[Scanner] Initial request returned ${initialResponse.status}, using original origin`);
+      // If we get a 4xx or 5xx error, it's not critical - the site exists, we can still scan
+      // Only log as warning if it's a server error
+      if (initialResponse.status >= 500) {
+        warnings.push(`Website returned server error (${initialResponse.status}) but scan will continue`);
+      }
     }
   } catch (error) {
-    console.log(`[Scanner] Could not detect canonical URL, using original: ${canonicalOrigin}`);
+    // Categorize the error to determine if it's critical
+    const errorInfo = categorizeFetchError(error, normalizedUrl);
+    console.error(`[Scanner] Error detecting canonical URL:`, error);
+    
+    // If it's a critical error (DNS, timeout, connection refused), throw it
+    // This will be caught by routes.ts and returned as a proper error response
+    if (errorInfo.isCritical) {
+      throw new Error(errorInfo.message);
+    }
+    
+    // For non-critical errors, log and continue with original URL
+    console.log(`[Scanner] Non-critical error, continuing with original URL: ${canonicalOrigin}`);
+    warnings.push(`Could not detect canonical URL: ${errorInfo.message}`);
   }
 
   let robotsTxtFound = false;
@@ -192,7 +296,9 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
     }
   } catch (error) {
     console.error('[Scanner] Error fetching robots.txt:', error);
-    errors.push(`Failed to fetch robots.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const errorInfo = categorizeFetchError(error, `${canonicalOrigin}/robots.txt`);
+    // For robots.txt, we don't treat errors as critical since the site might not have one
+    errors.push(`Failed to fetch robots.txt: ${errorInfo.message}`);
   }
 
   let llmsTxtFound = false;
@@ -240,7 +346,9 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
       console.error(`[Scanner] Error fetching llms.txt from ${llmsTxtUrl}:`, error);
       // Only add error if this was the last URL to try
       if (llmsTxtUrl === llmsTxtUrls[llmsTxtUrls.length - 1] && !llmsTxtFound) {
-        errors.push(`Failed to fetch llms.txt: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const errorInfo = categorizeFetchError(error, llmsTxtUrl);
+        // For llms.txt, we don't treat errors as critical since the site might not have one
+        errors.push(`Failed to fetch llms.txt: ${errorInfo.message}`);
       }
     }
   }

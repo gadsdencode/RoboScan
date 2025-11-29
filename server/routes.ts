@@ -157,7 +157,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isOnCooldown = await storage.checkDomainCooldown(userId, canonicalDomain);
       }
 
-      const result = await scanWebsite(url);
+      let result;
+      try {
+        result = await scanWebsite(url);
+      } catch (scanError) {
+        // If scanWebsite throws a critical error (DNS, timeout, etc.), return it immediately
+        console.error('[Routes] Critical scan error:', scanError);
+        const errorMessage = scanError instanceof Error ? scanError.message : 'Failed to scan website';
+        return res.status(500).json({ 
+          message: errorMessage,
+          error: errorMessage
+        });
+      }
 
       // Calculate score immediately
       const tempScanObj = { 
@@ -244,9 +255,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.error('Scan error:', error);
+      console.error('[Routes] Scan endpoint error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to scan website";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Enhance common error messages
+        if (error.message.includes('DNS')) {
+          errorMessage = "DNS resolution failed: Unable to resolve the domain name. Please check if the website URL is correct.";
+        } else if (error.message.includes('timeout')) {
+          errorMessage = "Connection timeout: The website did not respond within the time limit. The server may be down or unreachable.";
+        } else if (error.message.includes('refused') || error.message.includes('ECONNREFUSED')) {
+          errorMessage = "Connection refused: The website server is not accepting connections. The server may be down or blocking requests.";
+        } else if (error.message.includes('certificate') || error.message.includes('SSL') || error.message.includes('TLS')) {
+          errorMessage = "SSL/TLS certificate error: Unable to establish a secure connection. The website's certificate may be invalid or expired.";
+        }
+      }
+      
       res.status(500).json({ 
-        message: "Failed to scan website",
+        message: errorMessage,
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
