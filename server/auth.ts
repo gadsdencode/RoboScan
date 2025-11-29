@@ -33,25 +33,27 @@ function verifyToken(token: string): JWTPayload | null {
 }
 
 // Set auth cookie with proper attributes for Vercel deployment
+// Vercel serves both frontend and API on the same domain, so sameSite: "lax" works perfectly
 function setAuthCookie(res: any, token: string) {
   const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
   res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isProduction, // Always true on Vercel (HTTPS)
-    sameSite: "lax", // Lax is secure and works for same-site navigation
+    httpOnly: true, // Prevents XSS attacks by blocking JavaScript access
+    secure: isProduction, // Always true on Vercel (HTTPS required)
+    sameSite: "lax", // Secure for same-site navigation, works with Vercel's same-domain setup
     maxAge,
-    path: "/",
-    // Note: Don't set 'domain' - let the browser infer it from the request
+    path: "/", // Available across entire site
+    // Note: Don't set 'domain' - let the browser infer it from the request (required for Vercel)
   });
 }
 
-// Clear auth cookie with matching attributes
+// Clear auth cookie with matching attributes (must match setAuthCookie options exactly)
 function clearAuthCookie(res: any) {
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProduction,
     sameSite: "lax",
     path: "/",
+    // Note: maxAge not needed for clearing, but other options must match
   });
 }
 

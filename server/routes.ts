@@ -99,18 +99,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Don't fail startup for achievement seeding errors
   }
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
   // Get user's scans (protected)
   app.get('/api/user/scans', isAuthenticated, async (req: any, res) => {
     try {
