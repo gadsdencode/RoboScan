@@ -1,7 +1,7 @@
-import { storage } from "./storage";
-import { scanWebsite } from "./scanner";
-import { detectChanges } from "./change-detector";
-import { calculateLevel } from "./gamification";
+import { storage } from "./storage.js";
+import { scanWebsite } from "./scanner.js";
+import { detectChanges } from "./change-detector.js";
+import { calculateLevel } from "./gamification.js";
 import pLimit from "p-limit";
 
 // Calculate next run time based on frequency

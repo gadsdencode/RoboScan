@@ -1,6 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
-import { storage } from "./storage";
+import { storage } from "./storage.js";
 import cookieParser from "cookie-parser";
 
 const JWT_SECRET = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || "dev-secret-change-me";

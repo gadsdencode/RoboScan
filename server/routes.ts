@@ -1,12 +1,12 @@
 // Reference: blueprint:javascript_log_in_with_replit
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { scanWebsite } from "./scanner";
-import { generateOptimizationReport, calculateScanScore } from "./report-generator";
-import { setupAuth, isAuthenticated } from "./auth";
-import { calculateLevel, ACHIEVEMENTS } from "./gamification";
-import { normalizeDomainForCooldown } from "./domain-utils";
+import { storage } from "./storage.js";
+import { scanWebsite } from "./scanner.js";
+import { generateOptimizationReport, calculateScanScore } from "./report-generator.js";
+import { setupAuth, isAuthenticated } from "./auth.js";
+import { calculateLevel, ACHIEVEMENTS } from "./gamification.js";
+import { normalizeDomainForCooldown } from "./domain-utils.js";
 import { z } from "zod";
 import Stripe from "stripe";
 import { getBotUserAgent } from "@shared/bot-user-agents";
