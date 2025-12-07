@@ -79,13 +79,13 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
     
     // Scheduler is handled by Vercel Cron Jobs in production
     // For local development, you can manually trigger the scheduler
     if (process.env.NODE_ENV === "development" && process.env.RUN_SCHEDULER === "true") {
-      const { startScheduler } = await import("./scheduler");
+      const { startScheduler } = await import("./scheduler.js");
       startScheduler();
     }
   });
