@@ -230,101 +230,36 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
     warnings.push(`Could not detect canonical URL: ${errorInfo.message}`);
   }
 
-  let robotsTxtFound = false;
-  let robotsTxtContent: string | null = null;
-
-  // robots.txt must always be at the domain root per RFC 9309
-  try {
-    console.log(`[Scanner] Fetching ${canonicalOrigin}/robots.txt`);
-    const robotsResponse = await fetch(`${canonicalOrigin}/robots.txt`, {
-      headers: { 
-        'User-Agent': 'RoboscanBot/1.0',
-        'Accept': 'text/plain,*/*'
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
-    });
-
-    console.log(`[Scanner] robots.txt response status: ${robotsResponse.status}`);
-
-    if (robotsResponse.ok) {
-      robotsTxtFound = true;
-      robotsTxtContent = await robotsResponse.text();
-
-      const robotsUrl = `${canonicalOrigin}/robots.txt`;
-
-      // Analyze permissions for key AI bots
-      const aiBotsToCheck = [
-        'GPTBot',
-        'ChatGPT-User',
-        'CCBot',
-        'anthropic-ai',
-        'Claude-Web',
-        'Googlebot',
-        'Bingbot',
-        'Slurp'  // Yahoo
-      ];
-
-      for (const bot of aiBotsToCheck) {
-        botPermissions[bot] = getBotPermissionStatus(bot, robotsUrl, robotsTxtContent);
-      }
-
-      // Extract user agents from robots.txt to find additional bots
-      const userAgentMatches = Array.from(robotsTxtContent.matchAll(/user-agent:\s*([^\r\n]+)/gi));
-      const foundUserAgents = new Set<string>();
-      
-      for (const match of userAgentMatches) {
-        const userAgent = match[1].trim();
-        if (userAgent !== '*' && !aiBotsToCheck.some(b => b.toLowerCase() === userAgent.toLowerCase())) {
-          foundUserAgents.add(userAgent);
-        }
-      }
-
-      // Check additional bots found in the file
-      for (const userAgent of Array.from(foundUserAgents)) {
-        const lowerUA = userAgent.toLowerCase();
-        if (lowerUA.includes('bot') || lowerUA.includes('crawler') || lowerUA.includes('spider')) {
-          botPermissions[userAgent] = getBotPermissionStatus(userAgent, robotsUrl, robotsTxtContent);
-        }
-      }
-
-      if (!robotsTxtContent.toLowerCase().includes('sitemap:')) {
-        warnings.push('robots.txt found but missing sitemap reference');
-      }
-    } else {
-      console.log(`[Scanner] robots.txt not found (status ${robotsResponse.status})`);
-    }
-  } catch (error) {
-    console.error('[Scanner] Error fetching robots.txt:', error);
-    const errorInfo = categorizeFetchError(error, `${canonicalOrigin}/robots.txt`);
-    // For robots.txt, we don't treat errors as critical since the site might not have one
-    errors.push(`Failed to fetch robots.txt: ${errorInfo.message}`);
-  }
-
-  let llmsTxtFound = false;
-  let llmsTxtContent: string | null = null;
-
-  // llms.txt: try canonical path first, then fall back to domain root
+  // Prepare llms.txt URLs: try canonical path first, then fall back to domain root
   const llmsTxtUrls: string[] = [];
-  
-  // If there's a canonical path, check there first
   if (canonicalBasePath && canonicalBasePath !== '') {
     llmsTxtUrls.push(`${canonicalOrigin}${canonicalBasePath}/llms.txt`);
   }
-  
-  // Always also check the domain root as fallback (avoid duplicates)
   const rootUrl = `${canonicalOrigin}/llms.txt`;
   if (!llmsTxtUrls.includes(rootUrl)) {
     llmsTxtUrls.push(rootUrl);
   }
 
-  for (const llmsTxtUrl of llmsTxtUrls) {
-    // Skip if we already found it
-    if (llmsTxtFound) break;
+  // Define fetch functions for parallel execution
+  const fetchRobots = async (): Promise<{
+    found: boolean;
+    content: string | null;
+    botPermissions: Record<string, string>;
+    warnings: string[];
+    errors: string[];
+  }> => {
+    const result = {
+      found: false,
+      content: null as string | null,
+      botPermissions: {} as Record<string, string>,
+      warnings: [] as string[],
+      errors: [] as string[],
+    };
 
+    // robots.txt must always be at the domain root per RFC 9309
     try {
-      console.log(`[Scanner] Fetching ${llmsTxtUrl}`);
-      const llmsResponse = await fetch(llmsTxtUrl, {
+      console.log(`[Scanner] Fetching ${canonicalOrigin}/robots.txt`);
+      const robotsResponse = await fetch(`${canonicalOrigin}/robots.txt`, {
         headers: { 
           'User-Agent': 'RoboscanBot/1.0',
           'Accept': 'text/plain,*/*'
@@ -333,24 +268,147 @@ export async function scanWebsite(targetUrl: string): Promise<ScanResult> {
         signal: AbortSignal.timeout(10000),
       });
 
-      console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
+      console.log(`[Scanner] robots.txt response status: ${robotsResponse.status}`);
 
-      if (llmsResponse.ok) {
-        llmsTxtFound = true;
-        llmsTxtContent = await llmsResponse.text();
-        console.log(`[Scanner] llms.txt found at ${llmsTxtUrl}`);
+      if (robotsResponse.ok) {
+        result.found = true;
+        result.content = await robotsResponse.text();
+
+        const robotsUrl = `${canonicalOrigin}/robots.txt`;
+
+        // Analyze permissions for key AI bots
+        const aiBotsToCheck = [
+          'GPTBot',
+          'ChatGPT-User',
+          'CCBot',
+          'anthropic-ai',
+          'Claude-Web',
+          'Googlebot',
+          'Bingbot',
+          'Slurp'  // Yahoo
+        ];
+
+        for (const bot of aiBotsToCheck) {
+          result.botPermissions[bot] = getBotPermissionStatus(bot, robotsUrl, result.content);
+        }
+
+        // Extract user agents from robots.txt to find additional bots
+        const userAgentMatches = Array.from(result.content.matchAll(/user-agent:\s*([^\r\n]+)/gi));
+        const foundUserAgents = new Set<string>();
+        
+        for (const match of userAgentMatches) {
+          const userAgent = match[1].trim();
+          if (userAgent !== '*' && !aiBotsToCheck.some(b => b.toLowerCase() === userAgent.toLowerCase())) {
+            foundUserAgents.add(userAgent);
+          }
+        }
+
+        // Check additional bots found in the file
+        for (const userAgent of Array.from(foundUserAgents)) {
+          const lowerUA = userAgent.toLowerCase();
+          if (lowerUA.includes('bot') || lowerUA.includes('crawler') || lowerUA.includes('spider')) {
+            result.botPermissions[userAgent] = getBotPermissionStatus(userAgent, robotsUrl, result.content);
+          }
+        }
+
+        if (!result.content.toLowerCase().includes('sitemap:')) {
+          result.warnings.push('robots.txt found but missing sitemap reference');
+        }
       } else {
-        console.log(`[Scanner] llms.txt not found at ${llmsTxtUrl} (status ${llmsResponse.status})`);
+        console.log(`[Scanner] robots.txt not found (status ${robotsResponse.status})`);
       }
     } catch (error) {
-      console.error(`[Scanner] Error fetching llms.txt from ${llmsTxtUrl}:`, error);
-      // Only add error if this was the last URL to try
-      if (llmsTxtUrl === llmsTxtUrls[llmsTxtUrls.length - 1] && !llmsTxtFound) {
-        const errorInfo = categorizeFetchError(error, llmsTxtUrl);
-        // For llms.txt, we don't treat errors as critical since the site might not have one
-        errors.push(`Failed to fetch llms.txt: ${errorInfo.message}`);
+      console.error('[Scanner] Error fetching robots.txt:', error);
+      const errorInfo = categorizeFetchError(error, `${canonicalOrigin}/robots.txt`);
+      // For robots.txt, we don't treat errors as critical since the site might not have one
+      result.errors.push(`Failed to fetch robots.txt: ${errorInfo.message}`);
+    }
+
+    return result;
+  };
+
+  const fetchLlms = async (): Promise<{
+    found: boolean;
+    content: string | null;
+    errors: string[];
+  }> => {
+    const result = {
+      found: false,
+      content: null as string | null,
+      errors: [] as string[],
+    };
+
+    // Try each URL sequentially until one is found
+    for (const llmsTxtUrl of llmsTxtUrls) {
+      // Skip if we already found it
+      if (result.found) break;
+
+      try {
+        console.log(`[Scanner] Fetching ${llmsTxtUrl}`);
+        const llmsResponse = await fetch(llmsTxtUrl, {
+          headers: { 
+            'User-Agent': 'RoboscanBot/1.0',
+            'Accept': 'text/plain,*/*'
+          },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(10000),
+        });
+
+        console.log(`[Scanner] llms.txt response status: ${llmsResponse.status}`);
+
+        if (llmsResponse.ok) {
+          result.found = true;
+          result.content = await llmsResponse.text();
+          console.log(`[Scanner] llms.txt found at ${llmsTxtUrl}`);
+        } else {
+          console.log(`[Scanner] llms.txt not found at ${llmsTxtUrl} (status ${llmsResponse.status})`);
+        }
+      } catch (error) {
+        console.error(`[Scanner] Error fetching llms.txt from ${llmsTxtUrl}:`, error);
+        // Only add error if this was the last URL to try
+        if (llmsTxtUrl === llmsTxtUrls[llmsTxtUrls.length - 1] && !result.found) {
+          const errorInfo = categorizeFetchError(error, llmsTxtUrl);
+          // For llms.txt, we don't treat errors as critical since the site might not have one
+          result.errors.push(`Failed to fetch llms.txt: ${errorInfo.message}`);
+        }
       }
     }
+
+    return result;
+  };
+
+  // Execute both fetches in parallel using Promise.allSettled
+  console.log('[Scanner] Executing parallel fetches for robots.txt and llms.txt');
+  const [robotsResult, llmsResult] = await Promise.allSettled([fetchRobots(), fetchLlms()]);
+
+  // Process robots.txt results
+  let robotsTxtFound = false;
+  let robotsTxtContent: string | null = null;
+  
+  if (robotsResult.status === 'fulfilled') {
+    robotsTxtFound = robotsResult.value.found;
+    robotsTxtContent = robotsResult.value.content;
+    Object.assign(botPermissions, robotsResult.value.botPermissions);
+    warnings.push(...robotsResult.value.warnings);
+    errors.push(...robotsResult.value.errors);
+  } else {
+    console.error('[Scanner] robots.txt fetch promise rejected:', robotsResult.reason);
+    const errorInfo = categorizeFetchError(robotsResult.reason, `${canonicalOrigin}/robots.txt`);
+    errors.push(`Failed to fetch robots.txt: ${errorInfo.message}`);
+  }
+
+  // Process llms.txt results
+  let llmsTxtFound = false;
+  let llmsTxtContent: string | null = null;
+  
+  if (llmsResult.status === 'fulfilled') {
+    llmsTxtFound = llmsResult.value.found;
+    llmsTxtContent = llmsResult.value.content;
+    errors.push(...llmsResult.value.errors);
+  } else {
+    console.error('[Scanner] llms.txt fetch promise rejected:', llmsResult.reason);
+    const errorInfo = categorizeFetchError(llmsResult.reason, llmsTxtUrls[llmsTxtUrls.length - 1]);
+    errors.push(`Failed to fetch llms.txt: ${errorInfo.message}`);
   }
 
   // If no robots.txt was found, default to allowed
