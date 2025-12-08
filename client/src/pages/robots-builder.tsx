@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle } from "lucide-react";
+import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle, Upload } from "lucide-react";
+import { ImportUrlDialog } from "@/components/ImportUrlDialog";
+import { type ParsedRobotsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { robotsBuilderTourSteps } from "@/lib/tour-config";
@@ -154,6 +156,7 @@ export default function RobotsBuilder() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { register, watch, setValue } = useForm<RobotsTxtFormData>({
     defaultValues: {
@@ -461,6 +464,20 @@ export default function RobotsBuilder() {
     });
   };
 
+  const handleImport = (data: ParsedRobotsTxt) => {
+    // Populate form fields with parsed data
+    setValue('sitemapUrl', data.sitemapUrl);
+    setValue('crawlDelay', data.crawlDelay || '0');
+    setValue('disallowedPaths', data.disallowedPaths);
+    setValue('allowedPaths', data.allowedPaths);
+    setValue('defaultAccess', data.defaultAccess);
+    
+    toast({
+      title: "Configuration Imported",
+      description: `Imported ${data.metadata.totalRules} rules from external robots.txt`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
@@ -470,6 +487,16 @@ export default function RobotsBuilder() {
             <span>ROBOSCAN</span>
           </a>
           <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportModal(true)}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="button-import-url"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import from URL
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -857,6 +884,13 @@ export default function RobotsBuilder() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ImportUrlDialog
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImport}
+        type="robots"
+      />
     </div>
   );
 }

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle } from "lucide-react";
+import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle, Upload } from "lucide-react";
+import { ImportUrlDialog } from "@/components/ImportUrlDialog";
+import { type ParsedLLMsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { builderTourSteps } from "@/lib/tour-config";
@@ -155,6 +157,7 @@ export default function LLMsBuilder() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { register, watch, setValue } = useForm<LLMsTxtFormData>({
     defaultValues: {
@@ -457,6 +460,23 @@ For AI partnership inquiries: ${formData.contactEmail}
     });
   };
 
+  const handleImport = (data: ParsedLLMsTxt) => {
+    // Populate form fields with parsed data
+    if (data.websiteName) setValue('websiteName', data.websiteName);
+    if (data.websiteUrl) setValue('websiteUrl', data.websiteUrl);
+    if (data.contentDescription) setValue('contentDescription', data.contentDescription);
+    if (data.citationFormat) setValue('citationFormat', data.citationFormat);
+    if (data.allowedBots) setValue('allowedBots', data.allowedBots);
+    if (data.keyAreas) setValue('keyAreas', data.keyAreas);
+    if (data.contentGuidelines) setValue('contentGuidelines', data.contentGuidelines);
+    if (data.contactEmail) setValue('contactEmail', data.contactEmail);
+    
+    toast({
+      title: "Configuration Imported",
+      description: `Imported ${data.metadata.totalSections} sections from external llms.txt`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -467,6 +487,16 @@ For AI partnership inquiries: ${formData.contactEmail}
             <span>ROBOSCAN</span>
           </a>
           <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportModal(true)}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="button-import-url"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import from URL
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -872,6 +902,14 @@ For AI partnership inquiries: ${formData.contactEmail}
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Import URL Modal */}
+      <ImportUrlDialog
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImport}
+        type="llms"
+      />
     </div>
   );
 }
