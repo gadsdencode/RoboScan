@@ -48,6 +48,9 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   
+  // Stripe customer ID for subscription management
+  stripeCustomerId: varchar("stripe_customer_id").unique(),
+  
   // Gamification columns
   xp: integer("xp").notNull().default(0),
   level: integer("level").notNull().default(1),
@@ -249,3 +252,83 @@ export const insertUserDomainCooldownSchema = createInsertSchema(userDomainCoold
 
 export type InsertUserDomainCooldown = z.infer<typeof insertUserDomainCooldownSchema>;
 export type UserDomainCooldown = typeof userDomainCooldowns.$inferSelect;
+
+// Subscriptions table for Stripe subscription management
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stripeSubscriptionId: varchar("stripe_subscription_id").notNull().unique(),
+  stripePriceId: varchar("stripe_price_id").notNull(),
+  stripeProductId: varchar("stripe_product_id"),
+  status: varchar("status").notNull(), // 'active', 'canceled', 'past_due', 'trialing', 'incomplete', 'paused'
+  
+  // Billing cycle info
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  canceledAt: timestamp("canceled_at"),
+  
+  // Trial info
+  trialStart: timestamp("trial_start"),
+  trialEnd: timestamp("trial_end"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("subscription_user_idx").on(table.userId),
+  index("subscription_stripe_id_idx").on(table.stripeSubscriptionId),
+]);
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type Subscription = typeof subscriptions.$inferSelect;
+
+// Subscription events log for webhook tracking/auditing
+export const subscriptionEvents = pgTable("subscription_events", {
+  id: serial("id").primaryKey(),
+  subscriptionId: integer("subscription_id").references(() => subscriptions.id),
+  stripeEventId: varchar("stripe_event_id").notNull().unique(),
+  eventType: varchar("event_type").notNull(), // 'invoice.paid', 'customer.subscription.updated', etc.
+  eventData: jsonb("event_data").$type<Record<string, any>>(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
+export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({
+  id: true,
+  processedAt: true,
+});
+
+export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+
+// Subscription plans configuration (optional: for displaying plan info)
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  stripePriceId: varchar("stripe_price_id").notNull().unique(),
+  stripeProductId: varchar("stripe_product_id").notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  amount: integer("amount").notNull(), // in cents
+  currency: varchar("currency").notNull().default("usd"),
+  interval: varchar("interval").notNull(), // 'month', 'year'
+  intervalCount: integer("interval_count").notNull().default(1),
+  features: jsonb("features").$type<string[]>().default(sql`'[]'::jsonb`),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;

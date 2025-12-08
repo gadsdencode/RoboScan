@@ -12,3 +12,5 @@ export { default as llmsBuilderController } from './llmsBuilderController.js';
 export { default as robotsFieldsController } from './robotsFieldsController.js';
 export { default as toolsController } from './toolsController.js';
 export { default as seoController } from './seoController.js';
+export { default as subscriptionController } from './subscriptionController.js';
+export { default as webhookController } from './webhookController.js';

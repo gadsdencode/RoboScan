@@ -11,6 +11,9 @@ import {
   llmsFieldPurchases,
   robotsFieldPurchases,
   userDomainCooldowns,
+  subscriptions,
+  subscriptionEvents,
+  subscriptionPlans,
   type User,
   type UpsertUser,
   type Scan,
@@ -31,6 +34,12 @@ import {
   type InsertRobotsFieldPurchase,
   type UserDomainCooldown,
   type InsertUserDomainCooldown,
+  type Subscription,
+  type InsertSubscription,
+  type SubscriptionEvent,
+  type InsertSubscriptionEvent,
+  type SubscriptionPlan,
+  type InsertSubscriptionPlan,
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -108,6 +117,28 @@ export interface IStorage {
   
   // Score percentile operations
   getScorePercentile(score: number): Promise<number>;
+  
+  // Subscription operations
+  updateUserStripeCustomerId(userId: string, stripeCustomerId: string): Promise<User>;
+  getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined>;
+  
+  // Subscription CRUD
+  createSubscription(subscription: InsertSubscription): Promise<Subscription>;
+  getSubscription(id: number): Promise<Subscription | undefined>;
+  getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined>;
+  getUserSubscriptions(userId: string): Promise<Subscription[]>;
+  getUserActiveSubscription(userId: string): Promise<Subscription | undefined>;
+  updateSubscription(stripeSubscriptionId: string, data: Partial<InsertSubscription>): Promise<Subscription>;
+  
+  // Subscription events (for webhook idempotency)
+  createSubscriptionEvent(event: InsertSubscriptionEvent): Promise<SubscriptionEvent>;
+  getSubscriptionEventByStripeId(stripeEventId: string): Promise<SubscriptionEvent | undefined>;
+  
+  // Subscription plans
+  createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan>;
+  getSubscriptionPlans(activeOnly?: boolean): Promise<SubscriptionPlan[]>;
+  getSubscriptionPlanByPriceId(stripePriceId: string): Promise<SubscriptionPlan | undefined>;
+  updateSubscriptionPlan(id: number, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -575,6 +606,149 @@ export class DatabaseStorage implements IStorage {
 
     // Calculate percentile: (Scans Lower / Total Scans) * 100
     return Math.round((Number(lowerResult.count) / totalCount) * 100);
+  }
+
+  // ============== Subscription Operations ==============
+
+  async updateUserStripeCustomerId(userId: string, stripeCustomerId: string): Promise<User> {
+    const [updated] = await db
+      .update(users)
+      .set({ stripeCustomerId, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (!updated) throw new Error("User not found");
+    return updated;
+  }
+
+  async getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.stripeCustomerId, stripeCustomerId));
+    return user;
+  }
+
+  // Subscription CRUD
+  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
+    const [created] = await db
+      .insert(subscriptions)
+      .values(subscription)
+      .returning();
+    return created;
+  }
+
+  async getSubscription(id: number): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, id));
+    return subscription;
+  }
+
+  async getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId));
+    return subscription;
+  }
+
+  async getUserSubscriptions(userId: string): Promise<Subscription[]> {
+    return await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId))
+      .orderBy(desc(subscriptions.createdAt));
+  }
+
+  async getUserActiveSubscription(userId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.userId, userId),
+          sql`${subscriptions.status} IN ('active', 'trialing')`
+        )
+      )
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+    return subscription;
+  }
+
+  async updateSubscription(stripeSubscriptionId: string, data: Partial<InsertSubscription>): Promise<Subscription> {
+    const [updated] = await db
+      .update(subscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId))
+      .returning();
+    
+    if (!updated) throw new Error("Subscription not found");
+    return updated;
+  }
+
+  // Subscription events (for webhook idempotency)
+  async createSubscriptionEvent(event: InsertSubscriptionEvent): Promise<SubscriptionEvent> {
+    const [created] = await db
+      .insert(subscriptionEvents)
+      .values(event)
+      .returning();
+    return created;
+  }
+
+  async getSubscriptionEventByStripeId(stripeEventId: string): Promise<SubscriptionEvent | undefined> {
+    const [event] = await db
+      .select()
+      .from(subscriptionEvents)
+      .where(eq(subscriptionEvents.stripeEventId, stripeEventId));
+    return event;
+  }
+
+  // Subscription plans
+  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const [created] = await db
+      .insert(subscriptionPlans)
+      .values(plan)
+      .onConflictDoUpdate({
+        target: subscriptionPlans.stripePriceId,
+        set: { ...plan, updatedAt: new Date() },
+      })
+      .returning();
+    return created;
+  }
+
+  async getSubscriptionPlans(activeOnly: boolean = true): Promise<SubscriptionPlan[]> {
+    if (activeOnly) {
+      return await db
+        .select()
+        .from(subscriptionPlans)
+        .where(eq(subscriptionPlans.isActive, true))
+        .orderBy(subscriptionPlans.sortOrder);
+    }
+    return await db
+      .select()
+      .from(subscriptionPlans)
+      .orderBy(subscriptionPlans.sortOrder);
+  }
+
+  async getSubscriptionPlanByPriceId(stripePriceId: string): Promise<SubscriptionPlan | undefined> {
+    const [plan] = await db
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.stripePriceId, stripePriceId));
+    return plan;
+  }
+
+  async updateSubscriptionPlan(id: number, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan> {
+    const [updated] = await db
+      .update(subscriptionPlans)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(subscriptionPlans.id, id))
+      .returning();
+    
+    if (!updated) throw new Error("Subscription plan not found");
+    return updated;
   }
 }
 

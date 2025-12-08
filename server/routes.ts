@@ -20,6 +20,8 @@ import {
   robotsFieldsController,
   toolsController,
   seoController,
+  subscriptionController,
+  webhookController,
 } from "./controllers/index.js";
 
 // Guard against duplicate auth setup
@@ -98,6 +100,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SEO routes: GET /sitemap.xml
   app.use('/', seoController);
+
+  // Subscription routes: /api/subscriptions/*
+  app.use('/api/subscriptions', subscriptionController);
+
+  // Webhook routes: /api/webhooks/*
+  // Note: Webhook endpoint needs raw body - configured separately in index.ts
+  app.use('/api/webhooks', webhookController);
 
   const httpServer = createServer(app);
 
