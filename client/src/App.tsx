@@ -11,6 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
 import LLMsBuilder from "@/pages/llms-builder";
 import RobotsBuilder from "@/pages/robots-builder";
+import Pricing from "@/pages/pricing";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/llms-builder" component={LLMsBuilder} />
       <Route path="/tools/robots-builder" component={RobotsBuilder} />
       <Route path="/robots-builder" component={RobotsBuilder} />
+      <Route path="/pricing" component={Pricing} />
       <Route component={NotFound} />
     </Switch>
   );

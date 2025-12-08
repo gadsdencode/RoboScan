@@ -350,15 +350,37 @@ export default function Dashboard() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create recurring scan');
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Handle subscription required error
+        if (response.status === 403 && errorData.requiresSubscription) {
+          toast.error('Subscription Required', {
+            description: 'Recurring scans are a Guardian feature. Upgrade to enable automatic monitoring.',
+            action: {
+              label: 'Upgrade',
+              onClick: () => window.location.href = '/pricing',
+            },
+          });
+          setShowCreateRecurringDialog(false);
+          return;
+        }
+        
+        throw new Error(errorData.message || 'Failed to create recurring scan');
       }
 
       await fetchRecurringScans();
       setShowCreateRecurringDialog(false);
       setNewRecurringUrl("");
       setNewRecurringFrequency('daily');
+      
+      toast.success('Recurring Scan Created', {
+        description: `Monitoring ${newRecurringUrl} ${newRecurringFrequency}`,
+      });
     } catch (error) {
       console.error('Create recurring scan error:', error);
+      toast.error('Failed to create recurring scan', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
     } finally {
       setIsCreatingRecurring(false);
     }
