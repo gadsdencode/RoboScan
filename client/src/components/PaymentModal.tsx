@@ -126,7 +126,7 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
         <Button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+          className="flex-1 btn-cta"
           data-testid="button-submit-payment"
         >
           {isProcessing ? (

@@ -552,7 +552,7 @@ const TerminalDemo = ({
                       <span className="text-muted-foreground text-sm ml-2">one-time</span>
                     </div>
                     <Button 
-                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold h-12 text-base"
+                      className="w-full btn-cta h-12 text-base"
                       onClick={onUnlockReport}
                       data-testid="button-get-report"
                     >

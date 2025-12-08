@@ -146,7 +146,7 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, isAdmin =
                   </p>
                   <Button
                     onClick={() => onUnlockClick?.(scan)}
-                    className="gap-2"
+                    className="btn-cta gap-2"
                     data-testid="button-unlock-from-modal"
                   >
                     <Download className="w-4 h-4" />

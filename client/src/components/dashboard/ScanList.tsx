@@ -485,7 +485,7 @@ export function ScanList({
                           <div className="flex items-center gap-3">
                             <Button
                               onClick={() => onUnlock(scan)}
-                              className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
+                              className="btn-cta"
                               data-testid={`button-unlock-${scan.id}`}
                             >
                               <Sparkles className="w-4 h-4 mr-2" />

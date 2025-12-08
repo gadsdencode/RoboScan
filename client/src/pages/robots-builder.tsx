@@ -129,7 +129,7 @@ function PaymentForm({
         <Button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="flex-1 bg-primary"
+          className="flex-1 btn-cta"
         >
           {isProcessing ? "Processing..." : "Complete Purchase"}
         </Button>
