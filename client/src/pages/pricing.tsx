@@ -1,13 +1,15 @@
 // client/src/pages/pricing.tsx
 // Pricing page showcasing the Guardian subscription
 
-import { Shield, Crown, Sparkles, Check, Zap, Bell, Clock, FileText, GitCompare, Download, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { Shield, Crown, Sparkles, Check, Zap, Bell, Clock, FileText, GitCompare, Download, ArrowLeft, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -34,11 +36,20 @@ const GUARDIAN_FEATURES = [
   { name: "Priority Support", included: true },
 ];
 
+// Default price when no Stripe plan is configured
+const DEFAULT_PRICE = "$29";
+const DEFAULT_INTERVAL = "mo";
+
+// Fallback price ID - can be set via environment variable
+// Create this in Stripe Dashboard: Products → Guardian → Add Price → Recurring → $29/mo
+const FALLBACK_GUARDIAN_PRICE_ID = import.meta.env.VITE_GUARDIAN_PRICE_ID || "";
+
 export default function Pricing() {
   const { user } = useAuth();
   const {
     plans,
     plansLoading,
+    plansError,
     hasActiveSubscription,
     subscription,
     startCheckout,
@@ -49,17 +60,39 @@ export default function Pricing() {
   } = useSubscription();
 
   // Find the Guardian plan (or first available plan)
-  const guardianPlan = plans.find(p => p.name.toLowerCase().includes('guardian')) || plans[0];
+  const guardianPlan = plans?.find(p => p.name?.toLowerCase().includes('guardian')) || plans?.[0];
+
+  // Determine display price
+  const displayPrice = guardianPlan ? formatPrice(guardianPlan.amount, guardianPlan.currency) : DEFAULT_PRICE;
+  const displayInterval = guardianPlan?.interval === 'month' ? 'mo' : (guardianPlan?.interval === 'year' ? 'yr' : DEFAULT_INTERVAL);
+
+  // Determine which price ID to use
+  const priceId = guardianPlan?.stripePriceId || FALLBACK_GUARDIAN_PRICE_ID;
+  const hasValidPriceId = !!priceId;
+
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const handleSubscribe = () => {
+    setLocalError(null);
+    
     if (!user) {
       window.location.href = "/api/login";
       return;
     }
-    if (guardianPlan) {
-      startCheckout(guardianPlan.stripePriceId);
+    
+    if (!hasValidPriceId) {
+      // No plan configured - show helpful message
+      setLocalError("Subscription plans are being configured. Please set VITE_GUARDIAN_PRICE_ID in your environment variables with your Stripe recurring price ID, then restart the server.");
+      return;
     }
+    
+    startCheckout(priceId);
   };
+
+  // Show error state
+  if (plansError) {
+    console.error("Plans error:", plansError);
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -103,6 +136,21 @@ export default function Pricing() {
             and full access to all premium features.
           </p>
         </motion.div>
+
+        {/* Error Alert */}
+        {localError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-2xl mx-auto mb-8"
+          >
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Setup Required</AlertTitle>
+              <AlertDescription>{localError}</AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-16">
@@ -164,15 +212,10 @@ export default function Pricing() {
                 <div className="pt-4">
                   {plansLoading ? (
                     <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : guardianPlan ? (
-                    <>
-                      <span className="text-4xl font-bold">{formatPrice(guardianPlan.amount, guardianPlan.currency)}</span>
-                      <span className="text-muted-foreground">/{guardianPlan.interval === 'month' ? 'mo' : 'yr'}</span>
-                    </>
                   ) : (
                     <>
-                      <span className="text-4xl font-bold">$29</span>
-                      <span className="text-muted-foreground">/mo</span>
+                      <span className="text-4xl font-bold">{displayPrice}</span>
+                      <span className="text-muted-foreground">/{displayInterval}</span>
                     </>
                   )}
                 </div>
@@ -349,7 +392,7 @@ export default function Pricing() {
               ) : (
                 <>
                   <Crown className="w-5 h-5 mr-2" />
-                  Become a Guardian - {guardianPlan ? formatPrice(guardianPlan.amount, guardianPlan.currency) : '$29'}/mo
+                  Become a Guardian - {displayPrice}/{displayInterval}
                 </>
               )}
             </Button>
