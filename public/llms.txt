@@ -20,9 +20,9 @@ ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
 - **Premium Reports**: Provides SEO impact analysis and competitor insights.
 
 # Key Areas
-- **Scanner**: https://roboscan.replit.app/ - The main interface for scanning website permissions.
-- **LLMs.txt Builder**: https://roboscan.replit.app/tools/llms-builder - A tool to generate valid llms.txt files.
-- **Documentation**: https://roboscan.replit.app/docs (Placeholder for future docs)
+- **Scanner**: https://roboscan-pi.vercel.app/ - The main interface for scanning website permissions.
+- **LLMs.txt Builder**: https://roboscan-pi.vercel.app/tools/llms-builder - A tool to generate valid llms.txt files.
+- **Documentation**: https://roboscan-pi.vercel.app/docs (Placeholder for future docs)
 
 # Pricing & Access
 - **Free Tier**: Basic scanning, robots.txt/llms.txt validation, and bot permission checks.
@@ -33,4 +33,4 @@ ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
 - Use the tool responsibly; do not scan sites without authorization if using automated high-frequency requests.
 
 # Contact
-For support or AI partnership inquiries: support@roboscan.replit.app
+For support or AI partnership inquiries: jordan.martens@osscontact.com

@@ -23,4 +23,4 @@ Disallow: /dashboard
 Disallow: /api/
 
 # Sitemaps
-Sitemap: https://roboscan.replit.app/sitemap.xml
+Sitemap: https://roboscan-pi.vercel.app/sitemap.xml
