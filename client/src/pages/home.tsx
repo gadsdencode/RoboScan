@@ -303,6 +303,19 @@ interface ScanResult {
   robotsTxtContent: string | null;
   llmsTxtFound: boolean;
   llmsTxtContent: string | null;
+  // 6 additional technical files
+  sitemapXmlFound?: boolean;
+  sitemapXmlContent?: string | null;
+  securityTxtFound?: boolean;
+  securityTxtContent?: string | null;
+  manifestJsonFound?: boolean;
+  manifestJsonContent?: string | null;
+  adsTxtFound?: boolean;
+  adsTxtContent?: string | null;
+  humansTxtFound?: boolean;
+  humansTxtContent?: string | null;
+  aiTxtFound?: boolean;
+  aiTxtContent?: string | null;
   botPermissions: Record<string, string>;
   errors: string[];
   warnings: string[];
@@ -369,8 +382,13 @@ const TerminalDemo = ({
         const newLines = [...preflightSteps];
         newLines.push("> [SUCCESS] Connection established (200 OK)");
         newLines.push("> [SUCCESS] SSL certificate validated");
-        newLines.push("> Locating robots.txt...");
-
+        
+        // Scan all 8 technical files
+        newLines.push("> Scanning 8 technical files...");
+        newLines.push("");
+        
+        // 1. robots.txt
+        newLines.push("> [1/8] Locating robots.txt...");
         if (result.robotsTxtFound) {
           newLines.push("> [SUCCESS] robots.txt found");
           if (result.warnings && result.warnings.length > 0) {
@@ -380,15 +398,64 @@ const TerminalDemo = ({
           newLines.push("> [WARN] robots.txt not found (404)");
         }
 
-        newLines.push("> Locating llms.txt...");
+        // 2. llms.txt
+        newLines.push("> [2/8] Locating llms.txt...");
         if (result.llmsTxtFound) {
           newLines.push("> [SUCCESS] llms.txt found");
         } else {
           newLines.push("> [WARN] llms.txt not found (404)");
         }
 
+        // 3. sitemap.xml
+        newLines.push("> [3/8] Locating sitemap.xml...");
+        if (result.sitemapXmlFound) {
+          newLines.push("> [SUCCESS] sitemap.xml found");
+        } else {
+          newLines.push("> [WARN] sitemap.xml not found (404)");
+        }
+
+        // 4. security.txt
+        newLines.push("> [4/8] Locating security.txt...");
+        if (result.securityTxtFound) {
+          newLines.push("> [SUCCESS] security.txt found (RFC 9116)");
+        } else {
+          newLines.push("> [WARN] security.txt not found (404)");
+        }
+
+        // 5. manifest.json
+        newLines.push("> [5/8] Locating manifest.json...");
+        if (result.manifestJsonFound) {
+          newLines.push("> [SUCCESS] manifest.json found (PWA ready)");
+        } else {
+          newLines.push("> [WARN] manifest.json not found (404)");
+        }
+
+        // 6. ads.txt
+        newLines.push("> [6/8] Locating ads.txt...");
+        if (result.adsTxtFound) {
+          newLines.push("> [SUCCESS] ads.txt found (IAB standard)");
+        } else {
+          newLines.push("> [INFO] ads.txt not found (optional)");
+        }
+
+        // 7. humans.txt
+        newLines.push("> [7/8] Locating humans.txt...");
+        if (result.humansTxtFound) {
+          newLines.push("> [SUCCESS] humans.txt found");
+        } else {
+          newLines.push("> [INFO] humans.txt not found (optional)");
+        }
+
+        // 8. ai.txt
+        newLines.push("> [8/8] Locating ai.txt...");
+        if (result.aiTxtFound) {
+          newLines.push("> [SUCCESS] ai.txt found");
+        } else {
+          newLines.push("> [INFO] ai.txt not found (optional)");
+        }
+
+        newLines.push("");
         newLines.push("> Analyzing AI agent permissions...");
-        newLines.push("> Parsing configuration files...");
         
         Object.entries(result.botPermissions).forEach(([bot, permission]) => {
           newLines.push(`> [INFO] ${bot}: ${permission}`);
@@ -398,7 +465,21 @@ const TerminalDemo = ({
           result.errors.forEach(err => newLines.push(`> [ERROR] ${err}`));
         }
 
-        newLines.push("> Basic scan complete.");
+        // Calculate files found
+        const filesFound = [
+          result.robotsTxtFound, 
+          result.llmsTxtFound,
+          result.sitemapXmlFound,
+          result.securityTxtFound,
+          result.manifestJsonFound,
+          result.adsTxtFound,
+          result.humansTxtFound,
+          result.aiTxtFound
+        ].filter(Boolean).length;
+
+        newLines.push("");
+        newLines.push(`> Technical files found: ${filesFound}/8`);
+        newLines.push("> Scan complete.");
         newLines.push("> DONE.");
 
         let currentLine = 0;

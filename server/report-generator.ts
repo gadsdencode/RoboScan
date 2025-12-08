@@ -92,13 +92,13 @@ function analyzeRobotsTxtQuality(content: string | null): QualityAnalysis {
 export function calculateScanScore(scan: Scan): number {
   let score = 100;
   
-  // --- 1. Robots.txt Analysis ---
+  // --- 1. Robots.txt Analysis (Core file - heavily penalized if missing) ---
   if (!scan.robotsTxtFound) {
-    score -= 40;
+    score -= 30;
   } else {
-    // Check for Sitemap
+    // Check for Sitemap reference
     if (!scan.robotsTxtContent?.toLowerCase().includes('sitemap:')) {
-      score -= 10;
+      score -= 5;
     }
 
     // Advanced Quality Check
@@ -106,7 +106,7 @@ export function calculateScanScore(scan: Scan): number {
     score -= robotsQuality.scoreDeduced;
   }
 
-  // --- 2. LLMs.txt Analysis ---
+  // --- 2. LLMs.txt Analysis (Important for AI - penalized if missing) ---
   if (!scan.llmsTxtFound) {
     score -= 15;
   } else {
@@ -115,7 +115,35 @@ export function calculateScanScore(scan: Scan): number {
     score -= llmsQuality.scoreDeduced;
   }
 
-  // --- 3. Bot Permission Granularity ---
+  // --- 3. Sitemap.xml (Important for SEO - penalized if missing) ---
+  if (!scan.sitemapXmlFound) {
+    score -= 10;
+  }
+
+  // --- 4. Security.txt (RFC 9116 - minor penalty if missing) ---
+  if (!scan.securityTxtFound) {
+    score -= 5;
+  }
+
+  // --- 5. Manifest.json (PWA - optional, bonus if present) ---
+  if (scan.manifestJsonFound) {
+    score += 3;
+  }
+
+  // --- 6. Ads.txt (IAB standard - optional, no penalty/bonus) ---
+  // No score impact - purely optional
+
+  // --- 7. Humans.txt (Attribution - optional, small bonus) ---
+  if (scan.humansTxtFound) {
+    score += 2;
+  }
+
+  // --- 8. AI.txt (Emerging standard - bonus if present) ---
+  if (scan.aiTxtFound) {
+    score += 5;
+  }
+
+  // --- 9. Bot Permission Granularity ---
   if (scan.botPermissions) {
     const restrictedBots = Object.entries(scan.botPermissions).filter(
       ([_, status]) => status.includes('Restricted') || status === 'Blocked'
@@ -128,14 +156,15 @@ export function calculateScanScore(scan: Scan): number {
       );
 
       if (blockedCrucial) {
-        score -= 20;
+        score -= 15;
       } else {
-        score -= 5;
+        score -= 3;
       }
     }
   }
   
-  return Math.max(0, score);
+  // Cap score between 0 and 100
+  return Math.max(0, Math.min(100, score));
 }
 
 export function generateOptimizationReport(scan: Scan): OptimizationReport {

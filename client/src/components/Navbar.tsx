@@ -15,7 +15,10 @@ import {
   DollarSign,
   Users,
   Brain,
-  GitCompare
+  GitCompare,
+  Sparkles,
+  ArrowRight,
+  CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +29,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/useAuth";
 
 // Builder tools configuration
 const BUILDER_TOOLS = [
@@ -101,8 +112,32 @@ interface NavbarProps {
   onCompareSites?: () => void;
 }
 
+// Signup prompt benefits - focused on value proposition
+const SIGNUP_BENEFITS = [
+  "Generate all 8 technical files instantly",
+  "Download & export production-ready files",
+  "Get AI visibility score & recommendations",
+  "Priority support & continuous updates",
+];
+
 export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<typeof BUILDER_TOOLS[0] | null>(null);
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Handle tool click - check auth and either navigate or show prompt
+  const handleToolClick = (tool: typeof BUILDER_TOOLS[0]) => {
+    if (isLoading) return;
+    
+    if (isAuthenticated) {
+      window.location.href = tool.href;
+    } else {
+      setSelectedTool(tool);
+      setShowSignupPrompt(true);
+    }
+  };
+
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
@@ -146,14 +181,19 @@ export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: N
                   return (
                     <DropdownMenuItem
                       key={tool.href}
-                      className="flex items-start gap-3 p-3 cursor-pointer focus:bg-accent rounded-md"
-                      onClick={() => window.location.href = tool.href}
+                      className="flex items-start gap-3 p-3 cursor-pointer focus:bg-accent rounded-md group"
+                      onClick={() => handleToolClick(tool)}
                     >
-                      <div className={`p-2 rounded-md ${tool.bgColor}`}>
+                      <div className={`p-2 rounded-md ${tool.bgColor} transition-transform group-hover:scale-110`}>
                         <IconComponent className={`w-4 h-4 ${tool.color}`} />
                       </div>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-medium text-sm">{tool.name}</span>
+                      <div className="flex flex-col gap-0.5 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">{tool.name}</span>
+                          {!isAuthenticated && !isLoading && (
+                            <Sparkles className="w-3 h-3 text-amber-500 opacity-60" />
+                          )}
+                        </div>
                         <span className="text-xs text-muted-foreground">
                           {tool.description}
                         </span>
@@ -239,14 +279,17 @@ export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: N
                       <Button
                         key={tool.href}
                         variant="outline"
-                        className="justify-start gap-2 h-auto py-3 px-3"
+                        className="justify-start gap-2 h-auto py-3 px-3 relative"
                         onClick={() => {
                           setIsOpen(false);
-                          window.location.href = tool.href;
+                          handleToolClick(tool);
                         }}
                       >
                         <IconComponent className={`w-4 h-4 ${tool.color}`} />
                         <span className="text-xs font-medium truncate">{tool.name}</span>
+                        {!isAuthenticated && !isLoading && (
+                          <Sparkles className="w-3 h-3 text-amber-500 absolute top-1 right-1" />
+                        )}
                       </Button>
                     );
                   })}
@@ -297,6 +340,88 @@ export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: N
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Signup Prompt Dialog */}
+      <Dialog open={showSignupPrompt} onOpenChange={setShowSignupPrompt}>
+        <DialogContent className="sm:max-w-md border-primary/20">
+          <DialogHeader className="text-center space-y-4">
+            {selectedTool && (
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="mx-auto"
+              >
+                <div className={`w-20 h-20 rounded-2xl ${selectedTool.bgColor} flex items-center justify-center mx-auto mb-2 shadow-lg`}>
+                  <selectedTool.icon className={`w-10 h-10 ${selectedTool.color}`} />
+                </div>
+              </motion.div>
+            )}
+            <div className="space-y-2">
+              <DialogTitle className="text-2xl font-bold">
+                {selectedTool ? `Unlock ${selectedTool.name} Builder` : 'Unlock Premium Tools'}
+              </DialogTitle>
+              <DialogDescription className="text-muted-foreground text-base">
+                Create an account to access our professional-grade file generators
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            {/* Benefits List */}
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-5 space-y-3 border border-primary/10">
+              <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                What's included:
+              </p>
+              {SIGNUP_BENEFITS.map((benefit, i) => (
+                <motion.div 
+                  key={benefit}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-center gap-3 text-sm text-muted-foreground"
+                >
+                  <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                  <span>{benefit}</span>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Pricing hint */}
+            <div className="text-center bg-amber-500/10 rounded-lg py-2 px-4 border border-amber-500/20">
+              <p className="text-sm text-foreground font-medium">
+                Guardian Plan: <span className="font-bold text-primary">$29/month</span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Full access to all tools & premium features
+              </p>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="space-y-3">
+              <Button 
+                className="w-full h-12 text-base font-semibold gap-2 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+                onClick={() => window.location.href = '/pricing'}
+              >
+                <Sparkles className="w-4 h-4" />
+                Subscribe Now — $29/mo
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Already have account */}
+            <p className="text-center text-sm text-muted-foreground">
+              Already a subscriber?{" "}
+              <a 
+                href="/login" 
+                className="text-primary hover:underline font-semibold"
+              >
+                Sign in to access
+              </a>
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </nav>
   );
 }

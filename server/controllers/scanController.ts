@@ -149,7 +149,14 @@ router.post('/', async (req: any, res: Response) => {
       userId,
       createdAt: new Date(),
       tags: [],
-      score: 0
+      score: 0,
+      // Ensure all new fields are included for score calculation
+      sitemapXmlFound: result.sitemapXmlFound ?? false,
+      securityTxtFound: result.securityTxtFound ?? false,
+      manifestJsonFound: result.manifestJsonFound ?? false,
+      adsTxtFound: result.adsTxtFound ?? false,
+      humansTxtFound: result.humansTxtFound ?? false,
+      aiTxtFound: result.aiTxtFound ?? false,
     };
     const score = calculateScanScore(tempScanObj as any);
 
@@ -160,6 +167,19 @@ router.post('/', async (req: any, res: Response) => {
       robotsTxtContent: result.robotsTxtContent,
       llmsTxtFound: result.llmsTxtFound,
       llmsTxtContent: result.llmsTxtContent,
+      // 6 additional technical files
+      sitemapXmlFound: result.sitemapXmlFound,
+      sitemapXmlContent: result.sitemapXmlContent,
+      securityTxtFound: result.securityTxtFound,
+      securityTxtContent: result.securityTxtContent,
+      manifestJsonFound: result.manifestJsonFound,
+      manifestJsonContent: result.manifestJsonContent,
+      adsTxtFound: result.adsTxtFound,
+      adsTxtContent: result.adsTxtContent,
+      humansTxtFound: result.humansTxtFound,
+      humansTxtContent: result.humansTxtContent,
+      aiTxtFound: result.aiTxtFound,
+      aiTxtContent: result.aiTxtContent,
       botPermissions: result.botPermissions,
       errors: result.errors,
       warnings: result.warnings,
