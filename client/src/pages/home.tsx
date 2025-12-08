@@ -171,9 +171,9 @@ const Hero = ({
 
       <div className="container relative z-10 px-6 py-12 flex flex-col items-center text-center max-w-5xl">
         
-        {/* 1. COLLAPSIBLE HEADER: Use AnimatePresence to hide text when scanning starts */}
+        {/* 1. COLLAPSIBLE HEADER: Only show on 'input' step - stays collapsed during scan AND after completion */}
         <AnimatePresence>
-          {!isScanning && (
+          {currentStep === 'input' && (
             <motion.div
               initial={{ opacity: 0, y: 20, height: 'auto' }}
               animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -202,7 +202,7 @@ const Hero = ({
         </AnimatePresence>
 
         {/* 2. STICKY TRACKER: Keeps context visible while terminal runs */}
-        <div className="sticky top-16 z-30 w-full bg-background/80 backdrop-blur-md py-4 mb-8 rounded-b-xl border-b border-white/5 transition-all">
+        <div className="sticky top-16 z-30 w-full bg-background/95 backdrop-blur-md py-4 mb-8 rounded-b-xl border-b border-border shadow-sm transition-all">
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
         </div>
 
@@ -576,21 +576,21 @@ const TerminalDemo = ({
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="bg-card border border-border p-0 overflow-hidden shadow-2xl h-full">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
+          <Card className="bg-slate-900 border border-slate-700 p-0 overflow-hidden shadow-2xl h-full">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700 bg-slate-800/50">
               <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                <div className="w-3 h-3 rounded-full bg-green-500/50" />
+                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                <div className="w-3 h-3 rounded-full bg-green-500" />
               </div>
-              <div className="ml-2 text-xs text-muted-foreground font-mono flex items-center gap-2">
+              <div className="ml-2 text-xs text-slate-400 font-mono flex items-center gap-2">
                 <Terminal className="w-3 h-3" />
                 roboscan-cli — v1.0.4
               </div>
             </div>
-            <div className="p-6 font-mono text-sm min-h-[300px] max-h-[400px] overflow-y-auto flex flex-col" data-testid="terminal-output">
+            <div className="p-6 font-mono text-sm min-h-[300px] max-h-[400px] overflow-y-auto flex flex-col text-slate-300" data-testid="terminal-output">
               {lines.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-muted-foreground/50">
+                <div className="h-full flex items-center justify-center text-slate-500">
                   Initializing scan...
                 </div>
               ) : (
@@ -604,8 +604,8 @@ const TerminalDemo = ({
                       className={`mb-1 ${
                         line.includes("[ERROR]") ? "text-red-400" : 
                         line.includes("[WARN]") ? "text-yellow-400" : 
-                        line.includes("[SUCCESS]") ? "text-green-400" : 
-                        line.includes(">") ? "text-primary" : "text-muted-foreground"
+                        line.includes("[SUCCESS]") ? "text-emerald-400" : 
+                        line.includes(">") ? "text-cyan-400" : "text-slate-400"
                       }`}
                     >
                       {line}
@@ -617,7 +617,7 @@ const TerminalDemo = ({
                 <motion.span 
                   animate={{ opacity: [0, 1, 0] }} 
                   transition={{ repeat: Infinity, duration: 0.8 }}
-                  className="inline-block w-2 h-4 bg-primary ml-1"
+                  className="inline-block w-2 h-4 bg-cyan-400 ml-1"
                 />
               )}
             </div>
