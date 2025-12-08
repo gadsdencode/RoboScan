@@ -1,71 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock, Zap, FileSearch, LayoutDashboard, Clock, DollarSign, TrendingUp, Eye, RefreshCw, Building2, User, ChevronRight, Globe, FileText, ShieldCheck, Cpu } from "lucide-react";
+import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Sparkles, Lock, Zap, FileSearch, Clock, DollarSign, TrendingUp, Eye, RefreshCw, Building2, User, ChevronRight, Globe, FileText, ShieldCheck, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PremiumReport } from "@/components/PremiumReport";
-
-const Navbar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter cursor-pointer" onClick={() => window.location.href = '/'}>
-          <Shield className="w-6 h-6" />
-          <span>ROBOSCAN</span>
-        </div>
-
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-8">
-          {/* Changed: "Ghost" style button with explicit "Dashboard" label */}
-          <Button 
-            variant="ghost"
-            className="text-muted-foreground hover:text-primary hover:bg-primary/10 font-medium gap-2 transition-all"
-            onClick={() => window.location.href = '/login'}
-            data-testid="nav-dashboard-login"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            Dashboard Login
-          </Button>
-        </div>
-
-        {/* Mobile Menu Toggle */}
-        <button className="md:hidden text-foreground p-2" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
-
-      {/* Mobile Menu Dropdown */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-background border-b border-border overflow-hidden"
-          >
-            <div className="flex flex-col p-6 gap-4">
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Account Access</span>
-                <Button 
-                  className="w-full justify-start gap-2"
-                  variant="outline"
-                  onClick={() => window.location.href = '/login'}
-                >
-                  <LayoutDashboard className="w-4 h-4" />
-                  Log in to Dashboard
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </nav>
-  );
-};
+import { Navbar } from "@/components/Navbar";
 
 // Enhanced StepTracker Component with Pre-flight Checklist
 type ScanStep = 'input' | 'scanning' | 'report';

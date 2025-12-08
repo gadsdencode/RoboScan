@@ -11,6 +11,12 @@ import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
 import LLMsBuilder from "@/pages/llms-builder";
 import RobotsBuilder from "@/pages/robots-builder";
+import SitemapBuilder from "@/pages/sitemap-builder";
+import SecurityBuilder from "@/pages/security-builder";
+import ManifestBuilder from "@/pages/manifest-builder";
+import AdsBuilder from "@/pages/ads-builder";
+import HumansBuilder from "@/pages/humans-builder";
+import AIBuilder from "@/pages/ai-builder";
 import Pricing from "@/pages/pricing";
 
 function Router() {
@@ -29,6 +35,18 @@ function Router() {
       <Route path="/llms-builder" component={LLMsBuilder} />
       <Route path="/tools/robots-builder" component={RobotsBuilder} />
       <Route path="/robots-builder" component={RobotsBuilder} />
+      <Route path="/tools/sitemap-builder" component={SitemapBuilder} />
+      <Route path="/sitemap-builder" component={SitemapBuilder} />
+      <Route path="/tools/security-builder" component={SecurityBuilder} />
+      <Route path="/security-builder" component={SecurityBuilder} />
+      <Route path="/tools/manifest-builder" component={ManifestBuilder} />
+      <Route path="/manifest-builder" component={ManifestBuilder} />
+      <Route path="/tools/ads-builder" component={AdsBuilder} />
+      <Route path="/ads-builder" component={AdsBuilder} />
+      <Route path="/tools/humans-builder" component={HumansBuilder} />
+      <Route path="/humans-builder" component={HumansBuilder} />
+      <Route path="/tools/ai-builder" component={AIBuilder} />
+      <Route path="/ai-builder" component={AIBuilder} />
       <Route path="/pricing" component={Pricing} />
       <Route component={NotFound} />
     </Switch>

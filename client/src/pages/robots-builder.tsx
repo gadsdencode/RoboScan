@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle, Upload } from "lucide-react";
+import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle, Upload } from "lucide-react";
 import { ImportUrlDialog } from "@/components/ImportUrlDialog";
 import { type ParsedRobotsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { robotsBuilderTourSteps } from "@/lib/tour-config";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -492,13 +493,9 @@ export default function RobotsBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
-            <Shield className="w-6 h-6" />
-            <span>ROBOSCAN</span>
-          </a>
-          <div className="flex items-center gap-4">
+      <Navbar 
+        toolbarItems={
+          <>
             <Button
               variant="outline"
               size="sm"
@@ -518,12 +515,9 @@ export default function RobotsBuilder() {
             >
               <HelpCircle className="w-5 h-5" />
             </Button>
-            <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </a>
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       <div className="container mx-auto px-6 pt-24 pb-12">
         <motion.div

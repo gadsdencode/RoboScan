@@ -11,28 +11,10 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   },
   {
-    element: '[data-testid="button-llms-builder"]',
+    element: '[data-testid="button-tools-dropdown"]',
     popover: {
-      title: "✨ LLMs.txt Builder",
-      description: "Use our tool to generate a compliant llms.txt file to control how AI agents view your content. Validating your llms.txt unlocks the 'Architect' achievement!",
-      side: "bottom",
-      align: "center"
-    }
-  },
-  {
-    element: '[data-testid="button-robots-builder"]',
-    popover: {
-      title: "🤖 Robots.txt Builder",
-      description: "Create a professional robots.txt file to control how search engines and AI bots crawl your website. Set custom rules, crawl delays, and manage bot access with ease!",
-      side: "bottom",
-      align: "center"
-    }
-  },
-  {
-    element: '[data-testid="button-compare-sites"]',
-    popover: {
-      title: "⚡ Competitor Analysis",
-      description: "Compare your website against competitors to see how their AI strategies differ from yours.",
+      title: "🛠️ Tools & Analysis",
+      description: "Access all 8 technical file builders (robots.txt, llms.txt, sitemap.xml, security.txt, manifest.json, ads.txt, humans.txt, ai.txt) and the Compare Sites analysis tool from this dropdown menu.",
       side: "bottom",
       align: "center"
     }

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle, Upload } from "lucide-react";
+import { motion } from "framer-motion";
+import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle, Upload } from "lucide-react";
 import { ImportUrlDialog } from "@/components/ImportUrlDialog";
 import { type ParsedLLMsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { builderTourSteps } from "@/lib/tour-config";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -491,14 +492,9 @@ For AI partnership inquiries: ${formData.contactEmail}
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
-            <Shield className="w-6 h-6" />
-            <span>ROBOSCAN</span>
-          </a>
-          <div className="flex items-center gap-4">
+      <Navbar 
+        toolbarItems={
+          <>
             <Button
               variant="outline"
               size="sm"
@@ -518,12 +514,9 @@ For AI partnership inquiries: ${formData.contactEmail}
             >
               <HelpCircle className="w-5 h-5" />
             </Button>
-            <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </a>
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <div className="container mx-auto px-6 pt-24 pb-12">

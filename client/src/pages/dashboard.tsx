@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Shield, LogOut, Search, ArrowRight, Bot, Bell, GitCompare, HelpCircle, Trophy, AlertCircle, Sparkles, Settings } from "lucide-react";
+import { Bell, HelpCircle, Trophy, AlertCircle, LogOut, Search, ArrowRight, Settings, GitCompare } from "lucide-react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { dashboardTourSteps } from "@/lib/tour-config";
-import { Link } from "wouter";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -711,56 +711,11 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
-            <Shield className="w-6 h-6" />
-            <span>ROBOSCAN</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* PRIMARY TOOLS - Most important actions come first */}
-            
-            {/* llms.txt Builder - Primary feature */}
-            <Link href="/tools/llms-builder">
-              <Button 
-                variant="secondary" 
-                size="sm"
-                className="btn-hover-scale"
-                data-testid="button-llms-builder"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                llms.txt Builder
-              </Button>
-            </Link>
-
-            {/* robots.txt Builder - Primary feature */}
-            <Link href="/robots-builder">
-              <Button 
-                variant="secondary" 
-                size="sm"
-                className="btn-hover-scale"
-                data-testid="button-robots-builder"
-              >
-                <Bot className="w-4 h-4 mr-2" />
-                robots.txt Builder
-              </Button>
-            </Link>
-
-            {/* Compare Sites - Secondary tool */}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowCompetitorDialog(true)}
-              className="gap-2 btn-hover-scale"
-              data-testid="button-compare-sites"
-            >
-              <GitCompare className="w-4 h-4" />
-              Compare Sites
-            </Button>
-
-            {/* ENGAGEMENT FEATURES */}
-            
+      <Navbar 
+        showDashboard={false}
+        onCompareSites={() => setShowCompetitorDialog(true)}
+        toolbarItems={
+          <>
             {/* Trophy Case - Gamification */}
             {user && (
               <Button
@@ -775,8 +730,6 @@ export default function Dashboard() {
               </Button>
             )}
 
-            {/* SUPPORT */}
-            
             {/* Help/Tour Button */}
             <Button 
               variant="ghost" 
@@ -789,8 +742,6 @@ export default function Dashboard() {
               <HelpCircle className="w-5 h-5" />
             </Button>
 
-            {/* USER-SPECIFIC ITEMS - Always on the right */}
-            
             {/* Notifications Bell */}
             <button
               onClick={() => setShowNotificationsSheet(true)}
@@ -835,9 +786,9 @@ export default function Dashboard() {
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </Button>
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <div className="container mx-auto px-6 pt-24 pb-12">
