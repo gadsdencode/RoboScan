@@ -382,4 +382,218 @@ router.post('/sync-plans', requireAuth, async (req: any, res: Response) => {
   }
 });
 
+/**
+ * POST /api/subscriptions/seed-guardian
+ * Admin endpoint: Create the Guardian subscription plan in Stripe and database
+ * This creates a recurring price if one doesn't exist, then saves to database
+ */
+router.post('/seed-guardian', requireAuth, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+    
+    if (!user?.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const stripe = getStripe();
+    
+    // Guardian plan configuration
+    const GUARDIAN_CONFIG = {
+      name: 'Guardian',
+      description: 'Complete bot security automation with recurring scans, real-time change alerts, unlimited scan history, all premium builder fields, and 2x XP bonus.',
+      amount: 2900, // $29.00 in cents
+      currency: 'usd',
+      interval: 'month' as const,
+      features: [
+        'Unlimited Full Scans',
+        'Detailed Error Analysis',
+        'Recurring Scans (Daily/Weekly/Monthly)',
+        'Real-time Change Alerts',
+        'Unlimited Scan History',
+        'Scan Comparison Tool',
+        'All Premium Builder Fields',
+        'Unlimited PDF Exports',
+        '2x XP Bonus',
+        'Priority Support'
+      ]
+    };
+
+    // Check if we already have a Guardian plan with recurring price
+    const existingPlans = await storage.getSubscriptionPlans(true);
+    const existingGuardian = existingPlans.find(p => 
+      p.name?.toLowerCase().includes('guardian') && p.stripePriceId
+    );
+    
+    if (existingGuardian) {
+      // Verify the price still exists in Stripe
+      try {
+        const price = await stripe.prices.retrieve(existingGuardian.stripePriceId);
+        if (price.active && price.recurring) {
+          return res.json({
+            message: 'Guardian plan already exists',
+            plan: existingGuardian,
+            priceId: existingGuardian.stripePriceId
+          });
+        }
+      } catch (e) {
+        console.log('[Subscription] Existing price invalid, will create new one');
+      }
+    }
+
+    // Look for existing Guardian product in Stripe
+    const products = await stripe.products.list({ active: true, limit: 100 });
+    let guardianProduct = products.data.find(p => 
+      p.name.toLowerCase().includes('guardian')
+    );
+
+    // Create product if it doesn't exist
+    if (!guardianProduct) {
+      console.log('[Subscription] Creating Guardian product in Stripe...');
+      guardianProduct = await stripe.products.create({
+        name: GUARDIAN_CONFIG.name,
+        description: GUARDIAN_CONFIG.description,
+        metadata: {
+          features: JSON.stringify(GUARDIAN_CONFIG.features),
+          sort_order: '1'
+        }
+      });
+      console.log(`[Subscription] Created Guardian product: ${guardianProduct.id}`);
+    }
+
+    // Check if a recurring price already exists for this product
+    const existingPrices = await stripe.prices.list({
+      product: guardianProduct.id,
+      active: true,
+      type: 'recurring',
+      limit: 10
+    });
+
+    let recurringPrice = existingPrices.data.find(p => 
+      p.recurring?.interval === GUARDIAN_CONFIG.interval &&
+      p.unit_amount === GUARDIAN_CONFIG.amount &&
+      p.currency === GUARDIAN_CONFIG.currency
+    );
+
+    // Create recurring price if it doesn't exist
+    if (!recurringPrice) {
+      console.log('[Subscription] Creating recurring price for Guardian...');
+      recurringPrice = await stripe.prices.create({
+        product: guardianProduct.id,
+        unit_amount: GUARDIAN_CONFIG.amount,
+        currency: GUARDIAN_CONFIG.currency,
+        recurring: {
+          interval: GUARDIAN_CONFIG.interval,
+        },
+        metadata: {
+          plan_name: 'guardian'
+        }
+      });
+      console.log(`[Subscription] Created recurring price: ${recurringPrice.id}`);
+    }
+
+    // Save to database
+    const plan = await storage.createSubscriptionPlan({
+      stripePriceId: recurringPrice.id,
+      stripeProductId: guardianProduct.id,
+      name: GUARDIAN_CONFIG.name,
+      description: GUARDIAN_CONFIG.description,
+      amount: GUARDIAN_CONFIG.amount,
+      currency: GUARDIAN_CONFIG.currency,
+      interval: GUARDIAN_CONFIG.interval,
+      intervalCount: 1,
+      features: GUARDIAN_CONFIG.features,
+      isActive: true,
+      sortOrder: 1,
+    });
+
+    console.log(`[Subscription] Guardian plan seeded successfully: ${plan.id}`);
+
+    res.json({
+      message: 'Guardian plan created successfully',
+      plan,
+      priceId: recurringPrice.id,
+      productId: guardianProduct.id,
+      instructions: `Set VITE_GUARDIAN_PRICE_ID=${recurringPrice.id} in your environment variables for fallback support.`
+    });
+  } catch (error) {
+    console.error('[Subscription] Error seeding Guardian plan:', error);
+    res.status(500).json({ 
+      message: "Failed to seed Guardian plan",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+/**
+ * GET /api/subscriptions/debug
+ * Debug endpoint: Show current Stripe and database state
+ */
+router.get('/debug', requireAuth, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+    
+    if (!user?.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+
+    const stripe = getStripe();
+    
+    // Get database plans
+    const dbPlans = await storage.getSubscriptionPlans(false);
+    
+    // Get Stripe products and prices
+    const products = await stripe.products.list({ active: true, limit: 20 });
+    const recurringPrices = await stripe.prices.list({ 
+      active: true, 
+      type: 'recurring', 
+      expand: ['data.product'],
+      limit: 20 
+    });
+    const oneTimePrices = await stripe.prices.list({ 
+      active: true, 
+      type: 'one_time',
+      limit: 20 
+    });
+
+    res.json({
+      database: {
+        plans: dbPlans,
+        count: dbPlans.length
+      },
+      stripe: {
+        products: products.data.map(p => ({ 
+          id: p.id, 
+          name: p.name, 
+          active: p.active 
+        })),
+        recurringPrices: recurringPrices.data.map(p => ({
+          id: p.id,
+          product: typeof p.product === 'string' ? p.product : p.product?.name,
+          amount: p.unit_amount,
+          currency: p.currency,
+          interval: p.recurring?.interval
+        })),
+        oneTimePrices: oneTimePrices.data.map(p => ({
+          id: p.id,
+          product: p.product,
+          amount: p.unit_amount,
+          currency: p.currency
+        }))
+      },
+      environment: {
+        VITE_GUARDIAN_PRICE_ID: process.env.VITE_GUARDIAN_PRICE_ID || 'not set',
+        hasStripeKey: !!process.env.STRIPE_SECRET_KEY
+      }
+    });
+  } catch (error) {
+    console.error('[Subscription] Debug error:', error);
+    res.status(500).json({ 
+      message: "Debug failed",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
 export default router;
