@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock, Zap, FileSearch, LayoutDashboard } from "lucide-react";
+import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock, Zap, FileSearch, LayoutDashboard, Clock, DollarSign, TrendingUp, Eye, RefreshCw, Building2, User, ChevronRight, Globe, FileText, ShieldCheck, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -192,22 +192,37 @@ const Hero = ({
               transition={{ duration: 0.5 }}
               className="flex flex-col items-center overflow-hidden"
             >
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-8">
+              {/* Badge with "Big 7" positioning */}
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary/20 to-blue-500/20 border border-primary/30 text-primary text-xs font-mono mb-8">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                New: LLMs.txt Support Live
+                <span className="font-semibold">SEO on Steroids for AI</span>
+                <span className="text-muted-foreground">•</span>
+                <span>8 Technical Files</span>
               </div>
               
-              <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto">
-                Control How AI <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">Discovers Your Site</span>
+              <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto leading-[1.1]">
+                Rank Higher in the <br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-cyan-400">AI Era</span>
               </h1>
               
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-                Generate, validate, and optimize <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">robots.txt</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">llms.txt</code> to ensure AI agents discover and interact with your content exactly how you intend.
+              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
+                Get discovered by the <span className="text-foreground font-semibold">Big 7 LLMs</span> — OpenAI, Google, Anthropic, Meta, Microsoft, Mistral & Perplexity. We generate the <span className="text-primary font-semibold">8 technical files</span> your site needs to be found, cited, and ranked by AI.
               </p>
+
+              {/* Big 7 LLM logos/badges */}
+              <div className="flex flex-wrap justify-center gap-2 mb-10">
+                {['OpenAI', 'Google', 'Anthropic', 'Meta', 'Microsoft', 'Mistral', 'Perplexity'].map((llm, i) => (
+                  <span 
+                    key={llm} 
+                    className="px-3 py-1 text-xs font-medium bg-card border border-border rounded-full text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors cursor-default"
+                  >
+                    {llm}
+                  </span>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -216,6 +231,38 @@ const Hero = ({
         <div className="sticky top-16 z-30 w-full bg-background/95 backdrop-blur-md py-4 mb-8 rounded-b-xl border-b border-border shadow-sm transition-all">
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
         </div>
+
+        {/* User Segmentation Toggle */}
+        {currentStep === 'input' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <p className="text-sm text-muted-foreground mb-3">Who are you?</p>
+            <div className="inline-flex items-center bg-card border border-border rounded-full p-1">
+              <button
+                type="button"
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-primary text-primary-foreground transition-all"
+              >
+                <User className="w-4 h-4" />
+                Business Owner
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground transition-all"
+                onClick={() => window.location.href = '/login?type=agency'}
+              >
+                <Building2 className="w-4 h-4" />
+                Agency / Consultant
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Managing multiple brands? <a href="/login?type=agency" className="text-primary hover:underline">Access the Agency Dashboard →</a>
+            </p>
+          </motion.div>
+        )}
 
         {/* Input Form - scales down when scanning to de-emphasize */}
         <motion.div
@@ -233,9 +280,9 @@ const Hero = ({
                   <Search className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="font-bold text-lg mb-1">Step 1: Enter Your Website</h3>
+                  <h3 className="font-bold text-lg mb-1">Enter Your Website URL</h3>
                   <p className="text-sm text-muted-foreground">
-                    Start your AI readiness analysis by entering your domain
+                    Get AI-ready in under 3 minutes. No technical knowledge required.
                   </p>
                 </div>
               </div>
@@ -279,10 +326,15 @@ const Hero = ({
           </form>
         </motion.div>
         
-        {!isScanning && (
-          <p className="mt-6 text-xs text-muted-foreground">
-            Free scan • No credit card required • Instant results
-          </p>
+        {!isScanning && currentStep === 'input' && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <p className="text-xs text-muted-foreground">
+              ✓ Free scan • ✓ No credit card • ✓ Results in 2.3 minutes
+            </p>
+            <p className="text-xs text-primary/70 font-mono">
+              Join 10,000+ websites already optimized for AI
+            </p>
+          </div>
         )}
 
         {/* 3. TERMINAL INJECTION: Render children here */}
@@ -530,49 +582,75 @@ const TerminalDemo = ({
               >
                 <div className="p-6 bg-card border-2 border-primary/40 rounded-xl shadow-lg shadow-primary/10 flex-1 flex flex-col">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-primary/20 rounded-xl">
+                    <div className="p-3 bg-gradient-to-br from-primary/30 to-blue-500/30 rounded-xl">
                       <Sparkles className="w-7 h-7 text-primary" />
                     </div>
                     <div>
-                      <p className="text-xs text-primary font-mono uppercase tracking-wider">Step 3</p>
-                      <h3 className="font-bold text-xl">Scan Complete!</h3>
+                      <p className="text-xs text-emerald-500 font-mono uppercase tracking-wider flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Analysis Complete
+                      </p>
+                      <h3 className="font-bold text-xl">Your AI Visibility Report is Ready</h3>
                     </div>
                   </div>
                   
-                  <p className="text-muted-foreground mb-6 leading-relaxed">
-                    Get your <span className="text-foreground font-semibold">full optimization report</span> with actionable recommendations, ready-to-deploy files, and SEO impact analysis.
+                  <p className="text-muted-foreground mb-5 leading-relaxed">
+                    Get <span className="text-primary font-semibold">8 optimized technical files</span> tailored to your brand, plus a complete action plan to rank in the Big 7 LLMs.
                   </p>
                   
-                  <div className="space-y-3 mb-6 flex-1">
+                  <div className="space-y-2 mb-5 flex-1">
                     {[
-                      "Priority action plan",
-                      "Ready-to-use robots.txt & llms.txt",
-                      "AI crawler compatibility matrix",
-                      "Instant PDF download"
+                      "All 8 technical files (robots.txt, llms.txt, etc.)",
+                      "Big 7 LLM compatibility matrix",
+                      "Priority action plan with fixes",
+                      "One-click copy & PDF download"
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                        <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                         <span>{item}</span>
                       </div>
                     ))}
                   </div>
                   
                   <div className="mt-auto">
-                    <div className="text-center mb-4">
-                      <span className="text-3xl font-bold text-primary">$9.99</span>
-                      <span className="text-muted-foreground text-sm ml-2">one-time</span>
+                    {/* Pricing with value framing */}
+                    <div className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-blue-500/5 border border-primary/20 mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">Single Site License</span>
+                        <span className="text-xs text-muted-foreground line-through">$29.99</span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold text-primary">$9.99</span>
+                        <span className="text-muted-foreground text-sm">one-time payment</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        💡 Skip 8+ hours of manual work
+                      </p>
                     </div>
+                    
                     <Button 
                       className="w-full btn-cta h-12 text-base"
                       onClick={onUnlockReport}
                       data-testid="button-get-report"
                     >
-                      <Lock className="w-4 h-4 mr-2" />
-                      Unlock Full Report
+                      <Zap className="w-4 h-4 mr-2" />
+                      Get My AI Files Now
                     </Button>
-                    <p className="text-xs text-muted-foreground text-center mt-3">
+                    
+                    <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
+                      <Lock className="w-3 h-3" />
                       Secure payment • Instant delivery
                     </p>
+                    
+                    <div className="mt-4 pt-4 border-t border-border text-center">
+                      <a 
+                        href="/pricing" 
+                        className="text-xs text-primary hover:underline flex items-center justify-center gap-1"
+                      >
+                        <Building2 className="w-3 h-3" />
+                        Managing multiple sites? View Agency plans →
+                      </a>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -639,29 +717,189 @@ const TerminalDemo = ({
   );
 };
 
-// Refactored How It Works Component (Sequential Flow)
+// ROI Value Proposition Component
+const ValueProposition = () => {
+  const techFiles = [
+    { name: 'robots.txt', desc: 'Crawler permissions', icon: <Bot className="w-4 h-4" /> },
+    { name: 'llms.txt', desc: 'AI content map', icon: <Cpu className="w-4 h-4" /> },
+    { name: 'sitemap.xml', desc: 'Page structure', icon: <Globe className="w-4 h-4" /> },
+    { name: 'security.txt', desc: 'Security contact', icon: <ShieldCheck className="w-4 h-4" /> },
+    { name: 'manifest.json', desc: 'App metadata', icon: <FileCode className="w-4 h-4" /> },
+    { name: 'ads.txt', desc: 'Ad transparency', icon: <FileText className="w-4 h-4" /> },
+    { name: 'humans.txt', desc: 'Team credits', icon: <User className="w-4 h-4" /> },
+    { name: 'ai.txt', desc: 'AI guidelines', icon: <Sparkles className="w-4 h-4" /> },
+  ];
+
+  return (
+    <section className="py-20 container mx-auto px-6">
+      <div className="grid lg:grid-cols-2 gap-12 items-center">
+        {/* Left: Time vs Money messaging */}
+        <motion.div
+          initial={{ opacity: 0, x: -30 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.1 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-mono mb-6">
+            <TrendingUp className="w-3 h-3" />
+            The ROI is Clear
+          </div>
+          
+          <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-tight">
+            Stop Wasting Hours Learning Specs.
+            <br />
+            <span className="text-primary">Get AI-Ready in 2.3 Minutes.</span>
+          </h2>
+          
+          <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+            AI standards are evolving fast. You could spend countless hours researching file formats, syntax rules, and best practices — or let RoboScan handle it instantly.
+          </p>
+
+          {/* RASS comparison cards */}
+          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+            <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20">
+              <div className="flex items-center gap-2 text-red-500 font-semibold mb-2">
+                <XCircle className="w-5 h-5" />
+                DIY Approach
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span>4-8 hours of research</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <XCircle className="w-4 h-4" />
+                  <span>High error risk</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <XCircle className="w-4 h-4" />
+                  <span>No update notifications</span>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+              <div className="flex items-center gap-2 text-emerald-500 font-semibold mb-2">
+                <CheckCircle className="w-5 h-5" />
+                RoboScan
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-emerald-500" />
+                  <span className="text-foreground font-medium">2.3 minutes</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  <span>100% validated syntax</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  <span>Auto-update alerts</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Cost breakdown */}
+          <div className="p-5 rounded-xl bg-gradient-to-r from-primary/10 to-blue-500/10 border border-primary/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Your Investment</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-primary">$9.99</span>
+                  <span className="text-sm text-muted-foreground">one-time</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground mb-1">Your Return</p>
+                <p className="text-lg font-semibold text-foreground">Found by AI Forever</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Right: 8 Technical Files Grid */}
+        <motion.div
+          initial={{ opacity: 0, x: 30 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.1 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <div className="p-8 rounded-2xl bg-card border border-border">
+            <div className="text-center mb-6">
+              <h3 className="text-2xl font-bold mb-2">8 Technical Files</h3>
+              <p className="text-muted-foreground">Everything you need for complete AI visibility</p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {techFiles.map((file, i) => (
+                <motion.div
+                  key={file.name}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.05 }}
+                  className="p-3 rounded-xl bg-background border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group cursor-default"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      {file.icon}
+                    </div>
+                    <div>
+                      <p className="font-mono text-sm font-medium">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">{file.desc}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-border text-center">
+              <p className="text-sm text-muted-foreground">
+                <span className="text-primary font-semibold">Tailored to your brand</span> — not generic templates
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+};
+
+// 4-Step Process Grid Component
 const HowItWorks = () => {
   const steps = [
     {
       number: "01",
-      icon: <Search className="w-10 h-10 text-primary" />,
-      title: "Enter Your URL",
-      desc: "Simply input your website domain to begin the analysis. Our scanner works with any public website.",
-      color: "from-primary/10 to-primary/5"
+      icon: <Eye className="w-8 h-8" />,
+      title: "Identify",
+      desc: "We validate your site's purpose and current AI visibility status across all major LLM platforms.",
+      color: "from-cyan-500/20 to-cyan-500/5",
+      iconColor: "text-cyan-500"
     },
     {
       number: "02",
-      icon: <FileSearch className="w-10 h-10 text-primary" />,
-      title: "We Scan & Analyze",
-      desc: "Our engine checks robots.txt, llms.txt, validates syntax, and identifies which AI agents can access your content.",
-      color: "from-primary/10 to-primary/5"
+      icon: <Globe className="w-8 h-8" />,
+      title: "Input",
+      desc: "Simply provide your URL. Our scanner works with any public website — no technical setup required.",
+      color: "from-primary/20 to-primary/5",
+      iconColor: "text-primary"
     },
     {
       number: "03",
-      icon: <Sparkles className="w-10 h-10 text-primary" />,
-      title: "Get Optimized Files",
-      desc: "Receive ready-to-deploy configuration files, actionable insights, and a complete AI readiness report.",
-      color: "from-primary/10 to-primary/5"
+      icon: <FileSearch className="w-8 h-8" />,
+      title: "Analyze",
+      desc: "We test your site against current industry standards and identify gaps in your AI discoverability.",
+      color: "from-blue-500/20 to-blue-500/5",
+      iconColor: "text-blue-500"
+    },
+    {
+      number: "04",
+      icon: <RefreshCw className="w-8 h-8" />,
+      title: "Monitor",
+      desc: "Auto-update your files when standards change. Stay ahead as AI platforms evolve their crawling rules.",
+      color: "from-emerald-500/20 to-emerald-500/5",
+      iconColor: "text-emerald-500"
     }
   ];
 
@@ -677,49 +915,45 @@ const HowItWorks = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.6 }}
         >
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">How It Works</h2>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-4">
+            <Cpu className="w-3 h-3" />
+            Simple 4-Step Process
+          </div>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">How RoboScan Works</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-            Three simple steps to complete AI readiness for your website
+            From zero to AI-ready in under 3 minutes. No technical knowledge required.
           </p>
         </motion.div>
       </div>
       
-      <div className="grid md:grid-cols-3 gap-8 md:gap-6 relative">
+      {/* 4-Column Grid */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
         {/* Connection lines for desktop */}
-        <div className="hidden md:block absolute top-24 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+        <div className="hidden lg:block absolute top-20 left-[12%] right-[12%] h-0.5 bg-gradient-to-r from-cyan-500/30 via-primary/30 to-emerald-500/30" />
         
         {steps.map((step, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: i * 0.2 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ duration: 0.5, delay: i * 0.1 }}
             className="relative"
           >
-            <div className="relative p-8 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all group h-full card-hover">
+            <div className="relative p-6 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all group h-full card-hover text-center">
               {/* Step number badge */}
-              <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-xl flex items-center justify-center shadow-lg shadow-primary/20">
-                {step.number}
-              </div>
-              
-              {/* Icon container */}
-              <div className={`mb-6 p-4 bg-gradient-to-br ${step.color} w-fit rounded-xl group-hover:scale-110 transition-transform`}>
+              <div className={`mx-auto mb-4 w-14 h-14 rounded-full bg-gradient-to-br ${step.color} ${step.iconColor} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
                 {step.icon}
               </div>
               
-              <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">{step.desc}</p>
+              {/* Step indicator */}
+              <div className="text-xs font-mono text-muted-foreground mb-2">Step {step.number}</div>
               
-              {/* Arrow indicator */}
-              {i < steps.length - 1 && (
-                <div className="hidden md:block absolute -right-4 top-1/2 -translate-y-1/2 text-primary/30">
-                  <ArrowRight className="w-8 h-8" />
-                </div>
-              )}
+              <h3 className="text-xl font-bold mb-3">{step.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
             </div>
           </motion.div>
         ))}
@@ -827,9 +1061,12 @@ export default function Home() {
             />
           </Hero>
           
-          {/* Hide "How It Works" if scanning to reduce noise */}
+          {/* Show Value Proposition and How It Works only on input step */}
           {!isScanning && currentStep === 'input' && (
-            <HowItWorks />
+            <>
+              <ValueProposition />
+              <HowItWorks />
+            </>
           )}
         </>
       )}
