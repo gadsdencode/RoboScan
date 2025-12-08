@@ -102,7 +102,7 @@ export function NotificationSheet({
                       exit={{ opacity: 0, y: 10 }}
                       className={`p-4 rounded-lg border transition-all ${
                         notification.isRead
-                          ? 'bg-background/30 border-white/5'
+                          ? 'bg-card border border-border'
                           : 'bg-primary/10 border-primary/30'
                       }`}
                       data-testid={`notification-${notification.id}`}

@@ -104,7 +104,7 @@ export function PremiumReport({ report, url }: PremiumReportProps) {
           <p className="mt-3 text-sm text-muted-foreground">{report.summary}</p>
         </Card>
 
-        <Card className="p-6 bg-card border-white/5">
+        <Card className="p-6 bg-card border border-border">
           <div className="text-sm text-muted-foreground mb-2">SEO Crawlability</div>
           <div className="text-sm font-medium mb-4">{report.seoImpact.crawlability}</div>
           <div className="text-sm text-muted-foreground mb-2">Indexability</div>
@@ -113,7 +113,7 @@ export function PremiumReport({ report, url }: PremiumReportProps) {
           <div className="text-sm font-medium">{report.seoImpact.aiVisibility}</div>
         </Card>
 
-        <Card className="p-6 bg-card border-white/5">
+        <Card className="p-6 bg-card border border-border">
           <div className="text-sm text-muted-foreground mb-4">Ready-to-Use Files</div>
           <div className="space-y-2">
             <Button
@@ -141,7 +141,7 @@ export function PremiumReport({ report, url }: PremiumReportProps) {
       </div>
 
       {report.recommendations.length > 0 && (
-        <Card className="p-6 bg-card border-white/5">
+        <Card className="p-6 bg-card border border-border">
           <div className="flex items-center gap-2 mb-6">
             <TrendingUp className="w-5 h-5 text-primary" />
             <h3 className="text-xl font-bold">Priority Actions</h3>
@@ -190,7 +190,7 @@ export function PremiumReport({ report, url }: PremiumReportProps) {
       )}
 
       {report.competitorInsights.length > 0 && (
-        <Card className="p-6 bg-card border-white/5">
+        <Card className="p-6 bg-card border border-border">
           <div className="flex items-center gap-2 mb-6">
             <Award className="w-5 h-5 text-primary" />
             <h3 className="text-xl font-bold">Industry Insights</h3>

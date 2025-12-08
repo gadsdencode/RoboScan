@@ -460,9 +460,9 @@ For AI partnership inquiries: ${formData.contactEmail}
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-md">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-primary font-mono text-xl font-bold tracking-tighter">
+          <a href="/" className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
             <Shield className="w-6 h-6" />
             <span>ROBOSCAN</span>
           </a>
@@ -658,7 +658,7 @@ For AI partnership inquiries: ${formData.contactEmail}
                           return (
                             <Card
                               key={field.key}
-                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-white/10'}`}
+                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-border'}`}
                             >
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-4">

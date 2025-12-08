@@ -179,16 +179,17 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           className="w-full max-w-2xl"
         >
-          <Card className="bg-card border-primary/20 p-0 overflow-hidden">
-            <div className="relative bg-gradient-to-r from-primary/10 to-blue-500/10 p-6 border-b border-white/10">
+          <Card className="bg-card border border-border p-0 overflow-hidden">
+            <div className="relative bg-card p-6 border-b border-border">
               <button
+                title="Close"
                 onClick={onClose}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-close-modal"

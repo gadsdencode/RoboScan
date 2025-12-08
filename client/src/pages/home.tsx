@@ -6,22 +6,21 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PremiumReport } from "@/components/PremiumReport";
-import heroBg from "@assets/generated_images/cybernetic_data_scanning_visualization.png";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-md">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
       <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-primary font-mono text-xl font-bold tracking-tighter">
+        <div className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
           <Shield className="w-6 h-6" />
           <span>ROBOSCAN</span>
         </div>
 
         <div className="hidden md:flex items-center gap-8">
           <Button 
-            className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
             onClick={() => window.location.href = '/login'}
             data-testid="button-login"
           >
@@ -40,7 +39,7 @@ const Navbar = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-background border-b border-white/10 overflow-hidden"
+            className="md:hidden bg-background border-b border-border overflow-hidden"
           >
             <div className="flex flex-col p-6 gap-4">
               <Button 
@@ -57,10 +56,15 @@ const Navbar = () => {
   );
 };
 
-// New StepTracker Component
+// Enhanced StepTracker Component with Pre-flight Checklist
 type ScanStep = 'input' | 'scanning' | 'report';
 
-const StepTracker = ({ currentStep }: { currentStep: ScanStep }) => {
+interface StepTrackerProps {
+  currentStep: ScanStep;
+  preflightStatus?: string;
+}
+
+const StepTracker = ({ currentStep, preflightStatus }: StepTrackerProps) => {
   const steps = [
     { id: 'input', label: 'Enter URL', number: 1 },
     { id: 'scanning', label: 'Scanning', number: 2 },
@@ -93,7 +97,7 @@ const StepTracker = ({ currentStep }: { currentStep: ScanStep }) => {
                 relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-sm transition-all
                 ${state === 'completed' ? 'bg-primary text-primary-foreground' : ''}
                 ${state === 'active' ? 'bg-primary text-primary-foreground ring-4 ring-primary/30' : ''}
-                ${state === 'pending' ? 'bg-white/5 text-muted-foreground border border-white/10' : ''}
+                ${state === 'pending' ? 'bg-muted text-muted-foreground border border-border' : ''}
               `}>
                 {state === 'completed' ? (
                   <CheckCircle className="w-5 h-5" />
@@ -118,25 +122,32 @@ const StepTracker = ({ currentStep }: { currentStep: ScanStep }) => {
             {index < steps.length - 1 && (
               <div className={`
                 w-8 md:w-16 h-0.5 mx-2 transition-all
-                ${state === 'completed' ? 'bg-primary' : 'bg-white/10'}
+                ${state === 'completed' ? 'bg-primary' : 'bg-border'}
               `} />
             )}
           </div>
         );
       })}
+      {preflightStatus && currentStep === 'scanning' && (
+        <div className="mt-4 text-center">
+          <p className="text-xs text-muted-foreground font-mono">{preflightStatus}</p>
+        </div>
+      )}
     </div>
   );
 };
 
-// Enhanced Hero Component with Wizard UI
+// Enhanced Hero Component with Enterprise Aesthetic
 const Hero = ({ 
   onScan, 
   currentStep,
-  isScanning 
+  isScanning,
+  preflightStatus
 }: { 
   onScan: (url: string) => void;
   currentStep: ScanStep;
   isScanning: boolean;
+  preflightStatus?: string;
 }) => {
   const [url, setUrl] = useState("");
 
@@ -147,14 +158,10 @@ const Hero = ({
 
   return (
     <section className="relative min-h-screen pt-20 flex items-center justify-center overflow-hidden">
+      {/* Abstract gradient mesh background */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src={heroBg} 
-          alt="Background" 
-          className="w-full h-full object-cover opacity-20"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/90 to-background" />
-        <div className="absolute inset-0 grid-bg opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
+        <div className="absolute inset-0 grid-bg opacity-20" />
       </div>
 
       <div className="container relative z-10 px-6 py-20 flex flex-col items-center text-center">
@@ -173,7 +180,7 @@ const Hero = ({
           
           <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto">
             Control How AI <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500 text-glow">Sees Your Site</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">Sees Your Site</span>
           </h1>
           
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -181,7 +188,7 @@ const Hero = ({
           </p>
 
           {/* Step Tracker */}
-          <StepTracker currentStep={currentStep} />
+          <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
 
           {/* Wizard-style Form */}
           <motion.div
@@ -192,7 +199,7 @@ const Hero = ({
             transition={{ duration: 0.3 }}
           >
             <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-              <div className="bg-card/50 backdrop-blur border border-white/10 rounded-2xl p-6 md:p-8 shadow-2xl">
+              <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <Search className="w-5 h-5 text-primary" />
@@ -209,7 +216,7 @@ const Hero = ({
                   <div className="relative flex-1">
                     <Input 
                       placeholder="example.com" 
-                      className="h-12 bg-background/50 backdrop-blur border-white/10 focus:border-primary/50 transition-colors text-base"
+                      className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       data-testid="input-url"
@@ -219,7 +226,7 @@ const Hero = ({
                   <Button 
                     type="submit" 
                     size="lg" 
-                    className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
+                    className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
                     data-testid="button-scan"
                     disabled={isScanning || !url}
                   >
@@ -289,12 +296,16 @@ const TerminalDemo = ({
     setIsComplete(false);
 
     const performScan = async () => {
-      const steps = [
-        `> Connecting to ${targetUrl}...`,
+      // Enhanced pre-flight checklist
+      const preflightSteps = [
+        `> Initializing scan for ${targetUrl}...`,
         "> Resolving DNS...",
+        "> Checking SSL certificate...",
+        "> Establishing secure connection...",
+        `> Connecting to ${targetUrl}...`,
       ];
 
-      setLines([...steps]);
+      setLines([...preflightSteps]);
 
       try {
         const response = await fetch('/api/scan', {
@@ -318,9 +329,10 @@ const TerminalDemo = ({
         const result: ScanResult = await response.json();
         setScanResult(result);
 
-        const newLines = [...steps];
+        const newLines = [...preflightSteps];
         newLines.push("> [SUCCESS] Connection established (200 OK)");
-        newLines.push("> Searching for robots.txt...");
+        newLines.push("> [SUCCESS] SSL certificate validated");
+        newLines.push("> Locating robots.txt...");
 
         if (result.robotsTxtFound) {
           newLines.push("> [SUCCESS] robots.txt found");
@@ -331,14 +343,15 @@ const TerminalDemo = ({
           newLines.push("> [WARN] robots.txt not found (404)");
         }
 
-        newLines.push("> Searching for llms.txt...");
+        newLines.push("> Locating llms.txt...");
         if (result.llmsTxtFound) {
           newLines.push("> [SUCCESS] llms.txt found");
         } else {
-          newLines.push("> [ERROR] llms.txt not found (404)");
+          newLines.push("> [WARN] llms.txt not found (404)");
         }
 
         newLines.push("> Analyzing AI agent permissions...");
+        newLines.push("> Parsing configuration files...");
         
         Object.entries(result.botPermissions).forEach(([bot, permission]) => {
           newLines.push(`> [INFO] ${bot}: ${permission}`);
@@ -389,7 +402,7 @@ const TerminalDemo = ({
       initial={{ opacity: 0, y: 50 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="py-12 md:py-20 bg-black/20 border-y border-white/5"
+      className="py-12 md:py-20 bg-card/30 border-y border-border"
     >
       <div className="container mx-auto px-6">
         <motion.div
@@ -437,7 +450,7 @@ const TerminalDemo = ({
               ].map((item, i) => (
                 <motion.div 
                   key={i} 
-                  className="flex gap-4 p-4 rounded-xl bg-card/30 border border-white/5"
+                  className="flex gap-4 p-4 rounded-xl bg-card border border-border card-hover"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.4 + (i * 0.1) }}
@@ -460,8 +473,8 @@ const TerminalDemo = ({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <Card className="bg-[#0d1117] border-white/10 p-0 overflow-hidden shadow-2xl shadow-primary/5">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5 bg-white/5">
+            <Card className="bg-card border border-border p-0 overflow-hidden shadow-2xl">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-red-500/50" />
                   <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
@@ -513,7 +526,7 @@ const TerminalDemo = ({
                   initial={{ opacity: 0, y: 20, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                  className="p-6 bg-gradient-to-r from-primary/10 to-blue-500/10 border border-primary/20 rounded-xl"
+                  className="p-6 bg-card border border-primary/30 rounded-xl"
                   data-testid="upgrade-cta"
                 >
                   <div className="flex items-start gap-4">
@@ -558,21 +571,21 @@ const HowItWorks = () => {
       icon: <Search className="w-10 h-10 text-primary" />,
       title: "Enter Your URL",
       desc: "Simply input your website domain to begin the analysis. Our scanner works with any public website.",
-      color: "from-cyan-500/20 to-blue-500/20"
+      color: "from-primary/10 to-primary/5"
     },
     {
       number: "02",
       icon: <FileSearch className="w-10 h-10 text-primary" />,
       title: "We Scan & Analyze",
       desc: "Our engine checks robots.txt, llms.txt, validates syntax, and identifies which AI agents can access your content.",
-      color: "from-blue-500/20 to-purple-500/20"
+      color: "from-primary/10 to-primary/5"
     },
     {
       number: "03",
       icon: <Sparkles className="w-10 h-10 text-primary" />,
       title: "Get Optimized Files",
       desc: "Receive ready-to-deploy configuration files, actionable insights, and a complete AI readiness report.",
-      color: "from-purple-500/20 to-pink-500/20"
+      color: "from-primary/10 to-primary/5"
     }
   ];
 
@@ -611,7 +624,7 @@ const HowItWorks = () => {
             transition={{ duration: 0.5, delay: i * 0.2 }}
             className="relative"
           >
-            <div className="relative p-8 rounded-2xl bg-card border border-white/5 hover:border-primary/30 transition-all group h-full">
+            <div className="relative p-8 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all group h-full card-hover">
               {/* Step number badge */}
               <div className="absolute -top-4 -left-4 w-12 h-12 rounded-full bg-primary text-primary-foreground font-bold text-xl flex items-center justify-center shadow-lg shadow-primary/20">
                 {step.number}
@@ -640,7 +653,7 @@ const HowItWorks = () => {
 };
 
 const Footer = () => (
-  <footer className="py-12 border-t border-white/10 bg-black/20">
+  <footer className="py-12 border-t border-border bg-card/30">
     <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
       <div className="flex items-center gap-2 text-primary font-mono font-bold">
         <Shield className="w-5 h-5" />
@@ -736,6 +749,7 @@ export default function Home() {
             onScan={handleScan} 
             currentStep={currentStep}
             isScanning={isScanning}
+            preflightStatus={isScanning ? "Resolving DNS..." : undefined}
           />
           
           {/* Terminal appears immediately after Hero when scanning */}

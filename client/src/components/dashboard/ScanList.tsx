@@ -90,7 +90,7 @@ export function ScanList({
 
   if (scans.length === 0) {
     return (
-      <Card className="p-12 text-center bg-card border-white/5">
+      <Card className="p-12 text-center bg-card border border-border">
         <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/20 rounded-full mb-4">
           <FileText className="w-8 h-8 text-primary" />
         </div>
@@ -138,7 +138,7 @@ export function ScanList({
 
       {/* Tag Filter */}
       {showTagFilter && allTags.length > 0 && (
-        <Card className="p-4 mb-4 bg-card border-white/5">
+        <Card className="p-4 mb-4 bg-card border border-border">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <Tag className="w-4 h-4 text-primary" />
@@ -163,7 +163,7 @@ export function ScanList({
                 className={`cursor-pointer transition-all ${
                   selectedTags.includes(tag)
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-background border-white/10 hover:bg-primary/20'
+                    : 'bg-background border-border hover:bg-primary/20'
                 }`}
                 data-testid={`tag-filter-${tag}`}
               >
@@ -195,7 +195,7 @@ export function ScanList({
           return (
             <Card
               key={scan.id}
-              className="p-6 bg-card border-white/5 hover:border-primary/20 card-hover"
+              className="p-6 bg-card border border-border hover:border-primary/50 card-hover"
               data-testid={`scan-card-${scan.id}`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -322,7 +322,7 @@ export function ScanList({
                           return (
                             <div
                               key={bot}
-                              className="flex flex-col gap-2 p-2 bg-background/50 border border-white/5 rounded text-xs"
+                              className="flex flex-col gap-2 p-2 bg-background border border-border rounded text-xs"
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -418,7 +418,7 @@ export function ScanList({
                                   Download
                                 </Button>
                               </div>
-                              <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
+                              <pre className="p-4 bg-card border border-border rounded-lg text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap font-mono">
                                 {scan.robotsTxtContent}
                               </pre>
                             </div>
@@ -438,7 +438,7 @@ export function ScanList({
                                   Download
                                 </Button>
                               </div>
-                              <pre className="p-4 bg-black/40 border border-white/10 rounded-lg text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap">
+                              <pre className="p-4 bg-card border border-border rounded-lg text-xs overflow-auto max-h-64 break-words whitespace-pre-wrap font-mono">
                                 {scan.llmsTxtContent}
                               </pre>
                             </div>
@@ -485,7 +485,7 @@ export function ScanList({
                           <div className="flex items-center gap-3">
                             <Button
                               onClick={() => onUnlock(scan)}
-                              className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-glow btn-hover-lift"
+                              className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
                               data-testid={`button-unlock-${scan.id}`}
                             >
                               <Sparkles className="w-4 h-4 mr-2" />
@@ -524,7 +524,7 @@ export function ScanList({
               )}
 
               {/* Comparison Actions */}
-              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+              <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {canQuickCompare && isLatestForUrl && (
                     <Button

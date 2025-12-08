@@ -4,36 +4,41 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Space Grotesk', sans-serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Space Grotesk', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   
-  --color-background: hsl(222 47% 11%);
+  /* Enterprise Trust Palette - Deep Slate Backgrounds */
+  --color-background: hsl(224 71% 4%);
   --color-foreground: hsl(210 40% 98%);
 
-  --color-card: hsl(217 33% 17%);
+  --color-card: hsl(220 20% 10%);
   --color-card-foreground: hsl(210 40% 98%);
 
-  --color-popover: hsl(222 47% 11%);
+  --color-popover: hsl(224 71% 4%);
   --color-popover-foreground: hsl(210 40% 98%);
 
-  --color-primary: hsl(180 100% 50%); /* Cyan Neon */
-  --color-primary-foreground: hsl(222 47% 11%);
+  /* Primary: Deep Indigo/Blue for Trust & Security */
+  --color-primary: hsl(221 83% 53%);
+  --color-primary-foreground: hsl(210 40% 98%);
 
   --color-secondary: hsl(217 19% 27%);
   --color-secondary-foreground: hsl(210 40% 98%);
 
-  --color-muted: hsl(217 33% 17%);
+  --color-muted: hsl(220 20% 10%);
   --color-muted-foreground: hsl(215 20% 65%);
 
+  /* Accent: Reserve cyan only for success states */
   --color-accent: hsl(180 100% 50%);
   --color-accent-foreground: hsl(222 47% 11%);
 
   --color-destructive: hsl(0 62% 30%);
   --color-destructive-foreground: hsl(210 40% 98%);
 
-  --color-border: hsl(217 33% 17%);
-  --color-input: hsl(217 33% 17%);
-  --color-ring: hsl(180 100% 50%);
+  /* Professional Borders */
+  --color-border: hsl(216 34% 17%);
+  --color-input: hsl(220 20% 10%);
+  --color-ring: hsl(221 83% 53%);
 
   --radius-sm: 0.2rem;
   --radius-md: 0.4rem;
@@ -47,31 +52,38 @@
   body {
     @apply font-sans antialiased bg-background text-foreground selection:bg-primary/20 selection:text-primary;
   }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
 }
 
 @layer utilities {
+  /* Solid Surface Pattern - Enterprise Style */
   .glass-panel {
-    @apply bg-card/50 backdrop-blur-md border border-white/5;
+    @apply bg-card border border-border;
   }
   
+  /* Success State Glow Only */
   .text-glow {
-    text-shadow: 0 0 20px hsla(180, 100%, 50%, 0.5);
+    text-shadow: 0 0 12px hsla(180, 100%, 50%, 0.4);
   }
 
+  /* Subtle Grid Background */
   .grid-bg {
     background-size: 40px 40px;
-    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   }
 
-  /* Button Animations - Subtle and non-conflicting */
+  /* Professional Button Animations */
   .btn-hover-lift {
     @apply transform-gpu transition-all duration-200 ease-out;
   }
   
   .btn-hover-lift:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 255, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
   
   .btn-hover-lift:active:not(:disabled) {
@@ -90,12 +102,13 @@
     transform: scale(0.98);
   }
 
+  /* Removed neon glow - replaced with subtle shadow */
   .btn-hover-glow {
     @apply transform-gpu transition-all duration-250 ease-out;
   }
   
   .btn-hover-glow:hover:not(:disabled) {
-    box-shadow: 0 0 16px hsla(180, 100%, 50%, 0.35), 0 0 32px hsla(180, 100%, 50%, 0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     transform: translateY(-1px);
   }
 
@@ -108,14 +121,15 @@
     opacity: 0.8;
   }
 
-  /* Card Animations */
+  /* Professional Card Animations */
   .card-hover {
     @apply transform-gpu transition-all duration-250 ease-out;
   }
   
   .card-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 255, 255, 0.1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-color: hsl(221 83% 53% / 0.5);
   }
 
   /* Smooth Transitions */
@@ -143,13 +157,13 @@
   100% { background-position: 1000px 0; }
 }
 
-/* Driver.js Cyberpunk Theme Overrides */
+/* Driver.js Professional Theme Overrides */
 .roboscan-driver-popover.driver-popover {
-  @apply bg-card border border-primary/30 text-foreground rounded-xl shadow-2xl shadow-primary/10;
+  @apply bg-card border border-primary/30 text-foreground rounded-xl shadow-2xl;
 }
 
 .roboscan-driver-popover .driver-popover-title {
-  @apply font-mono text-lg font-bold text-primary flex items-center gap-2;
+  @apply font-heading text-lg font-bold text-primary flex items-center gap-2;
 }
 
 .roboscan-driver-popover .driver-popover-description {
@@ -158,7 +172,7 @@
 
 /* Navigation Buttons */
 .roboscan-driver-popover .driver-popover-footer button {
-  @apply bg-secondary text-secondary-foreground border border-white/10 rounded-md px-3 py-1 text-xs font-medium transition-colors;
+  @apply bg-secondary text-secondary-foreground border border-border rounded-md px-3 py-1 text-xs font-medium transition-colors;
   text-shadow: none;
 }
 

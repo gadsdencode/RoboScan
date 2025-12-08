@@ -75,7 +75,7 @@ export function ScanComparison({
         <div className="flex-1 overflow-y-auto min-h-0 pr-2">
           <TabsContent value="overview" className="mt-0 space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <Card className="p-4 bg-card/50 border-primary/20" data-testid="card-scan-a">
+              <Card className="p-4 bg-card border border-border" data-testid="card-scan-a">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg" data-testid="text-label-a">{labels[0]}</h3>
                   <Badge variant="outline" className="font-mono" data-testid="text-hostname-a">{getHostname(scanA.url)}</Badge>
@@ -96,7 +96,7 @@ export function ScanComparison({
                 </div>
               </Card>
 
-              <Card className="p-4 bg-card/50 border-primary/20" data-testid="card-scan-b">
+              <Card className="p-4 bg-card border border-border" data-testid="card-scan-b">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg" data-testid="text-label-b">{labels[1]}</h3>
                   <Badge variant="outline" className="font-mono" data-testid="text-hostname-b">{getHostname(scanB.url)}</Badge>

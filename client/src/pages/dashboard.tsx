@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, LogOut, Search, ArrowRight, Bot, Bell, GitCompare, HelpCircle, Trophy, AlertCircle } from "lucide-react";
+import { Shield, LogOut, Search, ArrowRight, Bot, Bell, GitCompare, HelpCircle, Trophy, AlertCircle, Sparkles, Settings } from "lucide-react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { dashboardTourSteps } from "@/lib/tour-config";
@@ -687,9 +687,9 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-md">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-primary font-mono text-xl font-bold tracking-tighter">
+          <div className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
             <Shield className="w-6 h-6" />
             <span>ROBOSCAN</span>
           </div>
@@ -805,7 +805,7 @@ export default function Dashboard() {
               variant="outline" 
               size="sm"
               onClick={() => window.location.href = '/api/logout'}
-              className="border-white/10 btn-hover-scale"
+              className="border-border btn-hover-scale"
               data-testid="button-logout"
             >
               <LogOut className="w-4 h-4 mr-2" />
@@ -827,7 +827,7 @@ export default function Dashboard() {
         </div>
 
         {/* Scan Input Section */}
-        <Card className="p-6 bg-card border-white/5 mb-8">
+        <Card className="p-6 bg-card border border-border mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Search className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-bold">Scan a New Website</h2>
@@ -840,13 +840,13 @@ export default function Dashboard() {
               onChange={(e) => setScanUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !isScanningMutation && handleScan()}
               disabled={isScanningMutation}
-              className="flex-1 bg-background border-white/10 focus:border-primary"
+              className="flex-1 bg-background border-border focus:border-primary"
               data-testid="input-scan-url"
             />
             <Button
               onClick={handleScan}
               disabled={isScanningMutation || !scanUrlInput.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 btn-hover-glow btn-hover-lift"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 btn-hover-lift"
               data-testid="button-scan"
             >
               {isScanningMutation ? (
