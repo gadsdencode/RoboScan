@@ -219,12 +219,22 @@ export default function RobotsBuilder() {
     }
   };
 
+  // Track if user has subscription (grants all fields)
+  const [hasAllFieldsAccess, setHasAllFieldsAccess] = useState(false);
+
   const loadPurchasedFields = async () => {
     try {
       const response = await fetch('/api/robots-fields/purchases', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
-        setPurchasedFields(data);
+        // Handle new response format with subscription status
+        if (data.purchases) {
+          setPurchasedFields(data.purchases);
+          setHasAllFieldsAccess(data.hasAllFieldsAccess || false);
+        } else {
+          // Legacy format: array of purchases
+          setPurchasedFields(data);
+        }
       }
     } catch (error) {
       console.error('Failed to load purchased fields:', error);
@@ -232,6 +242,8 @@ export default function RobotsBuilder() {
   };
 
   const isPurchased = (fieldKey: string): boolean => {
+    // Subscribers have access to all fields
+    if (hasAllFieldsAccess) return true;
     return purchasedFields.some(p => p.fieldKey === fieldKey);
   };
 

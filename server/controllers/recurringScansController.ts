@@ -1,10 +1,13 @@
 // server/controllers/recurringScansController.ts
 // Handles recurring scan management and notification preferences
+// NOTE: Recurring scans are a SUBSCRIPTION-ONLY feature (Guardian tier)
 
 import { Router, Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../auth.js";
+import { requireSubscription } from "../utils/accessControl.js";
+import { isAdmin } from "../utils/admin.js";
 import {
   recurringScanCreateSchema,
   recurringScanUpdateSchema,
@@ -16,10 +19,24 @@ const router = Router();
 /**
  * POST /api/recurring-scans
  * Create a new recurring scan
+ * SUBSCRIPTION REQUIRED: This is a Guardian-tier feature
  */
 router.post('/', isAuthenticated, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
+    
+    // Check subscription access (admins bypass this check)
+    if (!isAdmin(req)) {
+      const hasAccess = await storage.hasRecurringScanAccess(userId);
+      if (!hasAccess) {
+        return res.status(403).json({
+          message: "Recurring scans require an active Guardian subscription",
+          requiresSubscription: true,
+          feature: 'recurring_scans',
+        });
+      }
+    }
+    
     const { url, frequency, notificationPreferences } = recurringScanCreateSchema.parse(req.body);
 
     const nextRunAt = new Date(Date.now() + 60 * 1000); // First run in 1 minute

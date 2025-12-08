@@ -1,5 +1,6 @@
 // server/controllers/scanController.ts
 // Handles website scanning and scan management routes
+// NOTE: Free tier sees limited details; subscription/purchase unlocks full details
 
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -7,7 +8,7 @@ import { storage } from "../storage.js";
 import { scanWebsite } from "../scanner.js";
 import { calculateScanScore } from "../report-generator.js";
 import { isAuthenticated, checkAuthentication } from "../auth.js";
-import { calculateLevel } from "../gamification.js";
+import { calculateLevel, calculateXpWithMultiplier } from "../gamification.js";
 import { normalizeDomainForCooldown } from "../domain-utils.js";
 import { isAdmin } from "../utils/admin.js";
 import {
@@ -20,8 +21,38 @@ import {
 const router = Router();
 
 /**
+ * Helper to determine access level for scan details
+ */
+async function getScanAccessLevel(
+  req: any,
+  scanId: number,
+  userId: string | undefined
+): Promise<{ isPurchased: boolean; isSubscriber: boolean; hasFullAccess: boolean }> {
+  // Admin always has full access
+  if (isAdmin(req)) {
+    return { isPurchased: true, isSubscriber: true, hasFullAccess: true };
+  }
+
+  if (!userId) {
+    return { isPurchased: false, isSubscriber: false, hasFullAccess: false };
+  }
+
+  const [purchase, subscription] = await Promise.all([
+    storage.getPurchaseByScanId(scanId),
+    storage.getUserActiveSubscription(userId),
+  ]);
+
+  const isPurchased = !!purchase;
+  const isSubscriber = !!subscription;
+  const hasFullAccess = isPurchased || isSubscriber;
+
+  return { isPurchased, isSubscriber, hasFullAccess };
+}
+
+/**
  * GET /api/user/scans
  * Get authenticated user's scans with optional tag filtering and pagination
+ * Includes access level info (subscription/purchase status)
  */
 router.get('/scans', isAuthenticated, async (req: any, res: Response) => {
   try {
@@ -38,22 +69,34 @@ router.get('/scans', isAuthenticated, async (req: any, res: Response) => {
     
     const scans = await storage.getUserScans(userId, tagFilter, limit, offset);
     
-    // Add purchase status to each scan (only user's own scans)
-    const scansWithPurchaseStatus = await Promise.all(
+    // Check if user has active subscription (applies to all scans)
+    const subscription = await storage.getUserActiveSubscription(userId);
+    const isSubscriber = !!subscription || isAdmin(req);
+    
+    // Add access status to each scan
+    const scansWithAccessStatus = await Promise.all(
       scans.map(async (scan) => {
         const purchase = await storage.getPurchaseByScanId(scan.id);
-        
-        // GOD MODE: If admin, force isPurchased to true
-        const isPurchased = !!purchase || isAdmin(req);
+        const isPurchased = !!purchase;
+        const hasFullAccess = isPurchased || isSubscriber;
         
         return {
           ...scan,
           isPurchased,
+          isSubscriber,
+          hasFullAccess, // Can see full details (errors, warnings, content)
         };
       })
     );
     
-    res.json(scansWithPurchaseStatus);
+    res.json({
+      scans: scansWithAccessStatus,
+      meta: {
+        isSubscriber,
+        limit,
+        offset,
+      }
+    });
   } catch (error) {
     console.error("Error fetching user scans:", error);
     res.status(500).json({ message: "Failed to fetch scans" });
@@ -126,15 +169,22 @@ router.post('/', async (req: any, res: Response) => {
     let gamificationUpdates = null;
     
     if (userId) {
-      const currentUser = await storage.getUser(userId);
+      const [currentUser, subscription] = await Promise.all([
+        storage.getUser(userId),
+        storage.getUserActiveSubscription(userId),
+      ]);
+      const isSubscriber = !!subscription;
       
       if (currentUser) {
         if (!isOnCooldown) {
-          let xpGain = 10;
+          let baseXpGain = 10;
 
           if (result.robotsTxtFound && result.llmsTxtFound) {
-            xpGain += 40; 
+            baseXpGain += 40; 
           }
+
+          // Apply 2x multiplier for subscribers (Guardian tier)
+          const xpGain = calculateXpWithMultiplier(baseXpGain, isSubscriber);
 
           const currentXp = currentUser.xp || 0;
           const newXp = currentXp + xpGain;
@@ -147,9 +197,12 @@ router.post('/', async (req: any, res: Response) => {
 
           gamificationUpdates = {
             xpGained: xpGain,
+            baseXp: baseXpGain,
+            multiplier: isSubscriber ? 2 : 1,
             totalXp: newXp,
             newLevel: newLevel,
-            levelUp: newLevel > oldLevel
+            levelUp: newLevel > oldLevel,
+            isSubscriber,
           };
         } else {
           gamificationUpdates = {
@@ -157,7 +210,8 @@ router.post('/', async (req: any, res: Response) => {
             totalXp: currentUser.xp || 0,
             newLevel: currentUser.level || 1,
             levelUp: false,
-            cooldownActive: true
+            cooldownActive: true,
+            isSubscriber,
           };
         }
       }
@@ -212,6 +266,7 @@ router.post('/', async (req: any, res: Response) => {
 /**
  * GET /api/scans/:id
  * Get individual scan by ID with ownership check
+ * Returns access level info for proper UI rendering
  */
 router.get('/:id', isAuthenticated, async (req: any, res: Response) => {
   try {
@@ -228,14 +283,17 @@ router.get('/:id', isAuthenticated, async (req: any, res: Response) => {
       return res.status(404).json({ message: "Scan not found" });
     }
 
-    // Check if purchased
-    const purchase = await storage.getPurchaseByScanId(scanId);
-    const scanWithPurchase = {
+    // Get comprehensive access level
+    const accessLevel = await getScanAccessLevel(req, scanId, userId);
+
+    const scanWithAccess = {
       ...scan,
-      isPurchased: !!purchase || isAdmin(req)
+      isPurchased: accessLevel.isPurchased,
+      isSubscriber: accessLevel.isSubscriber,
+      hasFullAccess: accessLevel.hasFullAccess,
     };
 
-    res.json(scanWithPurchase);
+    res.json(scanWithAccess);
   } catch (error) {
     console.error('Get scan by ID error:', error);
     res.status(500).json({ message: "Failed to get scan" });

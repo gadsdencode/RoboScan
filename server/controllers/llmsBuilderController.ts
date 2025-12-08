@@ -1,5 +1,6 @@
 // server/controllers/llmsBuilderController.ts
 // Handles LLMs.txt validation and premium field purchases
+// NOTE: Premium fields accessible via subscription OR one-time purchase
 
 import { Router, Response } from "express";
 import { z } from "zod";
@@ -7,6 +8,7 @@ import { storage } from "../storage.js";
 import { isAuthenticated, checkAuthentication } from "../auth.js";
 import { ACHIEVEMENTS } from "../gamification.js";
 import { getStripe } from "../utils/stripe.js";
+import { isAdmin } from "../utils/admin.js";
 import { validateLlmsTxtSchema, fieldKeySchema, paymentIntentIdSchema } from "../utils/validation.js";
 
 const router = Router();
@@ -101,12 +103,23 @@ router.post('/validate-llms-txt', async (req: any, res: Response) => {
 /**
  * GET /api/llms-fields/purchases
  * Get user's purchased premium LLMs fields
+ * NOTE: Subscribers get access to ALL fields even without individual purchases
  */
 router.get('/llms-fields/purchases', isAuthenticated, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const purchases = await storage.getUserLlmsFieldPurchases(userId);
-    res.json(purchases);
+    
+    // Check if user has active subscription (grants all fields)
+    const subscription = await storage.getUserActiveSubscription(userId);
+    const hasSubscription = !!subscription;
+    
+    res.json({
+      purchases,
+      hasSubscription,
+      // If subscribed, they have access to all premium fields
+      hasAllFieldsAccess: hasSubscription || isAdmin(req),
+    });
   } catch (error) {
     console.error('Get field purchases error:', error);
     res.status(500).json({ message: "Failed to fetch field purchases" });
@@ -114,8 +127,31 @@ router.get('/llms-fields/purchases', isAuthenticated, async (req: any, res: Resp
 });
 
 /**
+ * GET /api/llms-fields/access/:fieldKey
+ * Check if user has access to a specific field (via subscription OR purchase)
+ */
+router.get('/llms-fields/access/:fieldKey', isAuthenticated, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+    const { fieldKey } = req.params;
+    
+    // Admin bypass
+    if (isAdmin(req)) {
+      return res.json({ hasAccess: true, reason: 'admin' });
+    }
+    
+    const accessResult = await storage.hasLlmsFieldAccess(userId, fieldKey);
+    res.json(accessResult);
+  } catch (error) {
+    console.error('Check field access error:', error);
+    res.status(500).json({ message: "Failed to check field access" });
+  }
+});
+
+/**
  * POST /api/llms-fields/create-payment-intent
  * Create payment intent for premium LLMs field
+ * NOTE: Subscribers don't need to purchase - they have full access
  */
 router.post('/llms-fields/create-payment-intent', isAuthenticated, async (req: any, res: Response) => {
   try {
@@ -123,10 +159,20 @@ router.post('/llms-fields/create-payment-intent', isAuthenticated, async (req: a
 
     const userId = req.user.claims.sub;
 
+    // Check if user has subscription (no payment needed)
+    const subscription = await storage.getUserActiveSubscription(userId);
+    if (subscription) {
+      return res.status(400).json({ 
+        message: "You have an active subscription - all premium fields are already unlocked!",
+        hasSubscription: true,
+        alreadyUnlocked: true 
+      });
+    }
+
     // Check if already purchased
     const alreadyPurchased = await storage.hasUserPurchasedField(userId, fieldKey);
     if (alreadyPurchased) {
-      return res.status(400).json({ message: "Field already purchased" });
+      return res.status(400).json({ message: "Field already purchased", alreadyUnlocked: true });
     }
 
     // SECURITY: Look up authoritative pricing from server-side configuration

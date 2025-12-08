@@ -139,6 +139,12 @@ export interface IStorage {
   getSubscriptionPlans(activeOnly?: boolean): Promise<SubscriptionPlan[]>;
   getSubscriptionPlanByPriceId(stripePriceId: string): Promise<SubscriptionPlan | undefined>;
   updateSubscriptionPlan(id: number, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan>;
+  
+  // Unified access control helpers
+  hasReportAccess(userId: string, scanId: number): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }>;
+  hasLlmsFieldAccess(userId: string, fieldKey: string): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }>;
+  hasRobotsFieldAccess(userId: string, fieldKey: string): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }>;
+  hasRecurringScanAccess(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -749,6 +755,77 @@ export class DatabaseStorage implements IStorage {
     
     if (!updated) throw new Error("Subscription plan not found");
     return updated;
+  }
+
+  // ============== Unified Access Control Helpers ==============
+
+  /**
+   * Check if user has access to full report details for a scan
+   * Access granted via: active subscription OR one-time report purchase
+   */
+  async hasReportAccess(userId: string, scanId: number): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }> {
+    // Check subscription first (most valuable)
+    const subscription = await this.getUserActiveSubscription(userId);
+    if (subscription) {
+      return { hasAccess: true, reason: 'subscription' };
+    }
+
+    // Check one-time purchase
+    const purchase = await this.getPurchaseByScanId(scanId);
+    if (purchase) {
+      return { hasAccess: true, reason: 'purchase' };
+    }
+
+    return { hasAccess: false, reason: 'none' };
+  }
+
+  /**
+   * Check if user has access to a premium LLMS field
+   * Access granted via: active subscription OR field purchase
+   */
+  async hasLlmsFieldAccess(userId: string, fieldKey: string): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }> {
+    // Check subscription first
+    const subscription = await this.getUserActiveSubscription(userId);
+    if (subscription) {
+      return { hasAccess: true, reason: 'subscription' };
+    }
+
+    // Check field purchase
+    const hasPurchased = await this.hasUserPurchasedField(userId, fieldKey);
+    if (hasPurchased) {
+      return { hasAccess: true, reason: 'purchase' };
+    }
+
+    return { hasAccess: false, reason: 'none' };
+  }
+
+  /**
+   * Check if user has access to a premium robots field
+   * Access granted via: active subscription OR field purchase
+   */
+  async hasRobotsFieldAccess(userId: string, fieldKey: string): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }> {
+    // Check subscription first
+    const subscription = await this.getUserActiveSubscription(userId);
+    if (subscription) {
+      return { hasAccess: true, reason: 'subscription' };
+    }
+
+    // Check field purchase
+    const hasPurchased = await this.hasUserPurchasedRobotsField(userId, fieldKey);
+    if (hasPurchased) {
+      return { hasAccess: true, reason: 'purchase' };
+    }
+
+    return { hasAccess: false, reason: 'none' };
+  }
+
+  /**
+   * Check if user has access to recurring scans feature
+   * This is subscription-only (no one-time purchase option)
+   */
+  async hasRecurringScanAccess(userId: string): Promise<boolean> {
+    const subscription = await this.getUserActiveSubscription(userId);
+    return !!subscription;
   }
 }
 

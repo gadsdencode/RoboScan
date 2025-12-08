@@ -158,7 +158,9 @@ export default function Dashboard() {
       const response = await fetch(url, { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
-        setScans(data);
+        // Handle new response format: { scans, meta } OR legacy array format
+        const scanData = Array.isArray(data) ? data : (data.scans || []);
+        setScans(scanData);
       }
     } catch (error) {
       console.error('Failed to fetch scans:', error);
@@ -886,6 +888,10 @@ export default function Dashboard() {
           onOpenPreferences={handleOpenPreferences}
           getFrequencyLabel={getFrequencyLabel}
           formatRelativeTime={formatRelativeTime}
+          onSubscribeClick={() => {
+            // Navigate to subscription page or open checkout
+            window.location.href = '/pricing';
+          }}
         />
 
         {/* Scans List */}
@@ -1171,6 +1177,10 @@ export default function Dashboard() {
           setSelectedScan(scan);
           setShowPaymentModal(true);
           setShowScanDetailsModal(false);
+        }}
+        onSubscribeClick={() => {
+          setShowScanDetailsModal(false);
+          window.location.href = '/pricing';
         }}
         isAdmin={user?.isAdmin}
       />

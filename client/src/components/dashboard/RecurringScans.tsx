@@ -1,4 +1,4 @@
-import { Repeat, Plus, Globe, Clock, Play, Pause, Settings, Trash2 } from "lucide-react";
+import { Repeat, Plus, Globe, Clock, Play, Pause, Settings, Trash2, Crown, Lock, Sparkles, Bell, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRecurringScanAccess } from "@/hooks/useAccessControl";
 
 export interface RecurringScan {
   id: number;
@@ -45,6 +46,7 @@ interface RecurringScansProps {
   onOpenPreferences: (scan: RecurringScan) => Promise<void>;
   getFrequencyLabel: (frequency: string) => string;
   formatRelativeTime: (date: string) => string;
+  onSubscribeClick?: () => void;
 }
 
 export function RecurringScans({
@@ -62,7 +64,81 @@ export function RecurringScans({
   onOpenPreferences,
   getFrequencyLabel,
   formatRelativeTime,
+  onSubscribeClick,
 }: RecurringScansProps) {
+  const { canCreateRecurringScans, requiresSubscription, isLoading } = useRecurringScanAccess();
+
+  // Show subscription gate for non-subscribers
+  if (requiresSubscription && !isLoading) {
+    return (
+      <Card className="p-6 bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20 mb-8 relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+        
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 rounded-lg bg-primary/20">
+              <Crown className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                Recurring Scans
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                  Guardian Feature
+                </Badge>
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-muted-foreground mb-6 max-w-lg">
+            Automate your security monitoring with recurring scans. Get notified when your 
+            robots.txt or llms.txt files change, ensuring your AI bot configurations stay optimal.
+          </p>
+
+          {/* Feature highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg border border-white/5">
+              <div className="p-1.5 rounded bg-green-500/20">
+                <Bell className="w-4 h-4 text-green-400" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Change Alerts</div>
+                <div className="text-xs text-muted-foreground">Real-time notifications</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg border border-white/5">
+              <div className="p-1.5 rounded bg-blue-500/20">
+                <Shield className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Daily/Weekly/Monthly</div>
+                <div className="text-xs text-muted-foreground">Flexible scheduling</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 bg-background/50 rounded-lg border border-white/5">
+              <div className="p-1.5 rounded bg-yellow-500/20">
+                <Zap className="w-4 h-4 text-yellow-400" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">2x XP Bonus</div>
+                <div className="text-xs text-muted-foreground">Level up faster</div>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={onSubscribeClick}
+            className="btn-cta"
+            data-testid="button-subscribe-recurring"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Upgrade to Guardian - $29/month
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card className="p-6 bg-card border-white/5 mb-8">
@@ -70,12 +146,17 @@ export function RecurringScans({
           <div className="flex items-center gap-2">
             <Repeat className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-bold">Recurring Scans</h2>
+            <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+              <Crown className="w-3 h-3 mr-1" />
+              Guardian
+            </Badge>
           </div>
           <Button
             onClick={() => setShowCreateRecurringDialog(true)}
             size="sm"
             className="bg-primary text-primary-foreground hover:bg-primary/90 btn-hover-scale"
             data-testid="button-create-recurring"
+            disabled={!canCreateRecurringScans}
           >
             <Plus className="w-4 h-4 mr-2" />
             New Recurring Scan
