@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Menu, X, Sparkles, Lock, Zap, FileSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,7 @@ const StepTracker = ({ currentStep, preflightStatus }: StepTrackerProps) => {
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 md:gap-4 mb-8">
+    <div className="flex items-center justify-center gap-2 md:gap-4">
       {steps.map((step, index) => {
         const state = getStepState(step.id);
         
@@ -137,17 +137,19 @@ const StepTracker = ({ currentStep, preflightStatus }: StepTrackerProps) => {
   );
 };
 
-// Enhanced Hero Component with Enterprise Aesthetic
+// Enhanced Hero Component with Enterprise Aesthetic - Product-Led Layout
 const Hero = ({ 
   onScan, 
   currentStep,
   isScanning,
-  preflightStatus
+  preflightStatus,
+  children // [NEW] Accept children (The Terminal)
 }: { 
   onScan: (url: string) => void;
   currentStep: ScanStep;
   isScanning: boolean;
   preflightStatus?: string;
+  children?: React.ReactNode;
 }) => {
   const [url, setUrl] = useState("");
 
@@ -157,104 +159,135 @@ const Hero = ({
   };
 
   return (
-    <section className="relative min-h-screen pt-20 flex items-center justify-center overflow-hidden">
-      {/* Abstract gradient mesh background */}
-      <div className="absolute inset-0 z-0">
+    <section className="relative min-h-screen pt-16 flex flex-col items-center">
+      {/* CRITICAL CSS FIX: 
+         Moved 'overflow-hidden' to this background div so 'sticky' positioning works.
+         The parent <section> must NOT have overflow-hidden for sticky to work.
+      */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5" />
         <div className="absolute inset-0 grid-bg opacity-20" />
       </div>
 
-      <div className="container relative z-10 px-6 py-20 flex flex-col items-center text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-8">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            New: LLMs.txt Support Live
-          </div>
-          
-          <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto">
-            Control How AI <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">Sees Your Site</span>
-          </h1>
-          
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            Generate, validate, and optimize <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">robots.txt</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">llms.txt</code> to ensure AI agents interact with your content exactly how you intend.
-          </p>
+      <div className="container relative z-10 px-6 py-12 flex flex-col items-center text-center max-w-5xl">
+        
+        {/* 1. COLLAPSIBLE HEADER: Use AnimatePresence to hide text when scanning starts */}
+        <AnimatePresence>
+          {!isScanning && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, height: 'auto' }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center overflow-hidden"
+            >
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-8">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                New: LLMs.txt Support Live
+              </div>
+              
+              <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto">
+                Control How AI <br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">Sees Your Site</span>
+              </h1>
+              
+              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+                Generate, validate, and optimize <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">robots.txt</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">llms.txt</code> to ensure AI agents interact with your content exactly how you intend.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Step Tracker */}
+        {/* 2. STICKY TRACKER: Keeps context visible while terminal runs */}
+        <div className="sticky top-16 z-30 w-full bg-background/80 backdrop-blur-md py-4 mb-8 rounded-b-xl border-b border-white/5 transition-all">
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
+        </div>
 
-          {/* Wizard-style Form */}
-          <motion.div
-            animate={{ 
-              scale: currentStep === 'input' ? 1 : 0.95,
-              opacity: currentStep === 'input' ? 1 : 0.7
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-              <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Search className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-bold text-lg mb-1">Step 1: Enter Your Website</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Start your AI readiness analysis by entering your domain
-                    </p>
-                  </div>
+        {/* Input Form - scales down when scanning to de-emphasize */}
+        <motion.div
+          className="w-full max-w-2xl mx-auto"
+          animate={{ 
+            scale: isScanning ? 0.95 : 1, 
+            opacity: isScanning ? 0.8 : 1 
+          }}
+          transition={{ duration: 0.3 }}
+        >
+          <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
+            <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Search className="w-5 h-5 text-primary" />
                 </div>
-                
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Input 
-                      placeholder="example.com" 
-                      className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      data-testid="input-url"
-                      disabled={isScanning}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    size="lg" 
-                    className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
-                    data-testid="button-scan"
-                    disabled={isScanning || !url}
-                  >
-                    {isScanning ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
-                        />
-                        Scanning...
-                      </>
-                    ) : (
-                      <>
-                        Begin Analysis
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
-                    )}
-                  </Button>
+                <div className="text-left flex-1">
+                  <h3 className="font-bold text-lg mb-1">Step 1: Enter Your Website</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Start your AI readiness analysis by entering your domain
+                  </p>
                 </div>
               </div>
-            </form>
-          </motion.div>
-          
+              
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Input 
+                    placeholder="example.com" 
+                    className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    data-testid="input-url"
+                    disabled={isScanning}
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  size="lg" 
+                  className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
+                  data-testid="button-scan"
+                  disabled={isScanning || !url}
+                >
+                  {isScanning ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
+                      />
+                      Scanning...
+                    </>
+                  ) : (
+                    <>
+                      Begin Analysis
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </form>
+        </motion.div>
+        
+        {!isScanning && (
           <p className="mt-6 text-xs text-muted-foreground">
             Free scan • No credit card required • Instant results
           </p>
-        </motion.div>
+        )}
+
+        {/* 3. TERMINAL INJECTION: Render children here */}
+        <AnimatePresence>
+          {children && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.4 }}
+              className="w-full mt-8"
+            >
+              {children}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );
@@ -397,169 +430,201 @@ const TerminalDemo = ({
   if (!isScanning && lines.length === 0) return null;
 
   return (
-    <motion.section 
+    <motion.div 
       id="terminal"
-      initial={{ opacity: 0, y: 50 }}
+      initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="py-12 md:py-20 bg-card/30 border-y border-border"
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="w-full"
     >
-      <div className="container mx-auto px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="text-center mb-8"
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-4">
-            <Zap className="w-3 h-3" />
-            Step 2: Live Analysis
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold">Real-Time Scan Results</h2>
-          <p className="text-muted-foreground mt-2">
-            Watch as we analyze your site's AI readiness
-          </p>
-        </motion.div>
-
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
-          <motion.div 
-            className="flex-1 space-y-6"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <h3 className="text-2xl font-bold">What We're Checking:</h3>
-            
-            <div className="grid gap-4">
-              {[
-                { 
-                  title: "1. Bot Identification", 
-                  desc: "Detecting which AI crawlers can access your site",
-                  icon: <Bot className="w-5 h-5" />
-                },
-                { 
-                  title: "2. Permission Validation", 
-                  desc: "Analyzing robots.txt rules and agent permissions",
-                  icon: <Shield className="w-5 h-5" />
-                },
-                { 
-                  title: "3. File Generation", 
-                  desc: "Preparing optimized configurations for AI agents",
-                  icon: <FileCode className="w-5 h-5" />
-                }
-              ].map((item, i) => (
-                <motion.div 
-                  key={i} 
-                  className="flex gap-4 p-4 rounded-xl bg-card border border-border card-hover"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 + (i * 0.1) }}
-                >
-                  <div className="mt-1 bg-primary/10 p-2 rounded-lg h-fit">
-                    {item.icon}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-primary">{item.title}</h4>
-                    <p className="text-sm text-muted-foreground">{item.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          <motion.div 
-            className="flex-1 w-full space-y-4"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <Card className="bg-card border border-border p-0 overflow-hidden shadow-2xl">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-green-500/50" />
-                </div>
-                <div className="ml-2 text-xs text-muted-foreground font-mono flex items-center gap-2">
-                  <Terminal className="w-3 h-3" />
-                  roboscan-cli — v1.0.4
-                </div>
-              </div>
-              <div className="p-6 font-mono text-sm min-h-[300px] flex flex-col" data-testid="terminal-output">
-                {lines.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-muted-foreground/50">
-                    Initializing scan...
-                  </div>
-                ) : (
-                  lines.map((line, i) => {
-                    if (!line) return null;
-                    return (
-                      <motion.div 
-                        key={i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`mb-1 ${
-                          line.includes("[ERROR]") ? "text-red-400" : 
-                          line.includes("[WARN]") ? "text-yellow-400" : 
-                          line.includes("[SUCCESS]") ? "text-green-400" : 
-                          line.includes(">") ? "text-primary" : "text-muted-foreground"
-                        }`}
-                      >
-                        {line}
-                      </motion.div>
-                    );
-                  })
-                )}
-                {isScanning && lines.length > 0 && !lines[lines.length - 1]?.includes("DONE") && !lines[lines.length - 1]?.includes("aborted") && (
-                  <motion.span 
-                    animate={{ opacity: [0, 1, 0] }} 
-                    transition={{ repeat: Infinity, duration: 0.8 }}
-                    className="inline-block w-2 h-4 bg-primary ml-1"
-                  />
-                )}
-              </div>
-            </Card>
-
-            <AnimatePresence>
-              {isComplete && scanResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                  className="p-6 bg-card border border-primary/30 rounded-xl"
-                  data-testid="upgrade-cta"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-primary/20 rounded-xl">
-                      <Sparkles className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg mb-2">Scan Complete! Ready for Step 3?</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Get actionable recommendations, optimized files ready to deploy, and SEO impact analysis for just <span className="text-primary font-bold">$9.99</span>
-                      </p>
-                      <div className="flex flex-wrap gap-2 text-xs mb-4">
-                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded">✓ Priority action plan</span>
-                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded">✓ Ready-to-use files</span>
-                        <span className="px-2 py-1 bg-primary/10 border border-primary/20 rounded">✓ Instant delivery</span>
-                      </div>
-                      <Button 
-                        className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
-                        onClick={onUnlockReport}
-                        data-testid="button-get-report"
-                      >
-                        <Lock className="w-4 h-4 mr-2" />
-                        Unlock Optimization Report
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
+      {/* Embedded header - more compact since we're inside Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="text-center mb-6"
+      >
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-mono mb-3">
+          <Zap className="w-3 h-3" />
+          Step 2: Live Analysis
         </div>
+        <h2 className="text-2xl md:text-3xl font-bold">Real-Time Scan Results</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Watch as we analyze your site's AI readiness
+        </p>
+      </motion.div>
+
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
+        {/* LEFT COLUMN: Shows checklist during scan, CTA after completion */}
+        <div className="flex-1 flex flex-col">
+          <AnimatePresence mode="wait">
+            {!isComplete ? (
+              /* Checklist - shown during scanning */
+              <motion.div 
+                key="checklist"
+                className="space-y-6 h-full"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <h3 className="text-2xl font-bold">What We're Checking:</h3>
+                
+                <div className="grid gap-4">
+                  {[
+                    { 
+                      title: "1. Bot Identification", 
+                      desc: "Detecting which AI crawlers can access your site",
+                      icon: <Bot className="w-5 h-5" />
+                    },
+                    { 
+                      title: "2. Permission Validation", 
+                      desc: "Analyzing robots.txt rules and agent permissions",
+                      icon: <Shield className="w-5 h-5" />
+                    },
+                    { 
+                      title: "3. File Generation", 
+                      desc: "Preparing optimized configurations for AI agents",
+                      icon: <FileCode className="w-5 h-5" />
+                    }
+                  ].map((item, i) => (
+                    <motion.div 
+                      key={i} 
+                      className="flex gap-4 p-4 rounded-xl bg-card border border-border card-hover"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 + (i * 0.1) }}
+                    >
+                      <div className="mt-1 bg-primary/10 p-2 rounded-lg h-fit">
+                        {item.icon}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-primary">{item.title}</h4>
+                        <p className="text-sm text-muted-foreground">{item.desc}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            ) : (
+              /* CTA - shown after scan completes (BESIDE the terminal, not under it) */
+              <motion.div
+                key="cta"
+                initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                transition={{ duration: 0.4 }}
+                className="h-full flex flex-col"
+                data-testid="upgrade-cta"
+              >
+                <div className="p-6 bg-card border-2 border-primary/40 rounded-xl shadow-lg shadow-primary/10 flex-1 flex flex-col">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 bg-primary/20 rounded-xl">
+                      <Sparkles className="w-7 h-7 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-primary font-mono uppercase tracking-wider">Step 3</p>
+                      <h3 className="font-bold text-xl">Scan Complete!</h3>
+                    </div>
+                  </div>
+                  
+                  <p className="text-muted-foreground mb-6 leading-relaxed">
+                    Get your <span className="text-foreground font-semibold">full optimization report</span> with actionable recommendations, ready-to-deploy files, and SEO impact analysis.
+                  </p>
+                  
+                  <div className="space-y-3 mb-6 flex-1">
+                    {[
+                      "Priority action plan",
+                      "Ready-to-use robots.txt & llms.txt",
+                      "AI crawler compatibility matrix",
+                      "Instant PDF download"
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-auto">
+                    <div className="text-center mb-4">
+                      <span className="text-3xl font-bold text-primary">$9.99</span>
+                      <span className="text-muted-foreground text-sm ml-2">one-time</span>
+                    </div>
+                    <Button 
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-bold h-12 text-base"
+                      onClick={onUnlockReport}
+                      data-testid="button-get-report"
+                    >
+                      <Lock className="w-4 h-4 mr-2" />
+                      Unlock Full Report
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Secure payment • Instant delivery
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* RIGHT COLUMN: Terminal output */}
+        <motion.div 
+          className="flex-1 w-full"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="bg-card border border-border p-0 overflow-hidden shadow-2xl h-full">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-red-500/50" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
+                <div className="w-3 h-3 rounded-full bg-green-500/50" />
+              </div>
+              <div className="ml-2 text-xs text-muted-foreground font-mono flex items-center gap-2">
+                <Terminal className="w-3 h-3" />
+                roboscan-cli — v1.0.4
+              </div>
+            </div>
+            <div className="p-6 font-mono text-sm min-h-[300px] max-h-[400px] overflow-y-auto flex flex-col" data-testid="terminal-output">
+              {lines.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-muted-foreground/50">
+                  Initializing scan...
+                </div>
+              ) : (
+                lines.map((line, i) => {
+                  if (!line) return null;
+                  return (
+                    <motion.div 
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`mb-1 ${
+                        line.includes("[ERROR]") ? "text-red-400" : 
+                        line.includes("[WARN]") ? "text-yellow-400" : 
+                        line.includes("[SUCCESS]") ? "text-green-400" : 
+                        line.includes(">") ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {line}
+                    </motion.div>
+                  );
+                })
+              )}
+              {isScanning && lines.length > 0 && !lines[lines.length - 1]?.includes("DONE") && !lines[lines.length - 1]?.includes("aborted") && (
+                <motion.span 
+                  animate={{ opacity: [0, 1, 0] }} 
+                  transition={{ repeat: Infinity, duration: 0.8 }}
+                  className="inline-block w-2 h-4 bg-primary ml-1"
+                />
+              )}
+            </div>
+          </Card>
+        </motion.div>
       </div>
-    </motion.section>
+    </motion.div>
   );
 };
 
@@ -680,7 +745,6 @@ export default function Home() {
   const [showPremiumReport, setShowPremiumReport] = useState(false);
   const [premiumReportData, setPremiumReportData] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState<ScanStep>('input');
-  const terminalRef = useRef<HTMLDivElement>(null);
 
   const handleScan = (url: string) => {
     setTargetUrl(url);
@@ -688,16 +752,7 @@ export default function Home() {
     setCurrentScanId(null);
     setShowPremiumReport(false);
     setCurrentStep('scanning');
-    
-    // Smooth scroll to terminal with offset for better UX
-    setTimeout(() => {
-      const terminalSection = document.getElementById("terminal");
-      if (terminalSection) {
-        const yOffset = -100; // Offset for navbar
-        const y = terminalSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
-        window.scrollTo({ top: y, behavior: "smooth" });
-      }
-    }, 100);
+    // REMOVED: Manual scrollTo logic - header now collapses, terminal slides into view naturally
   };
 
   const handleScanComplete = useCallback((scanId: number) => {
@@ -745,15 +800,14 @@ export default function Home() {
         </div>
       ) : (
         <>
+          {/* PASS TERMINAL AS CHILD - visually couples the action (Scan) with the result (Terminal) */}
           <Hero 
             onScan={handleScan} 
             currentStep={currentStep}
             isScanning={isScanning}
             preflightStatus={isScanning ? "Resolving DNS..." : undefined}
-          />
-          
-          {/* Terminal appears immediately after Hero when scanning */}
-          <div ref={terminalRef}>
+          >
+            {/* Conditionally render TerminalDemo inside Hero */}
             <TerminalDemo 
               isScanning={isScanning} 
               targetUrl={targetUrl} 
@@ -761,10 +815,10 @@ export default function Home() {
               onUnlockReport={handleUnlockReport}
               onScanError={handleScanError}
             />
-          </div>
+          </Hero>
           
-          {/* How It Works section - shown before any scanning */}
-          {!isScanning && (
+          {/* Hide "How It Works" if scanning to reduce noise */}
+          {!isScanning && currentStep === 'input' && (
             <HowItWorks />
           )}
         </>
