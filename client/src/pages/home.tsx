@@ -191,11 +191,11 @@ const Hero = ({
               
               <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto">
                 Control How AI <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">Sees Your Site</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">Discovers Your Site</span>
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-                Generate, validate, and optimize <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">robots.txt</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">llms.txt</code> to ensure AI agents interact with your content exactly how you intend.
+                Generate, validate, and optimize <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">robots.txt</code> and <code className="text-primary bg-primary/10 px-1 py-0.5 rounded">llms.txt</code> to ensure AI agents discover and interact with your content exactly how you intend.
               </p>
             </motion.div>
           )}
@@ -727,11 +727,10 @@ const Footer = () => (
       <div className="flex gap-8 text-sm text-muted-foreground">
         <a href="#" className="hover:text-primary">Privacy</a>
         <a href="#" className="hover:text-primary">Terms</a>
-        <a href="#" className="hover:text-primary">Twitter</a>
-        <a href="#" className="hover:text-primary">GitHub</a>
+        <a href="https://overture-systems.com" className="hover:text-primary">Overture Systems</a>
       </div>
       <div className="text-xs text-muted-foreground/50">
-        © 2024 Roboscan Inc. All rights reserved.
+        © 2025 Overture Systems Inc. All rights reserved.
       </div>
     </div>
   </footer>
