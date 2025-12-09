@@ -18,6 +18,15 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Pre-fill email from URL query param (when redirected from login)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get("email");
+    if (emailParam) {
+      setEmail(decodeURIComponent(emailParam));
+    }
+  }, []);
+
   // Check if user is already authenticated
   useEffect(() => {
     const checkAuth = async () => {

@@ -89,6 +89,53 @@ function validateEmail(email: string): boolean {
 export async function setupAuth(app: Express) {
   app.use(cookieParser());
 
+  // Check email status - determines if user exists and has password set
+  app.post("/api/auth/check-email", async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || typeof email !== "string") {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      if (!validateEmail(email)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      const user = await storage.getUser(normalizedEmail);
+      
+      if (!user) {
+        // User doesn't exist - needs to register
+        return res.json({ 
+          exists: false, 
+          hasPassword: false,
+          action: "register"
+        });
+      }
+
+      if (!user.passwordHash) {
+        // Legacy user - needs to set password
+        return res.json({ 
+          exists: true, 
+          hasPassword: false,
+          action: "set-password"
+        });
+      }
+
+      // User exists with password - normal login
+      return res.json({ 
+        exists: true, 
+        hasPassword: true,
+        action: "login"
+      });
+    } catch (error) {
+      console.error("[Auth] Check email error:", error);
+      res.status(500).json({ message: "Failed to check email" });
+    }
+  });
+
   // Email/password login
   app.post("/api/auth/login", async (req, res) => {
     let responseSent = false;
