@@ -177,45 +177,68 @@ const Hero = ({
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
         </div>
 
-        {/* Interactive User Type Toggle */}
+        {/* Interactive User Type Toggle - High Visibility Cards */}
         {currentStep === 'input' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
+            className="w-full max-w-xl mx-auto mb-8"
           >
-            <p className="text-sm text-muted-foreground mb-3">I am a...</p>
-            <div className="inline-flex items-center bg-card border border-border rounded-full p-1 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Business Option */}
               <button
                 type="button"
                 onClick={() => setUserType('business')}
-                className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                  userType === 'business' 
-                    ? 'bg-primary text-primary-foreground shadow-md' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
+                className={`
+                  relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 group
+                  ${userType === 'business' 
+                    ? 'border-primary bg-primary/5 text-primary shadow-md ring-1 ring-primary/20 scale-[1.02]' 
+                    : 'border-border bg-card/50 text-muted-foreground hover:border-primary/30 hover:bg-card hover:text-foreground'}
+                `}
               >
-                <User className="w-4 h-4" />
-                Business Owner
+                <div className="flex items-center gap-2 mb-1.5">
+                  <User className={`w-5 h-5 ${userType === 'business' ? 'fill-current' : ''}`} />
+                  <span className="font-bold text-lg tracking-tight">Business Owner</span>
+                </div>
+                <span className="text-xs font-medium opacity-80">
+                  Optimizing a Single Website
+                </span>
+                
+                {/* Active Checkmark Badge */}
+                {userType === 'business' && (
+                  <div className="absolute top-2 right-2 text-primary">
+                    <CheckCircle className="w-4 h-4" />
+                  </div>
+                )}
               </button>
+
+              {/* Agency Option */}
               <button
                 type="button"
                 onClick={() => setUserType('agency')}
-                className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                  userType === 'agency' 
-                    ? 'bg-primary text-primary-foreground shadow-md' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
+                className={`
+                  relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 group
+                  ${userType === 'agency' 
+                    ? 'border-blue-500 bg-blue-500/5 text-blue-500 shadow-md ring-1 ring-blue-500/20 scale-[1.02]' 
+                    : 'border-border bg-card/50 text-muted-foreground hover:border-blue-500/30 hover:bg-card hover:text-foreground'}
+                `}
               >
-                <Building2 className="w-4 h-4" />
-                Agency / Consultant
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Building2 className={`w-5 h-5 ${userType === 'agency' ? 'fill-current' : ''}`} />
+                  <span className="font-bold text-lg tracking-tight">Agency</span>
+                </div>
+                <span className="text-xs font-medium opacity-80">
+                  Managing Multiple Clients
+                </span>
+
+                {/* Active Checkmark Badge */}
+                {userType === 'agency' && (
+                  <div className="absolute top-2 right-2 text-blue-500">
+                    <CheckCircle className="w-4 h-4" />
+                  </div>
+                )}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {userType === 'business' 
-                ? '✨ Perfect for single websites and personal brands'
-                : '🚀 Ideal for managing multiple client websites'}
-            </p>
           </motion.div>
         )}
 
