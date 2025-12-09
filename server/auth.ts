@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage.js";
 import cookieParser from "cookie-parser";
 
@@ -57,17 +58,156 @@ function clearAuthCookie(res: any) {
   });
 }
 
+// Password hashing utilities
+const SALT_ROUNDS = 12;
+
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
+// Password validation
+function validatePassword(password: string): { valid: boolean; message?: string } {
+  if (!password || typeof password !== "string") {
+    return { valid: false, message: "Password is required" };
+  }
+  if (password.length < 8) {
+    return { valid: false, message: "Password must be at least 8 characters" };
+  }
+  return { valid: true };
+}
+
+// Email validation
+function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 export async function setupAuth(app: Express) {
   app.use(cookieParser());
 
-  // Simple email login - creates or gets user
+  // Email/password login
   app.post("/api/auth/login", async (req, res) => {
-    // Ensure response is always sent, even if error occurs
+    let responseSent = false;
+    const sendError = (status: number, message: string, code?: string, error?: any): void => {
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        console.error(`[Auth] Login error (${status}):`, message, error);
+        try {
+          res.status(status).json({ 
+            message,
+            code,
+            ...(process.env.NODE_ENV === "development" && error ? { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } : {})
+          });
+        } catch (sendErr) {
+          console.error("[Auth] Failed to send error response:", sendErr);
+        }
+      }
+    };
+
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || typeof email !== "string") {
+        sendError(400, "Email is required");
+        return;
+      }
+
+      if (!password || typeof password !== "string") {
+        sendError(400, "Password is required");
+        return;
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      console.log(`[Auth] Attempting login for: ${normalizedEmail}`);
+      
+      // Get user
+      let user: any;
+      try {
+        user = await storage.getUser(normalizedEmail);
+        console.log(`[Auth] getUser result:`, user ? "found" : "not found");
+      } catch (dbError) {
+        console.error("[Auth] Database error in getUser:", dbError);
+        sendError(500, "Database connection failed", undefined, dbError);
+        return;
+      }
+      
+      // User doesn't exist - need to register
+      if (!user) {
+        sendError(401, "Invalid email or password. If you don't have an account, please register first.");
+        return;
+      }
+
+      // User exists but has no password set (legacy user)
+      if (!user.passwordHash) {
+        sendError(403, "Please set a password for your account", "PASSWORD_REQUIRED");
+        return;
+      }
+
+      // Verify password
+      const passwordValid = await verifyPassword(password, user.passwordHash);
+      if (!passwordValid) {
+        sendError(401, "Invalid email or password");
+        return;
+      }
+
+      // Create JWT token
+      let token: string;
+      try {
+        token = createToken({
+          userId: user.id,
+          email: user.email || normalizedEmail,
+          name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
+        });
+      } catch (tokenError) {
+        console.error("[Auth] Token creation error:", tokenError);
+        sendError(500, "Failed to create authentication token", undefined, tokenError);
+        return;
+      }
+
+      // Set cookie
+      try {
+        setAuthCookie(res, token);
+      } catch (cookieError) {
+        console.error("[Auth] Cookie setting error:", cookieError);
+        sendError(500, "Failed to set authentication cookie", undefined, cookieError);
+        return;
+      }
+
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        try {
+          res.json({ 
+            success: true, 
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              passwordSetAt: user.passwordSetAt,
+            }
+          });
+        } catch (sendErr) {
+          console.error("[Auth] Failed to send success response:", sendErr);
+        }
+      }
+    } catch (error) {
+      console.error("[Auth] Unexpected login error:", error);
+      sendError(500, "Login failed", undefined, error);
+    }
+  });
+
+  // Register new user with email/password
+  app.post("/api/auth/register", async (req, res) => {
     let responseSent = false;
     const sendError = (status: number, message: string, error?: any): void => {
       if (!responseSent && !res.headersSent) {
         responseSent = true;
-        console.error(`[Auth] Login error (${status}):`, message, error);
+        console.error(`[Auth] Registration error (${status}):`, message, error);
         try {
           res.status(status).json({ 
             message,
@@ -80,44 +220,78 @@ export async function setupAuth(app: Express) {
     };
 
     try {
-      const { email } = req.body;
+      const { email, password } = req.body;
       
+      // Validate email
       if (!email || typeof email !== "string") {
         sendError(400, "Email is required");
         return;
       }
 
+      if (!validateEmail(email)) {
+        sendError(400, "Invalid email format");
+        return;
+      }
+
+      // Validate password
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        sendError(400, passwordValidation.message || "Invalid password");
+        return;
+      }
+
       const normalizedEmail = email.toLowerCase().trim();
       
-      console.log(`[Auth] Attempting login for: ${normalizedEmail}`);
+      console.log(`[Auth] Attempting registration for: ${normalizedEmail}`);
       
-      // Get or create user
-      let user: any;
+      // Check if user already exists
+      let existingUser: any;
       try {
-        user = await storage.getUser(normalizedEmail);
-        console.log(`[Auth] getUser result:`, user ? "found" : "not found");
+        existingUser = await storage.getUser(normalizedEmail);
       } catch (dbError) {
         console.error("[Auth] Database error in getUser:", dbError);
         sendError(500, "Database connection failed", dbError);
         return;
       }
       
-      if (!user) {
-        try {
-          console.log(`[Auth] Creating new user: ${normalizedEmail}`);
-          user = await storage.upsertUser({
-            id: normalizedEmail,
-            email: normalizedEmail,
-            firstName: null,
-            lastName: null,
-            profileImageUrl: null,
-          });
-          console.log(`[Auth] User created successfully`);
-        } catch (dbError) {
-          console.error("[Auth] Database error in upsertUser:", dbError);
-          sendError(500, "Failed to create user account", dbError);
-          return;
+      if (existingUser) {
+        // If user exists but has no password, they're a legacy user
+        if (!existingUser.passwordHash) {
+          sendError(400, "An account with this email already exists. Please use the login page and set your password.");
+        } else {
+          sendError(400, "An account with this email already exists. Please login instead.");
         }
+        return;
+      }
+
+      // Hash password
+      let passwordHash: string;
+      try {
+        passwordHash = await hashPassword(password);
+      } catch (hashError) {
+        console.error("[Auth] Password hashing error:", hashError);
+        sendError(500, "Failed to process password", hashError);
+        return;
+      }
+
+      // Create new user with password
+      let user: any;
+      try {
+        console.log(`[Auth] Creating new user: ${normalizedEmail}`);
+        user = await storage.upsertUser({
+          id: normalizedEmail,
+          email: normalizedEmail,
+          firstName: null,
+          lastName: null,
+          profileImageUrl: null,
+          passwordHash,
+          passwordSetAt: new Date(),
+        });
+        console.log(`[Auth] User created successfully`);
+      } catch (dbError) {
+        console.error("[Auth] Database error in upsertUser:", dbError);
+        sendError(500, "Failed to create user account", dbError);
+        return;
       }
 
       if (!user) {
@@ -158,6 +332,7 @@ export async function setupAuth(app: Express) {
               email: user.email,
               firstName: user.firstName,
               lastName: user.lastName,
+              passwordSetAt: user.passwordSetAt,
             }
           });
         } catch (sendErr) {
@@ -165,8 +340,133 @@ export async function setupAuth(app: Express) {
         }
       }
     } catch (error) {
-      console.error("[Auth] Unexpected login error:", error);
-      sendError(500, "Login failed", error);
+      console.error("[Auth] Unexpected registration error:", error);
+      sendError(500, "Registration failed", error);
+    }
+  });
+
+  // Set password for existing users (legacy users without password)
+  app.post("/api/auth/set-password", async (req, res) => {
+    let responseSent = false;
+    const sendError = (status: number, message: string, error?: any): void => {
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        console.error(`[Auth] Set password error (${status}):`, message, error);
+        try {
+          res.status(status).json({ 
+            message,
+            ...(process.env.NODE_ENV === "development" && error ? { error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined } : {})
+          });
+        } catch (sendErr) {
+          console.error("[Auth] Failed to send error response:", sendErr);
+        }
+      }
+    };
+
+    try {
+      const { email, password } = req.body;
+      
+      // Validate email
+      if (!email || typeof email !== "string") {
+        sendError(400, "Email is required");
+        return;
+      }
+
+      // Validate password
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        sendError(400, passwordValidation.message || "Invalid password");
+        return;
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      console.log(`[Auth] Setting password for: ${normalizedEmail}`);
+      
+      // Get user
+      let user: any;
+      try {
+        user = await storage.getUser(normalizedEmail);
+      } catch (dbError) {
+        console.error("[Auth] Database error in getUser:", dbError);
+        sendError(500, "Database connection failed", dbError);
+        return;
+      }
+      
+      if (!user) {
+        sendError(404, "User not found. Please register for a new account.");
+        return;
+      }
+
+      // If user already has a password, don't allow this endpoint
+      if (user.passwordHash) {
+        sendError(400, "Password is already set. Use the login page to sign in.");
+        return;
+      }
+
+      // Hash password
+      let passwordHash: string;
+      try {
+        passwordHash = await hashPassword(password);
+      } catch (hashError) {
+        console.error("[Auth] Password hashing error:", hashError);
+        sendError(500, "Failed to process password", hashError);
+        return;
+      }
+
+      // Update user with password
+      try {
+        user = await storage.updateUserPassword(normalizedEmail, passwordHash);
+        console.log(`[Auth] Password set successfully for: ${normalizedEmail}`);
+      } catch (dbError) {
+        console.error("[Auth] Database error updating password:", dbError);
+        sendError(500, "Failed to set password", dbError);
+        return;
+      }
+
+      // Create JWT token
+      let token: string;
+      try {
+        token = createToken({
+          userId: user.id,
+          email: user.email || normalizedEmail,
+          name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : undefined,
+        });
+      } catch (tokenError) {
+        console.error("[Auth] Token creation error:", tokenError);
+        sendError(500, "Failed to create authentication token", tokenError);
+        return;
+      }
+
+      // Set cookie
+      try {
+        setAuthCookie(res, token);
+      } catch (cookieError) {
+        console.error("[Auth] Cookie setting error:", cookieError);
+        sendError(500, "Failed to set authentication cookie", cookieError);
+        return;
+      }
+
+      if (!responseSent && !res.headersSent) {
+        responseSent = true;
+        try {
+          res.json({ 
+            success: true, 
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              passwordSetAt: user.passwordSetAt,
+            }
+          });
+        } catch (sendErr) {
+          console.error("[Auth] Failed to send success response:", sendErr);
+        }
+      }
+    } catch (error) {
+      console.error("[Auth] Unexpected set-password error:", error);
+      sendError(500, "Failed to set password", error);
     }
   });
 
@@ -191,7 +491,9 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "User not found" });
       }
 
-      res.json(user);
+      // Return user data without sensitive fields
+      const { passwordHash, ...safeUser } = user;
+      res.json(safeUser);
     } catch (error) {
       console.error("Get user error:", error);
       res.status(500).json({ message: "Failed to get user" });

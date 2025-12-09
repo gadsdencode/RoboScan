@@ -49,6 +49,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserGamificationStats(userId: string, xp: number, level: number): Promise<User>;
+  updateUserPassword(userId: string, passwordHash: string): Promise<User>;
   
   // Scan operations
   createScan(scan: InsertScan): Promise<Scan>;
@@ -189,6 +190,21 @@ export class DatabaseStorage implements IStorage {
       .set({ 
         xp, 
         level, 
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+      
+    if (!updated) throw new Error("User not found");
+    return updated;
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string): Promise<User> {
+    const [updated] = await db
+      .update(users)
+      .set({ 
+        passwordHash, 
+        passwordSetAt: new Date(),
         updatedAt: new Date() 
       })
       .where(eq(users.id, userId))

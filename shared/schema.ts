@@ -48,6 +48,10 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   
+  // Password authentication
+  passwordHash: varchar("password_hash"),
+  passwordSetAt: timestamp("password_set_at"),
+  
   // Stripe customer ID for subscription management
   stripeCustomerId: varchar("stripe_customer_id").unique(),
   

@@ -9,6 +9,8 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
+import Register from "@/pages/register";
+import SetPassword from "@/pages/set-password";
 import LLMsBuilder from "@/pages/llms-builder";
 import RobotsBuilder from "@/pages/robots-builder";
 import SitemapBuilder from "@/pages/sitemap-builder";
@@ -25,6 +27,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/set-password" component={SetPassword} />
       <Route path="/">
         {isLoading || !isAuthenticated ? <Home /> : <Dashboard />}
       </Route>
