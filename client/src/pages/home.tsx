@@ -153,8 +153,12 @@ const Hero = ({
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-cyan-400">AI Era</span>
               </h1>
               
+              <p className="text-2xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
+                Get discovered by the <span className="text-foreground font-semibold">Big 7 LLMs.</span> <br />
+              </p>
+
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
-                Get discovered by the <span className="text-foreground font-semibold">Big 7 LLMs</span> — OpenAI, Google, Anthropic, Meta, Microsoft, Mistral & Perplexity. We generate the <span className="text-primary font-semibold">8 technical files</span> your site needs to be found, cited, and ranked by AI.
+                We audit your current setup, benchmark competitor strategies, and generate the <span className="text-primary font-semibold">8 essential files</span> required for AI discovery, citation, and ranking.
               </p>
 
               {/* Big 7 LLM logos/badges */}
@@ -873,43 +877,43 @@ const ValueProposition = ({ userType }: { userType: 'business' | 'agency' }) => 
 
   // Dynamic content based on user type
   const content = userType === 'business' ? {
-    badge: "The ROI is Clear",
+    badge: "Maximize Efficiency",
     badgeIcon: <TrendingUp className="w-3 h-3" />,
-    headline: "Stop Wasting Hours Learning Specs.",
-    subheadline: "Get AI-Ready in 2.3 Minutes.",
-    description: "AI standards are evolving fast. You could spend countless hours researching file formats, syntax rules, and best practices — or let RoboScan handle it instantly.",
+    headline: "Eliminate the Technical Guesswork.",
+    subheadline: "Deploy AI Standards Instantly.",
+    description: "AI standards evolve rapidly. Avoid spending hours decoding syntax rules and file formats. RoboScan standardizes your deployment automatically.",
     comparisonLeft: {
-      title: "DIY Approach",
-      items: ["4-8 hours of research", "High error risk", "No update notifications"]
+      title: "Manual Implementation",
+      items: ["4-8 hours research/setup", "Risk of syntax errors", "No version control"]
     },
     comparisonRight: {
-      title: "RoboScan",
-      items: ["2.3 minutes", "100% validated syntax", "Auto-update alerts"]
+      title: "RoboScan Automation",
+      items: ["Instant generation", "Schema-validated syntax", "Real-time compliance updates"]
     },
-    pricingLabel: "Your Investment",
+    pricingLabel: "Standard License",
     pricingValue: "$9.99",
     pricingSubtext: "one-time",
-    returnLabel: "Your Return",
-    returnValue: "Found by AI Forever"
+    returnLabel: "Key Outcome",
+    returnValue: "Continuous AI Discoverability"
   } : {
-    badge: "Scale Your Services",
+    badge: "Operational Scale",
     badgeIcon: <Zap className="w-3 h-3" />,
-    headline: "Scale Your SEO Agency into the AI Era.",
-    subheadline: "Unlimited Client Reports in Minutes.",
-    description: "Don't spend hours manually auditing client sites. Generate comprehensive AI-readiness reports in minutes and upsell technical implementation services.",
+    headline: "Modernize Your Service Offerings.",
+    subheadline: "Generate Client Audits at Scale.",
+    description: "Eliminate manual auditing bottlenecks. Generate comprehensive technical reports in seconds to unlock new high-margin implementation services.",
     comparisonLeft: {
       title: "Manual Audits",
-      items: ["2-4 hours per client", "Inconsistent quality", "Hard to scale"]
+      items: ["2-4 hours per client", "Inconsistent output", "Bottlenecked operations"]
     },
     comparisonRight: {
-      title: "RoboScan Automated",
-      items: ["2.3 minutes per client", "White-label ready", "Unlimited scans"]
+      title: "Automated Platform",
+      items: ["Instant generation", "White-label reports", "Unlimited volume"]
     },
-    pricingLabel: "Monthly Investment",
+    pricingLabel: "Agency Plan",
     pricingValue: "$29",
     pricingSubtext: "/month",
-    returnLabel: "Your Return",
-    returnValue: "Recurring Revenue"
+    returnLabel: "Business Impact",
+    returnValue: "New RaaS Revenue Streams"
   };
 
   return (
