@@ -7,6 +7,7 @@ import { z } from "zod";
 
 export const scanRequestSchema = z.object({
   url: z.string().min(1, "URL is required"),
+  tags: z.array(z.string()).optional(),
 });
 
 export const createPaymentSchema = z.object({

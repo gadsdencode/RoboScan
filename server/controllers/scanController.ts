@@ -109,7 +109,7 @@ router.get('/scans', isAuthenticated, async (req: any, res: Response) => {
  */
 router.post('/', async (req: any, res: Response) => {
   try {
-    const { url } = scanRequestSchema.parse(req.body);
+    const { url, tags } = scanRequestSchema.parse(req.body);
 
     // Safely check authentication without requiring middleware
     const isAuth = checkAuthentication(req);
@@ -148,7 +148,7 @@ router.post('/', async (req: any, res: Response) => {
       id: 0,
       userId,
       createdAt: new Date(),
-      tags: [],
+      tags: tags || [],
       score: 0,
       // Ensure all new fields are included for score calculation
       sitemapXmlFound: result.sitemapXmlFound ?? false,
@@ -184,6 +184,7 @@ router.post('/', async (req: any, res: Response) => {
       errors: result.errors,
       warnings: result.warnings,
       score,
+      tags: tags || [],
     });
 
     let gamificationUpdates = null;

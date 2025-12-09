@@ -2,22 +2,27 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import { calculateLevel } from "@shared/gamification";
 
+interface ScanParams {
+  url: string;
+  tags?: string[];
+}
+
 export function useScan() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (url: string) => {
+    mutationFn: async ({ url, tags }: ScanParams) => {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, tags }),
         credentials: "include",
       });
       if (!res.ok) throw new Error("Scan failed");
       return res.json();
     },
     // [OPTIMISTIC UI] Update HUD instantly
-    onMutate: async (newUrl) => {
+    onMutate: async ({ url: newUrl }) => {
       // 1. Cancel outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: ["/api/auth/user"] });
 
@@ -42,7 +47,7 @@ export function useScan() {
       return { previousUser };
     },
     // [ROLLBACK] If error, revert to snapshot
-    onError: (err, newUrl, context) => {
+    onError: (err, { url: newUrl }, context) => {
       if (context?.previousUser) {
         queryClient.setQueryData(["/api/auth/user"], context.previousUser);
       }

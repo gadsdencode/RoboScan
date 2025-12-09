@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, HelpCircle, Trophy, AlertCircle, LogOut, Search, ArrowRight, Settings, GitCompare } from "lucide-react";
+import { Bell, HelpCircle, Trophy, AlertCircle, LogOut, Search, ArrowRight, Settings, GitCompare, Activity, Users, Gauge } from "lucide-react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { dashboardTourSteps } from "@/lib/tour-config";
@@ -103,6 +103,12 @@ export default function Dashboard() {
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
+
+  // Action Deck state - for tagging scans on creation
+  const [selectedScanTag, setSelectedScanTag] = useState<string>("default");
+
+  // View Mode Heuristic - determines Agency vs Business view
+  const isAgencyView = recurringScans.length > 1 || allTags.length > 0;
 
   // Bot access testing state
   const [botAccessTests, setBotAccessTests] = useState<Record<string, { status: number; accessible: boolean; statusText: string; loading?: boolean }>>({});
@@ -288,7 +294,10 @@ export default function Dashboard() {
     if (!scanUrlInput.trim()) return;
     setScanError(null);
 
-    scanUrl(scanUrlInput, {
+    scanUrl({ 
+      url: scanUrlInput, 
+      tags: selectedScanTag !== "default" ? [selectedScanTag] : [] 
+    }, {
       onSuccess: (data) => {
         // Gamification: Show XP gained toast
         if (data.gamification && user) {
@@ -801,49 +810,143 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Scan Input Section */}
-        <Card className="p-6 bg-card border border-border mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Search className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-bold">Scan a New Website</h2>
-          </div>
-          <div className="flex gap-3">
-            <Input
-              type="url"
-              placeholder="Enter website URL (e.g., example.com)"
-              value={scanUrlInput}
-              onChange={(e) => setScanUrlInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !isScanningMutation && handleScan()}
-              disabled={isScanningMutation}
-              className="flex-1 bg-background border-border focus:border-primary"
-              data-testid="input-scan-url"
-            />
-            <Button
-              onClick={handleScan}
-              disabled={isScanningMutation || !scanUrlInput.trim()}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 btn-hover-lift"
-              data-testid="button-scan"
-            >
-              {isScanningMutation ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                  Scanning...
-                </>
-              ) : (
-                <>
-                  <ArrowRight className="w-4 h-4 mr-2" />
-                  Scan
-                </>
-              )}
-            </Button>
-          </div>
-          {scanError && (
-            <div className="mt-3 text-sm text-red-400 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {scanError}
+        {/* Quick-Action Deck - Command Center Hero Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Left Column: The Scanner (Spans 2 cols) */}
+          <Card className="lg:col-span-2 p-6 flex flex-col justify-center border-primary/20 bg-gradient-to-br from-card to-primary/5">
+            <div className="flex items-center gap-2 mb-4">
+              <Search className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold">Run Diagnostic Scan</h2>
             </div>
-          )}
-        </Card>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* URL Input */}
+              <Input
+                type="url"
+                placeholder="Enter website URL (e.g., example.com)"
+                value={scanUrlInput}
+                onChange={(e) => setScanUrlInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isScanningMutation && handleScan()}
+                disabled={isScanningMutation}
+                className="flex-1 bg-background border-border focus:border-primary"
+                data-testid="input-scan-url"
+              />
+              
+              {/* Tag Selector */}
+              <Select
+                value={selectedScanTag}
+                onValueChange={setSelectedScanTag}
+              >
+                <SelectTrigger className="w-full sm:w-[180px] bg-background border-border" data-testid="select-scan-tag">
+                  <SelectValue placeholder="Assign Client" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">No Client</SelectItem>
+                  {allTags.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      {tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {/* Scan Button */}
+              <Button
+                onClick={handleScan}
+                disabled={isScanningMutation || !scanUrlInput.trim()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 btn-hover-lift"
+                data-testid="button-scan"
+              >
+                {isScanningMutation ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Scan
+                  </>
+                )}
+              </Button>
+            </div>
+            {scanError && (
+              <div className="mt-3 text-sm text-red-400 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {scanError}
+              </div>
+            )}
+          </Card>
+
+          {/* Right Column: Status HUD (Spans 1 col) */}
+          <Card className="p-6 border-border bg-card flex flex-col justify-between">
+            {isAgencyView ? (
+              /* Agency Mode - Fleet Status */
+              <>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Fleet Status
+                    </h3>
+                  </div>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-primary">
+                      {recurringScans.filter(s => s.isActive).length}
+                    </span>
+                    <span className="text-lg text-muted-foreground ml-2">
+                      Active Monitors
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Sites requiring attention</span>
+                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">
+                      {scans.filter(s => 
+                        (s.errors && s.errors.length > 0) || 
+                        (!s.robotsTxtFound && !s.llmsTxtFound)
+                      ).slice(0, recurringScans.length || 5).length}
+                    </Badge>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Business Mode - Site Health */
+              <>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      Site Health
+                    </h3>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className={`text-5xl font-bold ${
+                      (scans[0]?.score || 0) >= 80 
+                        ? 'text-emerald-500' 
+                        : (scans[0]?.score || 0) >= 50 
+                          ? 'text-yellow-500' 
+                          : 'text-red-500'
+                    }`}>
+                      {scans[0]?.score || 0}
+                    </span>
+                    <span className="text-lg text-muted-foreground">/100</span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Last scan</span>
+                    <span className="text-foreground">
+                      {scans[0] 
+                        ? formatRelativeTime(scans[0].createdAt?.toString() || new Date().toISOString()) 
+                        : 'No scans yet'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
 
         {/* Recurring Scans Section */}
         <RecurringScans
