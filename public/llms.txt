@@ -1,12 +1,12 @@
 # llms.txt - AI Agent Instructions
 # Website: ROBOSCAN
-# Description: Website permission scanner and optimization tool for robots.txt and llms.txt
+# Description: Comprehensive website permission scanner and file generator suite for webmasters and AI agents.
 # Publisher: Overture Systems
 # Publisher URL: https://overture-systems.com
 
 # About ROBOSCAN
 ROBOSCAN is a web application designed to help webmasters control how AI agents see their sites.
-It scans websites to validate robots.txt and llms.txt files, audits bot permissions, and generates optimization reports.
+It scans websites to validate robots.txt and llms.txt files, audits bot permissions, and generates standard web files.
 
 # Corporate & Ownership
 ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
@@ -15,17 +15,23 @@ ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
 
 # Key Features & Capabilities
 - **Agent Identification**: Identifies which AI agents (e.g., GPTBot, CCBot) are allowed or blocked.
-- **File Generation**: Automatically generates optimized `robots.txt` and `llms.txt` files.
+- **File Generation**: Automatically generates optimized `robots.txt`, `llms.txt`, `sitemap.xml`, and security headers.
 - **Change Detection**: Monitors websites for changes in bot permissions and crawling rules.
 - **Premium Reports**: Provides SEO impact analysis and competitor insights.
 
-# Key Areas
+# Key Areas & Tools
 - **Scanner**: https://roboscan-pi.vercel.app/ - The main interface for scanning website permissions.
-- **LLMs.txt Builder**: https://roboscan-pi.vercel.app/tools/llms-builder - A tool to generate valid llms.txt files.
-- **Documentation**: https://roboscan-pi.vercel.app/docs (Placeholder for future docs)
+- **LLMs.txt Builder**: https://roboscan-pi.vercel.app/tools/llms-builder - Generate valid llms.txt files.
+- **Robots.txt Builder**: https://roboscan-pi.vercel.app/tools/robots-builder - Create optimized robots.txt files.
+- **Sitemap Builder**: https://roboscan-pi.vercel.app/tools/sitemap-builder - Generate XML sitemaps.
+- **Security Builder**: https://roboscan-pi.vercel.app/tools/security-builder - Create security.txt and security header configurations.
+- **Manifest Builder**: https://roboscan-pi.vercel.app/tools/manifest-builder - Generate web app manifests.
+- **Ads.txt Builder**: https://roboscan-pi.vercel.app/tools/ads-builder - Create ads.txt files.
+- **Humans.txt Builder**: https://roboscan-pi.vercel.app/tools/humans-builder - Generate humans.txt files.
+- **AI.txt Builder**: https://roboscan-pi.vercel.app/tools/ai-builder - Create ai.txt files.
 
 # Pricing & Access
-- **Free Tier**: Basic scanning, robots.txt/llms.txt validation, and bot permission checks.
+- **Free Tier**: Basic scanning, file validation, and standard generators.
 - **Premium ($9.99)**: Comprehensive optimization reports, downloadable configuration files, and priority action plans.
 
 # Content Guidelines

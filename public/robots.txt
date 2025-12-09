@@ -5,10 +5,13 @@
 # Allow all standard crawlers to access public pages
 User-agent: *
 Allow: /
-Allow: /tools/llms-builder
+Allow: /tools/
 Disallow: /dashboard
 Disallow: /api/
 Disallow: /auth/
+Disallow: /login
+Disallow: /register
+Disallow: /set-password
 
 # Explicitly allow AI bots for discovery (aligned with project mission)
 User-agent: GPTBot
@@ -18,7 +21,7 @@ User-agent: anthropic-ai
 User-agent: Claude-Web
 User-agent: Google-Extended
 Allow: /
-Allow: /tools/llms-builder
+Allow: /tools/
 Disallow: /dashboard
 Disallow: /api/
 
