@@ -95,12 +95,16 @@ const Hero = ({
   currentStep,
   isScanning,
   preflightStatus,
+  userType,
+  setUserType,
   children // [NEW] Accept children (The Terminal)
 }: { 
   onScan: (url: string) => void;
   currentStep: ScanStep;
   isScanning: boolean;
   preflightStatus?: string;
+  userType: 'business' | 'agency';
+  setUserType: (type: 'business' | 'agency') => void;
   children?: React.ReactNode;
 }) => {
   const [url, setUrl] = useState("");
@@ -173,34 +177,44 @@ const Hero = ({
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
         </div>
 
-        {/* User Segmentation Toggle */}
+        {/* Interactive User Type Toggle */}
         {currentStep === 'input' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-6"
           >
-            <p className="text-sm text-muted-foreground mb-3">Who are you?</p>
-            <div className="inline-flex items-center bg-card border border-border rounded-full p-1">
+            <p className="text-sm text-muted-foreground mb-3">I am a...</p>
+            <div className="inline-flex items-center bg-card border border-border rounded-full p-1 shadow-sm">
               <button
                 type="button"
-                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-primary text-primary-foreground transition-all"
+                onClick={() => setUserType('business')}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  userType === 'business' 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
               >
                 <User className="w-4 h-4" />
                 Business Owner
               </button>
               <button
                 type="button"
-                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground transition-all"
-                onClick={() => window.location.href = '/login?type=agency'}
+                onClick={() => setUserType('agency')}
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  userType === 'agency' 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
               >
                 <Building2 className="w-4 h-4" />
                 Agency / Consultant
-                <ChevronRight className="w-3 h-3" />
               </button>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Managing multiple brands? <a href="/login?type=agency" className="text-primary hover:underline">Access the Agency Dashboard →</a>
+              {userType === 'business' 
+                ? '✨ Perfect for single websites and personal brands'
+                : '🚀 Ideal for managing multiple client websites'}
             </p>
           </motion.div>
         )}
@@ -231,7 +245,7 @@ const Hero = ({
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="relative flex-1">
                   <Input 
-                    placeholder="example.com" 
+                    placeholder={userType === 'business' ? "example.com" : "client-website.com"} 
                     className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
@@ -326,13 +340,15 @@ const TerminalDemo = ({
   targetUrl, 
   onScanComplete,
   onUnlockReport,
-  onScanError
+  onScanError,
+  userType
 }: { 
   isScanning: boolean; 
   targetUrl: string;
   onScanComplete: (scanId: number) => void;
   onUnlockReport: () => void;
   onScanError: () => void;
+  userType: 'business' | 'agency';
 }) => {
   const [lines, setLines] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -603,77 +619,157 @@ const TerminalDemo = ({
                 data-testid="upgrade-cta"
               >
                 <div className="p-6 bg-card border-2 border-primary/40 rounded-xl shadow-lg shadow-primary/10 flex-1 flex flex-col">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-gradient-to-br from-primary/30 to-blue-500/30 rounded-xl">
-                      <Sparkles className="w-7 h-7 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-emerald-500 font-mono uppercase tracking-wider flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        Analysis Complete
+                  {userType === 'business' ? (
+                    /* Business Owner CTA - Single Site License */
+                    <>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-gradient-to-br from-primary/30 to-blue-500/30 rounded-xl">
+                          <Sparkles className="w-7 h-7 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-emerald-500 font-mono uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Analysis Complete
+                          </p>
+                          <h3 className="font-bold text-xl">Your AI Visibility Report is Ready</h3>
+                        </div>
+                      </div>
+                      
+                      <p className="text-muted-foreground mb-5 leading-relaxed">
+                        Get <span className="text-primary font-semibold">8 optimized technical files</span> tailored to your brand, plus a complete action plan to rank in the Big 7 LLMs.
                       </p>
-                      <h3 className="font-bold text-xl">Your AI Visibility Report is Ready</h3>
-                    </div>
-                  </div>
-                  
-                  <p className="text-muted-foreground mb-5 leading-relaxed">
-                    Get <span className="text-primary font-semibold">8 optimized technical files</span> tailored to your brand, plus a complete action plan to rank in the Big 7 LLMs.
-                  </p>
-                  
-                  <div className="space-y-2 mb-5 flex-1">
-                    {[
-                      "All 8 technical files (robots.txt, llms.txt, etc.)",
-                      "Big 7 LLM compatibility matrix",
-                      "Priority action plan with fixes",
-                      "One-click copy & PDF download"
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                        <span>{item}</span>
+                      
+                      <div className="space-y-2 mb-5 flex-1">
+                        {[
+                          "All 8 technical files (robots.txt, llms.txt, etc.)",
+                          "Big 7 LLM compatibility matrix",
+                          "Priority action plan with fixes",
+                          "One-click copy & PDF download"
+                        ].map((item, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm">
+                            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  
-                  <div className="mt-auto">
-                    {/* Pricing with value framing */}
-                    <div className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-blue-500/5 border border-primary/20 mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-muted-foreground">Single Site License</span>
-                        <span className="text-xs text-muted-foreground line-through">$29.99</span>
+                      
+                      <div className="mt-auto">
+                        {/* Pricing with value framing */}
+                        <div className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-blue-500/5 border border-primary/20 mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-muted-foreground">Single Site License</span>
+                            <span className="text-xs text-muted-foreground line-through">$29.99</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-bold text-primary">$9.99</span>
+                            <span className="text-muted-foreground text-sm">one-time payment</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            💡 Skip 8+ hours of manual work
+                          </p>
+                        </div>
+                        
+                        <Button 
+                          className="w-full btn-cta h-12 text-base"
+                          onClick={onUnlockReport}
+                          data-testid="button-get-report"
+                        >
+                          <Zap className="w-4 h-4 mr-2" />
+                          Get My AI Files Now
+                        </Button>
+                        
+                        <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
+                          <Lock className="w-3 h-3" />
+                          Secure payment • Instant delivery
+                        </p>
+                        
+                        <div className="mt-4 pt-4 border-t border-border text-center">
+                          <a 
+                            href="/pricing" 
+                            className="text-xs text-primary hover:underline flex items-center justify-center gap-1"
+                          >
+                            <Building2 className="w-3 h-3" />
+                            Managing multiple sites? View Agency plans →
+                          </a>
+                        </div>
                       </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-bold text-primary">$9.99</span>
-                        <span className="text-muted-foreground text-sm">one-time payment</span>
+                    </>
+                  ) : (
+                    /* Agency CTA - Guardian Tier Subscription */
+                    <>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-gradient-to-br from-blue-500/30 to-cyan-500/30 rounded-xl">
+                          <Building2 className="w-7 h-7 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-emerald-500 font-mono uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Analysis Complete
+                          </p>
+                          <h3 className="font-bold text-xl">Generate Professional Client Audit</h3>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        💡 Skip 8+ hours of manual work
+                      
+                      <p className="text-muted-foreground mb-5 leading-relaxed">
+                        Impress your clients with a <span className="text-primary font-semibold">white-labeled AI visibility audit</span>. Unlock recurring revenue services for your agency.
                       </p>
-                    </div>
-                    
-                    <Button 
-                      className="w-full btn-cta h-12 text-base"
-                      onClick={onUnlockReport}
-                      data-testid="button-get-report"
-                    >
-                      <Zap className="w-4 h-4 mr-2" />
-                      Get My AI Files Now
-                    </Button>
-                    
-                    <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
-                      <Lock className="w-3 h-3" />
-                      Secure payment • Instant delivery
-                    </p>
-                    
-                    <div className="mt-4 pt-4 border-t border-border text-center">
-                      <a 
-                        href="/pricing" 
-                        className="text-xs text-primary hover:underline flex items-center justify-center gap-1"
-                      >
-                        <Building2 className="w-3 h-3" />
-                        Managing multiple sites? View Agency plans →
-                      </a>
-                    </div>
-                  </div>
+                      
+                      <div className="space-y-2 mb-5 flex-1">
+                        {[
+                          "Unlimited Client Scans",
+                          "White-label PDF Reports",
+                          "Change Monitoring Alerts",
+                          "Priority Support"
+                        ].map((item, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm">
+                            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-auto">
+                        {/* Guardian Tier Pricing */}
+                        <div className="p-4 rounded-lg bg-gradient-to-r from-blue-500/5 to-cyan-500/5 border border-blue-500/20 mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-muted-foreground">Guardian Tier</span>
+                            <span className="text-xs text-blue-500 font-mono px-2 py-0.5 bg-blue-500/10 rounded-full">Best for Agencies</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-bold text-blue-500">$29</span>
+                            <span className="text-muted-foreground text-sm">/month</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            🚀 Scale your AI SEO services
+                          </p>
+                        </div>
+                        
+                        <Button 
+                          className="w-full h-12 text-base bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white shadow-lg"
+                          onClick={() => window.location.href = '/pricing?tier=guardian'}
+                          data-testid="button-start-agency-trial"
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Start Agency Trial
+                        </Button>
+                        
+                        <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-2">
+                          <Lock className="w-3 h-3" />
+                          Cancel anytime • 14-day free trial
+                        </p>
+                        
+                        <div className="mt-4 pt-4 border-t border-border text-center">
+                          <button
+                            onClick={onUnlockReport}
+                            className="text-xs text-muted-foreground hover:text-primary hover:underline flex items-center justify-center gap-1 mx-auto"
+                          >
+                            <User className="w-3 h-3" />
+                            Just need this one report? Get single license →
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -739,8 +835,8 @@ const TerminalDemo = ({
   );
 };
 
-// ROI Value Proposition Component
-const ValueProposition = () => {
+// ROI Value Proposition Component - Bifurcated by User Type
+const ValueProposition = ({ userType }: { userType: 'business' | 'agency' }) => {
   const techFiles = [
     { name: 'robots.txt', desc: 'Crawler permissions', icon: <Bot className="w-4 h-4" /> },
     { name: 'llms.txt', desc: 'AI content map', icon: <Cpu className="w-4 h-4" /> },
@@ -752,6 +848,47 @@ const ValueProposition = () => {
     { name: 'ai.txt', desc: 'AI guidelines', icon: <Sparkles className="w-4 h-4" /> },
   ];
 
+  // Dynamic content based on user type
+  const content = userType === 'business' ? {
+    badge: "The ROI is Clear",
+    badgeIcon: <TrendingUp className="w-3 h-3" />,
+    headline: "Stop Wasting Hours Learning Specs.",
+    subheadline: "Get AI-Ready in 2.3 Minutes.",
+    description: "AI standards are evolving fast. You could spend countless hours researching file formats, syntax rules, and best practices — or let RoboScan handle it instantly.",
+    comparisonLeft: {
+      title: "DIY Approach",
+      items: ["4-8 hours of research", "High error risk", "No update notifications"]
+    },
+    comparisonRight: {
+      title: "RoboScan",
+      items: ["2.3 minutes", "100% validated syntax", "Auto-update alerts"]
+    },
+    pricingLabel: "Your Investment",
+    pricingValue: "$9.99",
+    pricingSubtext: "one-time",
+    returnLabel: "Your Return",
+    returnValue: "Found by AI Forever"
+  } : {
+    badge: "Scale Your Services",
+    badgeIcon: <Zap className="w-3 h-3" />,
+    headline: "Scale Your SEO Agency into the AI Era.",
+    subheadline: "Unlimited Client Reports in Minutes.",
+    description: "Don't spend hours manually auditing client sites. Generate comprehensive AI-readiness reports in minutes and upsell technical implementation services.",
+    comparisonLeft: {
+      title: "Manual Audits",
+      items: ["2-4 hours per client", "Inconsistent quality", "Hard to scale"]
+    },
+    comparisonRight: {
+      title: "RoboScan Automated",
+      items: ["2.3 minutes per client", "White-label ready", "Unlimited scans"]
+    },
+    pricingLabel: "Monthly Investment",
+    pricingValue: "$29",
+    pricingSubtext: "/month",
+    returnLabel: "Your Return",
+    returnValue: "Recurring Revenue"
+  };
+
   return (
     <section className="py-20 container mx-auto px-6">
       <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -762,79 +899,83 @@ const ValueProposition = () => {
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-mono mb-6">
-            <TrendingUp className="w-3 h-3" />
-            The ROI is Clear
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono mb-6 ${
+            userType === 'business' 
+              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-500'
+              : 'bg-blue-500/10 border border-blue-500/20 text-blue-500'
+          }`}>
+            {content.badgeIcon}
+            {content.badge}
           </div>
           
           <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-tight">
-            Stop Wasting Hours Learning Specs.
+            {content.headline}
             <br />
-            <span className="text-primary">Get AI-Ready in 2.3 Minutes.</span>
+            <span className={userType === 'business' ? 'text-primary' : 'text-blue-500'}>
+              {content.subheadline}
+            </span>
           </h2>
           
           <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
-            AI standards are evolving fast. You could spend countless hours researching file formats, syntax rules, and best practices — or let RoboScan handle it instantly.
+            {content.description}
           </p>
 
-          {/* RASS comparison cards */}
+          {/* Comparison cards */}
           <div className="grid sm:grid-cols-2 gap-4 mb-8">
             <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20">
               <div className="flex items-center gap-2 text-red-500 font-semibold mb-2">
                 <XCircle className="w-5 h-5" />
-                DIY Approach
+                {content.comparisonLeft.title}
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  <span>4-8 hours of research</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <XCircle className="w-4 h-4" />
-                  <span>High error risk</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <XCircle className="w-4 h-4" />
-                  <span>No update notifications</span>
-                </li>
+                {content.comparisonLeft.items.map((item, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    {i === 0 ? <Clock className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    <span>{item}</span>
+                  </li>
+                ))}
               </ul>
             </div>
             
             <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
               <div className="flex items-center gap-2 text-emerald-500 font-semibold mb-2">
                 <CheckCircle className="w-5 h-5" />
-                RoboScan
+                {content.comparisonRight.title}
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-emerald-500" />
-                  <span className="text-foreground font-medium">2.3 minutes</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-500" />
-                  <span>100% validated syntax</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-500" />
-                  <span>Auto-update alerts</span>
-                </li>
+                {content.comparisonRight.items.map((item, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    {i === 0 ? (
+                      <Clock className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    )}
+                    <span className={i === 0 ? 'text-foreground font-medium' : ''}>{item}</span>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
 
           {/* Cost breakdown */}
-          <div className="p-5 rounded-xl bg-gradient-to-r from-primary/10 to-blue-500/10 border border-primary/20">
+          <div className={`p-5 rounded-xl border ${
+            userType === 'business'
+              ? 'bg-gradient-to-r from-primary/10 to-blue-500/10 border-primary/20'
+              : 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20'
+          }`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Your Investment</p>
+                <p className="text-sm text-muted-foreground mb-1">{content.pricingLabel}</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-primary">$9.99</span>
-                  <span className="text-sm text-muted-foreground">one-time</span>
+                  <span className={`text-3xl font-bold ${userType === 'business' ? 'text-primary' : 'text-blue-500'}`}>
+                    {content.pricingValue}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{content.pricingSubtext}</span>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground mb-1">Your Return</p>
-                <p className="text-lg font-semibold text-foreground">Found by AI Forever</p>
+                <p className="text-sm text-muted-foreground mb-1">{content.returnLabel}</p>
+                <p className="text-lg font-semibold text-foreground">{content.returnValue}</p>
               </div>
             </div>
           </div>
@@ -888,14 +1029,16 @@ const ValueProposition = () => {
   );
 };
 
-// 4-Step Process Grid Component
-const HowItWorks = () => {
+// 4-Step Process Grid Component - Bifurcated by User Type
+const HowItWorks = ({ userType }: { userType: 'business' | 'agency' }) => {
   const steps = [
     {
       number: "01",
       icon: <Eye className="w-8 h-8" />,
       title: "Identify",
-      desc: "We validate your site's purpose and current AI visibility status across all major LLM platforms.",
+      desc: userType === 'business'
+        ? "We validate your site's purpose and current AI visibility status across all major LLM platforms."
+        : "We validate your client's site purpose and current AI visibility status across all major LLM platforms.",
       color: "from-cyan-500/20 to-cyan-500/5",
       iconColor: "text-cyan-500"
     },
@@ -903,7 +1046,9 @@ const HowItWorks = () => {
       number: "02",
       icon: <Globe className="w-8 h-8" />,
       title: "Input",
-      desc: "Simply provide your URL. Our scanner works with any public website — no technical setup required.",
+      desc: userType === 'business'
+        ? "Simply provide your URL. Our scanner works with any public website — no technical setup required."
+        : "Simply provide your client's URL. Our scanner works with any public website — no technical setup required.",
       color: "from-primary/20 to-primary/5",
       iconColor: "text-primary"
     },
@@ -911,7 +1056,9 @@ const HowItWorks = () => {
       number: "03",
       icon: <FileSearch className="w-8 h-8" />,
       title: "Analyze",
-      desc: "We test your site against current industry standards and identify gaps in your AI discoverability.",
+      desc: userType === 'business'
+        ? "We test your site against current industry standards and identify gaps in your AI discoverability."
+        : "We test your client's site against current industry standards and generate a professional audit report.",
       color: "from-blue-500/20 to-blue-500/5",
       iconColor: "text-blue-500"
     },
@@ -919,7 +1066,9 @@ const HowItWorks = () => {
       number: "04",
       icon: <RefreshCw className="w-8 h-8" />,
       title: "Monitor",
-      desc: "Auto-update your files when standards change. Stay ahead as AI platforms evolve their crawling rules.",
+      desc: userType === 'business'
+        ? "Auto-update your files when standards change. Stay ahead as AI platforms evolve their crawling rules."
+        : "Get alerts when your client's sites need attention. Track changes across all managed domains from one dashboard.",
       color: "from-emerald-500/20 to-emerald-500/5",
       iconColor: "text-emerald-500"
     }
@@ -1003,6 +1152,9 @@ const Footer = () => (
   </footer>
 );
 
+// User Type for bifurcated funnel
+type UserType = 'business' | 'agency';
+
 export default function Home() {
   const [isScanning, setIsScanning] = useState(false);
   const [targetUrl, setTargetUrl] = useState("");
@@ -1011,6 +1163,7 @@ export default function Home() {
   const [showPremiumReport, setShowPremiumReport] = useState(false);
   const [premiumReportData, setPremiumReportData] = useState<any>(null);
   const [currentStep, setCurrentStep] = useState<ScanStep>('input');
+  const [userType, setUserType] = useState<UserType>('business');
 
   const handleScan = (url: string) => {
     setTargetUrl(url);
@@ -1072,6 +1225,8 @@ export default function Home() {
             currentStep={currentStep}
             isScanning={isScanning}
             preflightStatus={isScanning ? "Resolving DNS..." : undefined}
+            userType={userType}
+            setUserType={setUserType}
           >
             {/* Conditionally render TerminalDemo inside Hero */}
             <TerminalDemo 
@@ -1080,14 +1235,15 @@ export default function Home() {
               onScanComplete={handleScanComplete}
               onUnlockReport={handleUnlockReport}
               onScanError={handleScanError}
+              userType={userType}
             />
           </Hero>
           
           {/* Show Value Proposition and How It Works only on input step */}
           {!isScanning && currentStep === 'input' && (
             <>
-              <ValueProposition />
-              <HowItWorks />
+              <ValueProposition userType={userType} />
+              <HowItWorks userType={userType} />
             </>
           )}
         </>
