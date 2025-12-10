@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useScan } from "@/hooks/useScan";
+import { useSubscription } from "@/hooks/useSubscription";
 import { PaymentModal } from "@/components/PaymentModal";
 import { ScanComparison } from "@/components/ScanComparison";
 import { CompactUserHUD } from "@/components/CompactUserHUD";
@@ -55,6 +56,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { mutate: scanUrl, isPending: isScanningMutation } = useScan();
+  const { hasActiveSubscription, refreshSubscription } = useSubscription();
   const [scans, setScans] = useState<ScanWithPurchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedScan, setSelectedScan] = useState<ScanWithPurchase | null>(null);
@@ -635,9 +637,13 @@ export default function Dashboard() {
   };
 
   const getScansForUrl = (url: string) => {
-    return scans.filter(s => s.url === url).sort((a, b) => 
+    const urlScans = scans.filter(s => s.url === url).sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+    // If user has active subscription, mark all scans as purchased
+    return hasActiveSubscription 
+      ? urlScans.map(scan => ({ ...scan, isPurchased: true }))
+      : urlScans;
   };
 
   const handleQuickCompare = (scan: ScanWithPurchase) => {
@@ -978,7 +984,9 @@ export default function Dashboard() {
         {/* Scans List */}
         <ScanList
           loading={loading}
-          scans={scans}
+          scans={hasActiveSubscription 
+            ? scans.map(scan => ({ ...scan, isPurchased: true })) 
+            : scans}
           allTags={allTags}
           selectedTags={selectedTags}
           showTagFilter={showTagFilter}
