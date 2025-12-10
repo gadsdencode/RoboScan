@@ -8,8 +8,24 @@ import { checkAuthentication } from "../auth.js";
 import { getStripe } from "../utils/stripe.js";
 import { isAdmin } from "../utils/admin.js";
 import { createPaymentSchema, paymentIntentIdSchema } from "../utils/validation.js";
+import { PRICING } from "../../shared/tiers.js";
 
 const router = Router();
+
+/**
+ * Generate a deterministic idempotency key for payment intent creation.
+ * This prevents duplicate payment intents if the client retries the request.
+ * 
+ * Key format: pi_scan_{scanId}_{userId|anon}_{timestamp_bucket}
+ * - timestamp_bucket groups requests within a 5-minute window to allow retries
+ *   but prevent completely separate payment attempts from colliding
+ */
+function generatePaymentIdempotencyKey(scanId: number, userId: string | null): string {
+  // Create a 5-minute time bucket to allow retries within a short window
+  const timeBucket = Math.floor(Date.now() / (5 * 60 * 1000));
+  const userPart = userId || 'anon';
+  return `pi_scan_${scanId}_${userPart}_${timeBucket}`;
+}
 
 /**
  * POST /api/create-payment-intent
@@ -50,22 +66,32 @@ router.post('/create-payment-intent', async (req: any, res: Response) => {
     };
     
     // Add userId to metadata if user is authenticated
-    if (isAuth) {
-      metadata.userId = req.user.claims.sub;
+    const userId = isAuth ? req.user.claims.sub : null;
+    if (userId) {
+      metadata.userId = userId;
     }
 
+    // Use centralized pricing from shared/tiers.ts (convert dollars to cents)
+    const amountInCents = Math.round(PRICING.REPORT_UNLOCK * 100);
+    
+    // Generate idempotency key to prevent duplicate payment intents
+    // This ensures the same request won't create multiple payment intents
+    const idempotencyKey = generatePaymentIdempotencyKey(scanId, userId);
+
     const paymentIntent = await getStripe().paymentIntents.create({
-      amount: 999,
+      amount: amountInCents,
       currency: "usd",
       metadata,
       automatic_payment_methods: {
         enabled: true,
       },
+    }, {
+      idempotencyKey,
     });
 
     res.json({ 
       clientSecret: paymentIntent.client_secret,
-      amount: 9.99
+      amount: PRICING.REPORT_UNLOCK
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -76,9 +102,12 @@ router.post('/create-payment-intent', async (req: any, res: Response) => {
     }
     
     console.error('Payment intent error:', error);
+    
+    // Don't leak internal error details in production
+    const isDev = process.env.NODE_ENV === 'development';
     res.status(500).json({ 
       message: "Failed to create payment intent",
-      error: error instanceof Error ? error.message : "Unknown error"
+      ...(isDev && { error: error instanceof Error ? error.message : "Unknown error" })
     });
   }
 });
@@ -124,9 +153,12 @@ router.post('/confirm-payment', async (req: any, res: Response) => {
     }
   } catch (error) {
     console.error('Payment confirmation error:', error);
+    
+    // Don't leak internal error details in production
+    const isDev = process.env.NODE_ENV === 'development';
     res.status(500).json({ 
       message: "Failed to confirm payment",
-      error: error instanceof Error ? error.message : "Unknown error"
+      ...(isDev && { error: error instanceof Error ? error.message : "Unknown error" })
     });
   }
 });

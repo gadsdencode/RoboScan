@@ -6,6 +6,18 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import confetti from "canvas-confetti";
+import { PRICING } from "../../../shared/tiers";
+
+/**
+ * Format price for display with currency symbol
+ * Uses server-provided amount when available, falls back to PRICING constant
+ */
+function formatPrice(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+}
 
 if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
@@ -52,7 +64,7 @@ const triggerPurchaseConfetti = () => {
   }, 250);
 };
 
-const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: () => void }) => {
+const CheckoutForm = ({ onSuccess, onClose, amount }: { onSuccess: () => void, onClose: () => void, amount: number }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -135,7 +147,7 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
               Processing...
             </span>
           ) : (
-            `Pay $9.99`
+            `Pay ${formatPrice(amount)}`
           )}
         </Button>
       </div>
@@ -147,6 +159,8 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
   const [clientSecret, setClientSecret] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [alreadyPurchased, setAlreadyPurchased] = useState(false);
+  // Use server-provided amount, fallback to centralized PRICING constant
+  const [amount, setAmount] = useState<number>(PRICING.REPORT_UNLOCK);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -167,6 +181,10 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
           }, 1500);
         } else {
           setClientSecret(data.clientSecret);
+          // Use server-provided amount for consistency
+          if (data.amount) {
+            setAmount(data.amount);
+          }
         }
         setLoading(false);
       })
@@ -245,7 +263,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
                     <div className="space-y-4">
                       <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
                         <div className="flex items-baseline gap-2 mb-2">
-                          <span className="text-3xl font-bold">$9.99</span>
+                          <span className="text-3xl font-bold">{formatPrice(amount)}</span>
                           <span className="text-muted-foreground text-sm">one-time</span>
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
@@ -274,7 +292,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
                     </div>
                   ) : clientSecret ? (
                     <Elements stripe={stripePromise} options={{ clientSecret }}>
-                      <CheckoutForm onSuccess={onSuccess} onClose={onClose} />
+                      <CheckoutForm onSuccess={onSuccess} onClose={onClose} amount={amount} />
                     </Elements>
                   ) : (
                     <div className="text-center py-8 text-red-400">

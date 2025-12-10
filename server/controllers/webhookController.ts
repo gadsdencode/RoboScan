@@ -9,6 +9,64 @@ import Stripe from "stripe";
 const router = Router();
 
 /**
+ * Error types for webhook processing
+ * - Retryable: Database connection issues, temporary failures - return 5xx
+ * - Non-retryable: User not found, invalid data - return 200 to prevent infinite retries
+ */
+class RetryableWebhookError extends Error {
+  constructor(message: string, public readonly originalError?: Error) {
+    super(message);
+    this.name = 'RetryableWebhookError';
+  }
+}
+
+class NonRetryableWebhookError extends Error {
+  constructor(message: string, public readonly originalError?: Error) {
+    super(message);
+    this.name = 'NonRetryableWebhookError';
+  }
+}
+
+/**
+ * Determine if an error is retryable based on its type
+ * Database connection errors, network timeouts should be retried
+ * Business logic errors (user not found) should not be retried
+ */
+function isRetryableError(error: unknown): boolean {
+  // Explicitly marked as retryable
+  if (error instanceof RetryableWebhookError) {
+    return true;
+  }
+  
+  // Explicitly marked as non-retryable
+  if (error instanceof NonRetryableWebhookError) {
+    return false;
+  }
+  
+  // Check for common retryable error patterns
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    const retryablePatterns = [
+      'connection',
+      'timeout',
+      'econnrefused',
+      'econnreset',
+      'socket',
+      'network',
+      'database',
+      'deadlock',
+      'pool',
+      'too many connections',
+    ];
+    
+    return retryablePatterns.some(pattern => message.includes(pattern));
+  }
+  
+  // Default to non-retryable to prevent infinite retry loops
+  return false;
+}
+
+/**
  * POST /api/webhooks/stripe
  * Stripe webhook endpoint - handles subscription lifecycle events
  * 
@@ -111,8 +169,42 @@ router.post('/stripe', async (req: Request, res: Response) => {
     res.json({ received: true });
   } catch (error) {
     console.error(`[Webhook] Error processing event ${event.id}:`, error);
-    // Return 200 to prevent Stripe from retrying - log the error for investigation
-    res.json({ received: true, error: error instanceof Error ? error.message : 'Unknown error' });
+    
+    // Determine if error is retryable
+    const shouldRetry = isRetryableError(error);
+    
+    if (shouldRetry) {
+      // Return 500 to trigger Stripe retry for transient errors
+      // Stripe will retry with exponential backoff
+      console.error(`[Webhook] Retryable error for event ${event.id} - returning 500 for retry`);
+      return res.status(500).json({ 
+        error: 'Temporary processing error, please retry' 
+      });
+    }
+    
+    // For non-retryable errors, log and acknowledge to prevent infinite retries
+    // The event ID is logged for investigation
+    console.error(`[Webhook] Non-retryable error for event ${event.id} - acknowledging to prevent retry`);
+    
+    // Still try to log the event for audit trail (with error status)
+    try {
+      const subscription = await getSubscriptionFromEvent(event);
+      await storage.createSubscriptionEvent({
+        subscriptionId: subscription?.id || null,
+        stripeEventId: event.id,
+        eventType: event.type,
+        eventData: {
+          ...event.data.object as Record<string, any>,
+          _processingError: error instanceof Error ? error.message : 'Unknown error',
+          _processingFailed: true,
+        },
+      });
+    } catch (auditError) {
+      console.error(`[Webhook] Failed to log audit event for ${event.id}:`, auditError);
+    }
+    
+    // Return 200 to acknowledge receipt and prevent retries for non-recoverable errors
+    res.json({ received: true, processed: false });
   }
 });
 
@@ -163,8 +255,10 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const userId = await getUserIdFromSubscription(subscription);
   
   if (!userId) {
-    console.error(`[Webhook] No user found for subscription ${subscription.id}`);
-    return;
+    // Non-retryable: User doesn't exist, retrying won't help
+    throw new NonRetryableWebhookError(
+      `No user found for subscription ${subscription.id} - customer may not be linked`
+    );
   }
 
   // Check if we already have this subscription
@@ -244,8 +338,10 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
   const userId = await getUserIdFromSubscription(subscription);
   
   if (!userId) {
-    console.error(`[Webhook] No user found for subscription ${subscription.id}`);
-    return;
+    // Non-retryable: User doesn't exist
+    throw new NonRetryableWebhookError(
+      `No user found for subscription ${subscription.id} - cannot send trial notification`
+    );
   }
 
   // Create a notification for the user
@@ -307,8 +403,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   const subscription = await storage.getSubscriptionByStripeId(subscriptionId);
   if (!subscription) {
-    console.error(`[Webhook] No subscription found for invoice ${invoice.id}`);
-    return;
+    // Non-retryable: Subscription doesn't exist locally
+    throw new NonRetryableWebhookError(
+      `No subscription found for invoice ${invoice.id} - subscription may have been created externally`
+    );
   }
 
   // Create a notification for the user
