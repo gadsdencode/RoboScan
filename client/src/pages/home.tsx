@@ -9,7 +9,7 @@ import { PremiumReport } from "@/components/PremiumReport";
 import { Navbar } from "@/components/Navbar";
 
 // Enhanced StepTracker Component with Pre-flight Checklist
-type ScanStep = 'input' | 'scanning' | 'report';
+type ScanStep = 'select-type' | 'input' | 'scanning' | 'report';
 
 interface StepTrackerProps {
   currentStep: ScanStep;
@@ -18,9 +18,10 @@ interface StepTrackerProps {
 
 const StepTracker = ({ currentStep, preflightStatus }: StepTrackerProps) => {
   const steps = [
-    { id: 'input', label: 'Enter URL', number: 1 },
-    { id: 'scanning', label: 'Scanning', number: 2 },
-    { id: 'report', label: 'View Report', number: 3 }
+    { id: 'select-type', label: 'Choose Path', number: 1 },
+    { id: 'input', label: 'Enter URL', number: 2 },
+    { id: 'scanning', label: 'Scanning', number: 3 },
+    { id: 'report', label: 'View Report', number: 4 }
   ];
 
   const getStepState = (stepId: string) => {
@@ -97,6 +98,7 @@ const Hero = ({
   preflightStatus,
   userType,
   setUserType,
+  onProceedToInput,
   children // [NEW] Accept children (The Terminal)
 }: { 
   onScan: (url: string) => void;
@@ -105,6 +107,7 @@ const Hero = ({
   preflightStatus?: string;
   userType: 'business' | 'agency';
   setUserType: (type: 'business' | 'agency') => void;
+  onProceedToInput: () => void;
   children?: React.ReactNode;
 }) => {
   const [url, setUrl] = useState("");
@@ -127,9 +130,9 @@ const Hero = ({
 
       <div className="container relative z-10 px-6 py-12 flex flex-col items-center text-center max-w-5xl">
         
-        {/* 1. COLLAPSIBLE HEADER: Only show on 'input' step - stays collapsed during scan AND after completion */}
+        {/* 1. COLLAPSIBLE HEADER: Only show on 'select-type' step - stays collapsed after user proceeds */}
         <AnimatePresence>
-          {currentStep === 'input' && (
+          {currentStep === 'select-type' && (
             <motion.div
               initial={{ opacity: 0, y: 20, height: 'auto' }}
               animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -181,132 +184,166 @@ const Hero = ({
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
         </div>
 
-        {/* Interactive User Type Toggle - High Visibility Cards */}
-        {currentStep === 'input' && (
+        {/* Step 1: User Type Selection - Choose Path */}
+        {currentStep === 'select-type' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-xl mx-auto mb-8"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Business Option */}
-              <button
-                type="button"
-                onClick={() => setUserType('business')}
-                className={`
-                  relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 group
-                  ${userType === 'business' 
-                    ? 'border-primary bg-primary/5 text-primary shadow-md ring-1 ring-primary/20 scale-[1.02]' 
-                    : 'border-border bg-card/50 text-muted-foreground hover:border-primary/30 hover:bg-card hover:text-foreground'}
-                `}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <User className={`w-5 h-5 ${userType === 'business' ? 'fill-current' : ''}`} />
-                  <span className="font-bold text-lg tracking-tight">Business Owner</span>
+            <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
+              <div className="flex items-start gap-3 mb-6">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <User className="w-5 h-5 text-primary" />
                 </div>
-                <span className="text-xs font-medium opacity-80">
-                  Optimizing a Single Website
-                </span>
-                
-                {/* Active Checkmark Badge */}
-                {userType === 'business' && (
-                  <div className="absolute top-2 right-2 text-primary">
-                    <CheckCircle className="w-4 h-4" />
-                  </div>
-                )}
-              </button>
-
-              {/* Agency Option */}
-              <button
-                type="button"
-                onClick={() => setUserType('agency')}
-                className={`
-                  relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 group
-                  ${userType === 'agency' 
-                    ? 'border-blue-500 bg-blue-500/5 text-blue-500 shadow-md ring-1 ring-blue-500/20 scale-[1.02]' 
-                    : 'border-border bg-card/50 text-muted-foreground hover:border-blue-500/30 hover:bg-card hover:text-foreground'}
-                `}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Building2 className={`w-5 h-5 ${userType === 'agency' ? 'fill-current' : ''}`} />
-                  <span className="font-bold text-lg tracking-tight">Agency</span>
+                <div className="text-left flex-1">
+                  <h3 className="font-bold text-lg mb-1">How will you use RoboScan?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Select your path to get a tailored experience
+                  </p>
                 </div>
-                <span className="text-xs font-medium opacity-80">
-                  Managing Multiple Clients
-                </span>
+              </div>
 
-                {/* Active Checkmark Badge */}
-                {userType === 'agency' && (
-                  <div className="absolute top-2 right-2 text-blue-500">
-                    <CheckCircle className="w-4 h-4" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {/* Business Option */}
+                <button
+                  type="button"
+                  onClick={() => setUserType('business')}
+                  className={`
+                    relative flex flex-col items-center justify-center p-5 rounded-xl border-2 transition-all duration-200 group
+                    ${userType === 'business' 
+                      ? 'border-primary bg-primary/5 text-primary shadow-md ring-1 ring-primary/20 scale-[1.02]' 
+                      : 'border-border bg-card/50 text-muted-foreground hover:border-primary/30 hover:bg-card hover:text-foreground'}
+                  `}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <User className={`w-5 h-5 ${userType === 'business' ? 'fill-current' : ''}`} />
+                    <span className="font-bold text-lg tracking-tight">Business Owner</span>
                   </div>
-                )}
-              </button>
+                  <span className="text-xs font-medium opacity-80">
+                    Optimizing a Single Website
+                  </span>
+                  
+                  {/* Active Checkmark Badge */}
+                  {userType === 'business' && (
+                    <div className="absolute top-2 right-2 text-primary">
+                      <CheckCircle className="w-4 h-4" />
+                    </div>
+                  )}
+                </button>
+
+                {/* Agency Option */}
+                <button
+                  type="button"
+                  onClick={() => setUserType('agency')}
+                  className={`
+                    relative flex flex-col items-center justify-center p-5 rounded-xl border-2 transition-all duration-200 group
+                    ${userType === 'agency' 
+                      ? 'border-blue-500 bg-blue-500/5 text-blue-500 shadow-md ring-1 ring-blue-500/20 scale-[1.02]' 
+                      : 'border-border bg-card/50 text-muted-foreground hover:border-blue-500/30 hover:bg-card hover:text-foreground'}
+                  `}
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Building2 className={`w-5 h-5 ${userType === 'agency' ? 'fill-current' : ''}`} />
+                    <span className="font-bold text-lg tracking-tight">Agency</span>
+                  </div>
+                  <span className="text-xs font-medium opacity-80">
+                    Managing Multiple Clients
+                  </span>
+
+                  {/* Active Checkmark Badge */}
+                  {userType === 'agency' && (
+                    <div className="absolute top-2 right-2 text-blue-500">
+                      <CheckCircle className="w-4 h-4" />
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              {/* Continue Button */}
+              <Button 
+                onClick={onProceedToInput}
+                size="lg" 
+                className={`w-full h-12 font-bold btn-hover-lift ${
+                  userType === 'agency' 
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white' 
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                }`}
+              >
+                Continue
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
             </div>
           </motion.div>
         )}
 
-        {/* Input Form - scales down when scanning to de-emphasize */}
-        <motion.div
-          className="w-full max-w-2xl mx-auto"
-          animate={{ 
-            scale: isScanning ? 0.95 : 1, 
-            opacity: isScanning ? 0.8 : 1 
-          }}
-          transition={{ duration: 0.3 }}
-        >
-          <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
-            <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Search className="w-5 h-5 text-primary" />
+        {/* Step 2: Input Form - Only show on 'input' or 'scanning' step */}
+        {(currentStep === 'input' || currentStep === 'scanning') && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ 
+              opacity: isScanning ? 0.8 : 1,
+              scale: isScanning ? 0.95 : 1,
+              y: 0
+            }}
+            transition={{ duration: 0.3 }}
+            className="w-full max-w-2xl mx-auto"
+          >
+            <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
+              <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Search className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <h3 className="font-bold text-lg mb-1">Enter Your Website URL</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {userType === 'business' 
+                        ? "Get AI-ready in under 3 minutes. No technical knowledge required."
+                        : "Enter your client's website to generate a professional audit."}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left flex-1">
-                  <h3 className="font-bold text-lg mb-1">Enter Your Website URL</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Get AI-ready in under 3 minutes. No technical knowledge required.
-                  </p>
+                
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Input 
+                      placeholder={userType === 'business' ? "example.com" : "client-website.com"} 
+                      className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      data-testid="input-url"
+                      disabled={isScanning}
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    size="lg" 
+                    className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
+                    data-testid="button-scan"
+                    disabled={isScanning || !url}
+                  >
+                    {isScanning ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                          className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
+                        />
+                        Scanning...
+                      </>
+                    ) : (
+                      <>
+                        Begin Analysis
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
-              
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Input 
-                    placeholder={userType === 'business' ? "example.com" : "client-website.com"} 
-                    className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    data-testid="input-url"
-                    disabled={isScanning}
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  size="lg" 
-                  className="h-12 px-8 bg-primary text-primary-foreground hover:bg-primary/90 font-bold btn-hover-lift"
-                  data-testid="button-scan"
-                  disabled={isScanning || !url}
-                >
-                  {isScanning ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
-                      />
-                      Scanning...
-                    </>
-                  ) : (
-                    <>
-                      Begin Analysis
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </motion.div>
+            </form>
+          </motion.div>
+        )}
         
         {!isScanning && currentStep === 'input' && (
           <div className="mt-6 flex flex-col items-center gap-2">
@@ -1189,8 +1226,12 @@ export default function Home() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPremiumReport, setShowPremiumReport] = useState(false);
   const [premiumReportData, setPremiumReportData] = useState<any>(null);
-  const [currentStep, setCurrentStep] = useState<ScanStep>('input');
+  const [currentStep, setCurrentStep] = useState<ScanStep>('select-type');
   const [userType, setUserType] = useState<UserType>('business');
+
+  const handleProceedToInput = useCallback(() => {
+    setCurrentStep('input');
+  }, []);
 
   const handleScan = (url: string) => {
     setTargetUrl(url);
@@ -1254,6 +1295,7 @@ export default function Home() {
             preflightStatus={isScanning ? "Resolving DNS..." : undefined}
             userType={userType}
             setUserType={setUserType}
+            onProceedToInput={handleProceedToInput}
           >
             {/* Conditionally render TerminalDemo inside Hero */}
             <TerminalDemo 
@@ -1266,8 +1308,8 @@ export default function Home() {
             />
           </Hero>
           
-          {/* Show Value Proposition and How It Works only on input step */}
-          {!isScanning && currentStep === 'input' && (
+          {/* Show Value Proposition and How It Works on select-type and input steps */}
+          {!isScanning && (currentStep === 'select-type' || currentStep === 'input') && (
             <>
               <ValueProposition userType={userType} />
               <HowItWorks userType={userType} />
