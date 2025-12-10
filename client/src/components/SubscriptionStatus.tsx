@@ -6,7 +6,9 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Separator } from "./ui/separator";
 import { useSubscription } from "../hooks/useSubscription";
+import { PromotionalCodeInput } from "./PromotionalCodeInput";
 
 interface SubscriptionStatusProps {
   className?: string;
@@ -26,6 +28,7 @@ export function SubscriptionStatus({ className = "", compact = false }: Subscrip
     reactivateSubscription,
     reactivateLoading,
     formatPrice,
+    refreshSubscription,
   } = useSubscription();
 
   if (subscriptionLoading) {
@@ -61,13 +64,18 @@ export function SubscriptionStatus({ className = "", compact = false }: Subscrip
           </CardTitle>
           <CardDescription>You don't have an active subscription</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
             Subscribe to unlock premium features and get the most out of RoboScan.
           </p>
           <Button asChild>
             <a href="/pricing">View Plans</a>
           </Button>
+          
+          <Separator />
+          
+          {/* Promotional Code Input */}
+          <PromotionalCodeInput onSuccess={refreshSubscription} />
         </CardContent>
       </Card>
     );
@@ -260,6 +268,11 @@ export function SubscriptionStatus({ className = "", compact = false }: Subscrip
             </Button>
           )}
         </div>
+
+        <Separator />
+        
+        {/* Promotional Code Input - Extend subscription */}
+        <PromotionalCodeInput onSuccess={refreshSubscription} />
       </CardContent>
     </Card>
   );

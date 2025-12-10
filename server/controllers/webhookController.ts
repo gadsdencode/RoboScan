@@ -126,8 +126,13 @@ async function getSubscriptionFromEvent(event: Stripe.Event) {
     return storage.getSubscriptionByStripeId(data.id);
   }
   
-  if (data.object === 'invoice' && data.subscription) {
-    return storage.getSubscriptionByStripeId(data.subscription as string);
+  // In Stripe v20, invoice subscription is accessed via parent.subscription_details
+  if (data.object === 'invoice') {
+    const subscriptionRef = data.parent?.subscription_details?.subscription;
+    if (subscriptionRef) {
+      const subscriptionId = typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef.id;
+      return storage.getSubscriptionByStripeId(subscriptionId);
+    }
   }
   
   return null;
@@ -177,14 +182,19 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     ? item.price.product 
     : item?.price?.product?.id || '';
 
+  // In Stripe v20, current_period_start/end are on subscription items
+  const firstItem = subscription.items.data[0];
+  const currentPeriodStart = firstItem?.current_period_start;
+  const currentPeriodEnd = firstItem?.current_period_end;
+
   await storage.createSubscription({
     userId,
     stripeSubscriptionId: subscription.id,
     stripePriceId: priceId,
     stripeProductId: productId,
     status: subscription.status,
-    currentPeriodStart: new Date(subscription.current_period_start * 1000),
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+    currentPeriodStart: currentPeriodStart ? new Date(currentPeriodStart * 1000) : null,
+    currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd * 1000) : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
     trialStart: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
@@ -246,8 +256,8 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     message: `Your free trial will end on ${new Date(subscription.trial_end! * 1000).toLocaleDateString()}. Add a payment method to continue your subscription.`,
     changes: {
       subscriptionId: subscription.id,
-      trialEnd: subscription.trial_end,
-    },
+      trialEnd: subscription.trial_end ?? null,
+    } as any,
   });
 
   console.log(`[Webhook] Trial ending notification sent for subscription ${subscription.id}`);
@@ -258,14 +268,16 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
  * Sent when a subscription invoice is successfully paid
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) {
+  // In Stripe v20, subscription is accessed via parent.subscription_details
+  const subscriptionDetails = invoice.parent?.subscription_details;
+  if (!subscriptionDetails?.subscription) {
     console.log(`[Webhook] Invoice ${invoice.id} is not for a subscription`);
     return;
   }
 
-  const subscriptionId = typeof invoice.subscription === 'string'
-    ? invoice.subscription
-    : invoice.subscription.id;
+  const subscriptionId = typeof subscriptionDetails.subscription === 'string'
+    ? subscriptionDetails.subscription
+    : subscriptionDetails.subscription.id;
 
   // Update subscription status to active
   const subscription = await storage.getSubscriptionByStripeId(subscriptionId);
@@ -282,14 +294,16 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
  * Sent when a subscription payment fails
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) {
+  // In Stripe v20, subscription is accessed via parent.subscription_details
+  const subscriptionDetails = invoice.parent?.subscription_details;
+  if (!subscriptionDetails?.subscription) {
     console.log(`[Webhook] Invoice ${invoice.id} is not for a subscription`);
     return;
   }
 
-  const subscriptionId = typeof invoice.subscription === 'string'
-    ? invoice.subscription
-    : invoice.subscription.id;
+  const subscriptionId = typeof subscriptionDetails.subscription === 'string'
+    ? subscriptionDetails.subscription
+    : subscriptionDetails.subscription.id;
 
   const subscription = await storage.getSubscriptionByStripeId(subscriptionId);
   if (!subscription) {
@@ -305,9 +319,9 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     message: 'We were unable to process your subscription payment. Please update your payment method to avoid service interruption.',
     changes: {
       subscriptionId: subscriptionId,
-      invoiceId: invoice.id,
-      amount: invoice.amount_due,
-    },
+      invoiceId: invoice.id ?? null,
+      amount: invoice.amount_due ?? 0,
+    } as any,
   });
 
   console.log(`[Webhook] Payment failed notification sent for invoice ${invoice.id}`);
@@ -349,12 +363,17 @@ async function updateSubscriptionFromStripe(subscription: Stripe.Subscription) {
     ? item.price.product 
     : item?.price?.product?.id || existing.stripeProductId;
 
+  // In Stripe v20, current_period_start/end are on subscription items
+  const firstItemUpdate = subscription.items.data[0];
+  const periodStart = firstItemUpdate?.current_period_start;
+  const periodEnd = firstItemUpdate?.current_period_end;
+
   await storage.updateSubscription(subscription.id, {
     stripePriceId: priceId,
     stripeProductId: productId || null,
     status: subscription.status,
-    currentPeriodStart: new Date(subscription.current_period_start * 1000),
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+    currentPeriodStart: periodStart ? new Date(periodStart * 1000) : null,
+    currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
     trialStart: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,

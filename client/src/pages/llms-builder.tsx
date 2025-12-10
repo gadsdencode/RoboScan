@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle, Upload } from "lucide-react";
 import { ImportUrlDialog } from "@/components/ImportUrlDialog";
-import { type ParsedLLMsTxt } from "@/lib/parsers";
+import { type ParsedLLMsTxt, type ParsedRobotsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { builderTourSteps } from "@/lib/tour-config";
@@ -473,20 +473,23 @@ For AI partnership inquiries: ${formData.contactEmail}
     });
   };
 
-  const handleImport = (data: ParsedLLMsTxt) => {
+  const handleImport = (data: ParsedRobotsTxt | ParsedLLMsTxt) => {
+    // Type guard: we know this is ParsedLLMsTxt because we set type="llms" in ImportUrlDialog
+    if (!('websiteName' in data)) return;
+    const llmsData = data as ParsedLLMsTxt;
     // Populate form fields with parsed data
-    if (data.websiteName) setValue('websiteName', data.websiteName);
-    if (data.websiteUrl) setValue('websiteUrl', data.websiteUrl);
-    if (data.contentDescription) setValue('contentDescription', data.contentDescription);
-    if (data.citationFormat) setValue('citationFormat', data.citationFormat);
-    if (data.allowedBots) setValue('allowedBots', data.allowedBots);
-    if (data.keyAreas) setValue('keyAreas', data.keyAreas);
-    if (data.contentGuidelines) setValue('contentGuidelines', data.contentGuidelines);
-    if (data.contactEmail) setValue('contactEmail', data.contactEmail);
+    if (llmsData.websiteName) setValue('websiteName', llmsData.websiteName);
+    if (llmsData.websiteUrl) setValue('websiteUrl', llmsData.websiteUrl);
+    if (llmsData.contentDescription) setValue('contentDescription', llmsData.contentDescription);
+    if (llmsData.citationFormat) setValue('citationFormat', llmsData.citationFormat);
+    if (llmsData.allowedBots) setValue('allowedBots', llmsData.allowedBots);
+    if (llmsData.keyAreas) setValue('keyAreas', llmsData.keyAreas);
+    if (llmsData.contentGuidelines) setValue('contentGuidelines', llmsData.contentGuidelines);
+    if (llmsData.contactEmail) setValue('contactEmail', llmsData.contactEmail);
     
     toast({
       title: "Configuration Imported",
-      description: `Imported ${data.metadata.totalSections} sections from external llms.txt`,
+      description: `Imported ${llmsData.metadata.totalSections} sections from external llms.txt`,
     });
   };
 

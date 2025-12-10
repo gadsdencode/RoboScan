@@ -23,6 +23,7 @@ import {
   seoController,
   subscriptionController,
   webhookController,
+  promotionalCodeController,
 } from "./controllers/index.js";
 
 // Guardian subscription plan configuration
@@ -245,6 +246,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Webhook routes: /api/webhooks/*
   // Note: Webhook endpoint needs raw body - configured separately in index.ts
   app.use('/api/webhooks', webhookController);
+
+  // Promotional codes routes: /api/promotional-codes/*
+  app.use('/api/promotional-codes', promotionalCodeController);
 
   const httpServer = createServer(app);
 

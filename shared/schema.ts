@@ -349,3 +349,47 @@ export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans
 
 export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
+// Promotional codes for free subscription periods
+export const promotionalCodes = pgTable("promotional_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code").notNull().unique(),
+  description: text("description"),
+  monthsFree: integer("months_free").notNull().default(1),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  maxUses: integer("max_uses"), // null = unlimited
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("promotional_code_idx").on(table.code),
+]);
+
+export const insertPromotionalCodeSchema = createInsertSchema(promotionalCodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPromotionalCode = z.infer<typeof insertPromotionalCodeSchema>;
+export type PromotionalCode = typeof promotionalCodes.$inferSelect;
+
+// Promotional code redemptions tracking
+export const promotionalCodeRedemptions = pgTable("promotional_code_redemptions", {
+  id: serial("id").primaryKey(),
+  codeId: integer("code_id").notNull().references(() => promotionalCodes.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  subscriptionId: integer("subscription_id").references(() => subscriptions.id),
+  redeemedAt: timestamp("redeemed_at").defaultNow().notNull(),
+}, (table) => [
+  index("redemption_user_idx").on(table.userId),
+  index("redemption_code_idx").on(table.codeId),
+]);
+
+export const insertPromotionalCodeRedemptionSchema = createInsertSchema(promotionalCodeRedemptions).omit({
+  id: true,
+  redeemedAt: true,
+});
+
+export type InsertPromotionalCodeRedemption = z.infer<typeof insertPromotionalCodeRedemptionSchema>;
+export type PromotionalCodeRedemption = typeof promotionalCodeRedemptions.$inferSelect;

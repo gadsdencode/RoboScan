@@ -14,6 +14,8 @@ import {
   subscriptions,
   subscriptionEvents,
   subscriptionPlans,
+  promotionalCodes,
+  promotionalCodeRedemptions,
   type User,
   type UpsertUser,
   type Scan,
@@ -40,6 +42,10 @@ import {
   type InsertSubscriptionEvent,
   type SubscriptionPlan,
   type InsertSubscriptionPlan,
+  type PromotionalCode,
+  type InsertPromotionalCode,
+  type PromotionalCodeRedemption,
+  type InsertPromotionalCodeRedemption,
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -146,6 +152,13 @@ export interface IStorage {
   hasLlmsFieldAccess(userId: string, fieldKey: string): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }>;
   hasRobotsFieldAccess(userId: string, fieldKey: string): Promise<{ hasAccess: boolean; reason: 'subscription' | 'purchase' | 'none' }>;
   hasRecurringScanAccess(userId: string): Promise<boolean>;
+  
+  // Promotional code operations
+  getPromotionalCode(code: string): Promise<PromotionalCode | undefined>;
+  createPromotionalCode(code: InsertPromotionalCode): Promise<PromotionalCode>;
+  getPromotionalCodeRedemptionCount(codeId: number): Promise<number>;
+  createPromotionalCodeRedemption(redemption: InsertPromotionalCodeRedemption): Promise<PromotionalCodeRedemption>;
+  getUserPromotionalCodeRedemptions(userId: string): Promise<PromotionalCodeRedemption[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -729,12 +742,18 @@ export class DatabaseStorage implements IStorage {
 
   // Subscription plans
   async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    // Ensure features is properly typed for Drizzle
+    const planData = {
+      ...plan,
+      features: plan.features ? (plan.features as string[]) : [],
+    };
+    
     const [created] = await db
       .insert(subscriptionPlans)
-      .values(plan)
+      .values(planData)
       .onConflictDoUpdate({
         target: subscriptionPlans.stripePriceId,
-        set: { ...plan, updatedAt: new Date() },
+        set: { ...planData, updatedAt: new Date() },
       })
       .returning();
     return created;
@@ -763,9 +782,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSubscriptionPlan(id: number, data: Partial<InsertSubscriptionPlan>): Promise<SubscriptionPlan> {
+    // Ensure features is properly typed for Drizzle if present
+    const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
+    if (data.features !== undefined) {
+      updateData.features = data.features as string[];
+    }
+    
     const [updated] = await db
       .update(subscriptionPlans)
-      .set({ ...data, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(subscriptionPlans.id, id))
       .returning();
     
@@ -842,6 +867,51 @@ export class DatabaseStorage implements IStorage {
   async hasRecurringScanAccess(userId: string): Promise<boolean> {
     const subscription = await this.getUserActiveSubscription(userId);
     return !!subscription;
+  }
+
+  // ============== Promotional Code Operations ==============
+
+  async getPromotionalCode(code: string): Promise<PromotionalCode | undefined> {
+    const [promoCode] = await db
+      .select()
+      .from(promotionalCodes)
+      .where(eq(promotionalCodes.code, code.toUpperCase()));
+    return promoCode;
+  }
+
+  async createPromotionalCode(code: InsertPromotionalCode): Promise<PromotionalCode> {
+    const [created] = await db
+      .insert(promotionalCodes)
+      .values({
+        ...code,
+        code: code.code.toUpperCase(), // Normalize to uppercase
+      })
+      .returning();
+    return created;
+  }
+
+  async getPromotionalCodeRedemptionCount(codeId: number): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(promotionalCodeRedemptions)
+      .where(eq(promotionalCodeRedemptions.codeId, codeId));
+    return Number(result[0]?.count || 0);
+  }
+
+  async createPromotionalCodeRedemption(redemption: InsertPromotionalCodeRedemption): Promise<PromotionalCodeRedemption> {
+    const [created] = await db
+      .insert(promotionalCodeRedemptions)
+      .values(redemption)
+      .returning();
+    return created;
+  }
+
+  async getUserPromotionalCodeRedemptions(userId: string): Promise<PromotionalCodeRedemption[]> {
+    return await db
+      .select()
+      .from(promotionalCodeRedemptions)
+      .where(eq(promotionalCodeRedemptions.userId, userId))
+      .orderBy(desc(promotionalCodeRedemptions.redeemedAt));
   }
 }
 

@@ -13,6 +13,7 @@ import { PaymentModal } from "@/components/PaymentModal";
 import { ScanComparison } from "@/components/ScanComparison";
 import { CompactUserHUD } from "@/components/CompactUserHUD";
 import { TrophyCase } from "@/components/TrophyCase";
+import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { ScanDetailsModal } from "@/components/ScanDetailsModal";
 import { RecurringScans, type RecurringScan } from "@/components/dashboard/RecurringScans";
 import { NotificationSheet, type Notification } from "@/components/dashboard/NotificationSheet";
@@ -687,7 +688,6 @@ export default function Dashboard() {
       if (response.ok) {
         await fetchScans(selectedTags.length > 0 ? selectedTags : undefined);
         await fetchAllTags();
-        setTagInput("");
       }
     } catch (error) {
       console.error('Failed to add tag:', error);
@@ -946,6 +946,11 @@ export default function Dashboard() {
               </>
             )}
           </Card>
+        </div>
+
+        {/* Subscription & Promo Code Section */}
+        <div className="mb-8">
+          <SubscriptionStatus />
         </div>
 
         {/* Recurring Scans Section */}

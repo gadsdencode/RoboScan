@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle, Upload } from "lucide-react";
 import { ImportUrlDialog } from "@/components/ImportUrlDialog";
-import { type ParsedRobotsTxt } from "@/lib/parsers";
+import { type ParsedRobotsTxt, type ParsedLLMsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { robotsBuilderTourSteps } from "@/lib/tour-config";
@@ -477,17 +477,20 @@ export default function RobotsBuilder() {
     });
   };
 
-  const handleImport = (data: ParsedRobotsTxt) => {
+  const handleImport = (data: ParsedRobotsTxt | ParsedLLMsTxt) => {
+    // Type guard: we know this is ParsedRobotsTxt because we set type="robots" in ImportUrlDialog
+    if (!('sitemapUrl' in data)) return;
+    const robotsData = data as ParsedRobotsTxt;
     // Populate form fields with parsed data
-    setValue('sitemapUrl', data.sitemapUrl);
-    setValue('crawlDelay', data.crawlDelay || '0');
-    setValue('disallowedPaths', data.disallowedPaths);
-    setValue('allowedPaths', data.allowedPaths);
-    setValue('defaultAccess', data.defaultAccess);
+    setValue('sitemapUrl', robotsData.sitemapUrl);
+    setValue('crawlDelay', robotsData.crawlDelay || '0');
+    setValue('disallowedPaths', robotsData.disallowedPaths);
+    setValue('allowedPaths', robotsData.allowedPaths);
+    setValue('defaultAccess', robotsData.defaultAccess);
     
     toast({
       title: "Configuration Imported",
-      description: `Imported ${data.metadata.totalRules} rules from external robots.txt`,
+      description: `Imported ${robotsData.metadata.totalRules} rules from external robots.txt`,
     });
   };
 

@@ -268,5 +268,6 @@ export function useSubscription() {
     // Helpers
     formatPrice,
     refetchSubscription: () => queryClient.invalidateQueries({ queryKey: ["current-subscription"] }),
+    refreshSubscription: () => queryClient.invalidateQueries({ queryKey: ["current-subscription"] }),
   };
 }

@@ -570,7 +570,9 @@ router.get('/debug', requireAuth, async (req: any, res: Response) => {
         })),
         recurringPrices: recurringPrices.data.map(p => ({
           id: p.id,
-          product: typeof p.product === 'string' ? p.product : p.product?.name,
+          product: typeof p.product === 'string' 
+            ? p.product 
+            : (p.product && 'name' in p.product ? p.product.name : p.product?.id),
           amount: p.unit_amount,
           currency: p.currency,
           interval: p.recurring?.interval
