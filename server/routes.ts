@@ -195,12 +195,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Don't fail startup for achievement seeding errors
   }
 
-  // [SUBSCRIPTIONS] Seed Guardian plan on startup
-  try {
-    await seedGuardianPlan();
-  } catch (error) {
-    console.error('[Routes] Error in Guardian plan seeding:', error);
-    // Don't fail startup for seeding errors
+  // [SUBSCRIPTIONS] Only seed Guardian plan if SEED_DB=true
+  // For production, run: npm run seed:plans (or set SEED_DB=true once during deployment)
+  if (process.env.SEED_DB === 'true') {
+    try {
+      console.log('[Routes] SEED_DB=true detected, seeding Guardian plan...');
+      await seedGuardianPlan();
+    } catch (error) {
+      console.error('[Routes] Error in Guardian plan seeding:', error);
+      // Don't fail startup for seeding errors
+    }
+  } else {
+    console.log('[Routes] Skipping Guardian plan seeding (set SEED_DB=true to enable)');
   }
 
   // ============== Mount Controllers ==============
