@@ -20,27 +20,45 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+// Request logger - logs only metadata to avoid memory leaks
+// Set DEBUG_RESPONSE_BODY=true to enable truncated body logging (max 1KB)
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+  
+  // Only capture body in debug mode, and truncate to prevent memory issues
+  let truncatedBody: string | undefined;
+  const shouldLogBody = process.env.DEBUG_RESPONSE_BODY === 'true';
+  
+  if (shouldLogBody) {
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      // Truncate body to max 1KB to prevent memory leaks
+      try {
+        const bodyStr = JSON.stringify(bodyJson);
+        truncatedBody = bodyStr.length > 1024 
+          ? bodyStr.slice(0, 1024) + '...[truncated]' 
+          : bodyStr;
+      } catch {
+        truncatedBody = '[non-serializable]';
+      }
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+  }
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
+      // Log only essential metadata by default
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      
+      // Append truncated body only in debug mode
+      if (shouldLogBody && truncatedBody) {
+        logLine += ` :: ${truncatedBody}`;
+        // Final truncation for console readability
+        if (logLine.length > 200) {
+          logLine = logLine.slice(0, 199) + "…";
+        }
       }
 
       log(logLine);
