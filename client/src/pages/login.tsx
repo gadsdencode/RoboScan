@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Mail, Loader2, AlertCircle, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from "lucide-react";
+import { Shield, Loader2, AlertCircle, Lock, Eye, EyeOff, ArrowLeft, CheckCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-type LoginStep = "email" | "password" | "set-password";
+type LoginStep = "credentials" | "set-password";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -19,7 +19,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<LoginStep>("email");
+  const [step, setStep] = useState<LoginStep>("credentials");
 
   // Check if user is already authenticated
   useEffect(() => {
@@ -46,47 +46,6 @@ export default function Login() {
   const isPasswordValid = passwordChecks.minLength;
   const passwordsMatch = password === confirmPassword && confirmPassword.length > 0;
 
-  const handleCheckEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/auth/check-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to check email");
-      }
-
-      if (data.action === "register") {
-        // New user - redirect to register
-        toast({
-          title: "Account Not Found",
-          description: "Please create an account to continue.",
-        });
-        setLocation(`/register?email=${encodeURIComponent(email)}`);
-      } else if (data.action === "set-password") {
-        // Legacy user - show set password UI
-        setStep("set-password");
-      } else {
-        // Existing user with password - show login UI
-        setStep("password");
-      }
-    } catch (error) {
-      console.error("Check email error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to check email";
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -111,18 +70,17 @@ export default function Login() {
           description: "You've been signed in successfully.",
         });
         setLocation("/dashboard");
+      } else if (response.status === 403 && data.code === "PASSWORD_REQUIRED") {
+        // Legacy user needs to set password - switch to set-password UI
+        setPassword(""); // Clear the password they attempted
+        setStep("set-password");
       } else {
-        throw new Error(data.message || "Login failed");
+        throw new Error(data.message || "Invalid email or password");
       }
     } catch (error) {
       console.error("Login error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to sign in";
+      const errorMessage = error instanceof Error ? error.message : "Invalid email or password";
       setError(errorMessage);
-      toast({
-        title: "Sign-in Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
@@ -182,7 +140,7 @@ export default function Login() {
   };
 
   const goBack = () => {
-    setStep("email");
+    setStep("credentials");
     setPassword("");
     setConfirmPassword("");
     setError(null);
@@ -204,29 +162,16 @@ export default function Login() {
               <span className="text-2xl font-bold font-mono text-primary">ROBOSCAN</span>
             </div>
             <AnimatePresence mode="wait">
-              {step === "email" && (
+              {step === "credentials" && (
                 <motion.div
-                  key="email-header"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <h1 className="text-2xl font-bold">Welcome</h1>
-                  <p className="text-muted-foreground text-sm">
-                    Enter your email to sign in or create an account
-                  </p>
-                </motion.div>
-              )}
-              {step === "password" && (
-                <motion.div
-                  key="password-header"
+                  key="credentials-header"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                 >
                   <h1 className="text-2xl font-bold">Welcome Back</h1>
                   <p className="text-muted-foreground text-sm">
-                    Enter your password to sign in
+                    Sign in to your account
                   </p>
                 </motion.div>
               )}
@@ -276,14 +221,14 @@ export default function Login() {
           )}
 
           <AnimatePresence mode="wait">
-            {/* Step 1: Email Input */}
-            {step === "email" && (
+            {/* Unified Login Form */}
+            {step === "credentials" && (
               <motion.form
-                key="email-form"
+                key="credentials-form"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleCheckEmail}
+                onSubmit={handleLogin}
                 className="space-y-4"
               >
                 <div className="space-y-2">
@@ -302,45 +247,6 @@ export default function Login() {
                     autoFocus
                   />
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full h-12"
-                  disabled={isLoading || !email}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Checking...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4 mr-2" />
-                      Continue
-                    </>
-                  )}
-                </Button>
-              </motion.form>
-            )}
-
-            {/* Step 2a: Password Login (existing user with password) */}
-            {step === "password" && (
-              <motion.form
-                key="password-form"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onSubmit={handleLogin}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Email
-                  </label>
-                  <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-border">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{email}</span>
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <label htmlFor="password" className="text-sm font-medium">
                     Password
@@ -355,7 +261,6 @@ export default function Login() {
                       required
                       disabled={isLoading}
                       className="w-full pr-10"
-                      autoFocus
                     />
                     <button
                       type="button"
@@ -369,7 +274,7 @@ export default function Login() {
                 <Button
                   type="submit"
                   className="w-full h-12"
-                  disabled={isLoading || !password}
+                  disabled={isLoading || !email || !password}
                 >
                   {isLoading ? (
                     <>
@@ -378,24 +283,15 @@ export default function Login() {
                     </>
                   ) : (
                     <>
-                      <Lock className="w-4 h-4 mr-2" />
+                      <LogIn className="w-4 h-4 mr-2" />
                       Sign In
                     </>
                   )}
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={goBack}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Use a different email
-                </Button>
               </motion.form>
             )}
 
-            {/* Step 2b: Set Password (legacy user without password) */}
+            {/* Set Password (legacy user without password) */}
             {step === "set-password" && (
               <motion.form
                 key="set-password-form"
@@ -405,15 +301,6 @@ export default function Login() {
                 onSubmit={handleSetPassword}
                 className="space-y-4"
               >
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Email
-                  </label>
-                  <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-border">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{email}</span>
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <label htmlFor="new-password" className="text-sm font-medium">
                     Create Password
@@ -510,14 +397,14 @@ export default function Login() {
                   onClick={goBack}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Use a different email
+                  Back to login
                 </Button>
               </motion.form>
             )}
           </AnimatePresence>
 
-          {/* Register Link - only show on email step */}
-          {step === "email" && (
+          {/* Register Link */}
+          {step === "credentials" && (
             <div className="text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>
               <Link href="/register" className="text-primary hover:underline font-medium">

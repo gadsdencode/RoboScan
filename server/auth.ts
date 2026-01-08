@@ -4,7 +4,11 @@ import bcrypt from "bcryptjs";
 import { storage } from "./storage.js";
 import cookieParser from "cookie-parser";
 
-const JWT_SECRET = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET || "dev-secret-change-me";
+// SESSION_SECRET is required - no insecure defaults allowed
+const JWT_SECRET = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('FATAL: SESSION_SECRET environment variable is required. The application cannot start without a secure session secret.');
+}
 const COOKIE_NAME = "auth_token";
 const TOKEN_EXPIRY = "7d";
 
@@ -89,54 +93,9 @@ function validateEmail(email: string): boolean {
 export async function setupAuth(app: Express) {
   app.use(cookieParser());
 
-  // Check email status - determines if user exists and has password set
-  app.post("/api/auth/check-email", async (req, res) => {
-    try {
-      const { email } = req.body;
-      
-      if (!email || typeof email !== "string") {
-        return res.status(400).json({ message: "Email is required" });
-      }
-
-      if (!validateEmail(email)) {
-        return res.status(400).json({ message: "Invalid email format" });
-      }
-
-      const normalizedEmail = email.toLowerCase().trim();
-      
-      const user = await storage.getUser(normalizedEmail);
-      
-      if (!user) {
-        // User doesn't exist - needs to register
-        return res.json({ 
-          exists: false, 
-          hasPassword: false,
-          action: "register"
-        });
-      }
-
-      if (!user.passwordHash) {
-        // Legacy user - needs to set password
-        return res.json({ 
-          exists: true, 
-          hasPassword: false,
-          action: "set-password"
-        });
-      }
-
-      // User exists with password - normal login
-      return res.json({ 
-        exists: true, 
-        hasPassword: true,
-        action: "login"
-      });
-    } catch (error) {
-      console.error("[Auth] Check email error:", error);
-      res.status(500).json({ message: "Failed to check email" });
-    }
-  });
-
   // Email/password login
+  // NOTE: check-email endpoint was removed to prevent user enumeration attacks.
+  // The login flow now uses generic error messages and handles legacy users via PASSWORD_REQUIRED code.
   app.post("/api/auth/login", async (req, res) => {
     let responseSent = false;
     const sendError = (status: number, message: string, code?: string, error?: any): void => {
@@ -183,9 +142,9 @@ export async function setupAuth(app: Express) {
         return;
       }
       
-      // User doesn't exist - need to register
+      // User doesn't exist - use generic message to prevent user enumeration
       if (!user) {
-        sendError(401, "Invalid email or password. If you don't have an account, please register first.");
+        sendError(401, "Invalid email or password");
         return;
       }
 
@@ -302,12 +261,9 @@ export async function setupAuth(app: Express) {
       }
       
       if (existingUser) {
-        // If user exists but has no password, they're a legacy user
-        if (!existingUser.passwordHash) {
-          sendError(400, "An account with this email already exists. Please use the login page and set your password.");
-        } else {
-          sendError(400, "An account with this email already exists. Please login instead.");
-        }
+        // Use generic message to prevent user enumeration
+        // Don't reveal whether account exists or if password is set
+        sendError(400, "Unable to create account. Please try signing in instead.");
         return;
       }
 
@@ -440,14 +396,15 @@ export async function setupAuth(app: Express) {
         return;
       }
       
+      // Use generic messages to prevent user enumeration
       if (!user) {
-        sendError(404, "User not found. Please register for a new account.");
+        sendError(400, "Unable to set password. Please try signing in or registering.");
         return;
       }
 
       // If user already has a password, don't allow this endpoint
       if (user.passwordHash) {
-        sendError(400, "Password is already set. Use the login page to sign in.");
+        sendError(400, "Unable to set password. Please try signing in.");
         return;
       }
 
