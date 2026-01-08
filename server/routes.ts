@@ -11,6 +11,7 @@ import { getStripe } from "./utils/stripe.js";
 // Import all controllers
 import {
   scanController,
+  scanWorkerController,
   paymentController,
   reportController,
   recurringScansController,
@@ -212,9 +213,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============== Mount Controllers ==============
   
   // Scan routes: POST /api/scan, GET /api/user/scans, GET /api/scans/:id, PATCH /api/scans/:id/tags
+  // Also includes: GET /api/scan-jobs/:jobId/status for async scan polling
   app.use('/api/scan', scanController);           // POST /api/scan (route: /)
   app.use('/api/scans', scanController);          // GET /api/scans/:id, PATCH /api/scans/:id/tags
+  app.use('/api/scan-jobs', scanController);      // GET /api/scan-jobs/:jobId/status (route: /jobs/:jobId/status)
   app.use('/api/user', scanController);           // GET /api/user/scans (route: /scans)
+  
+  // Scan worker routes: POST /api/scan-worker (QStash background job endpoint)
+  // These endpoints are called by QStash, not by users directly
+  app.use('/api/scan-worker', scanWorkerController);
+  app.use('/api/scan-callback', scanWorkerController);  // Callback endpoint for QStash
 
   // Payment routes: POST /api/create-payment-intent, POST /api/confirm-payment
   app.use('/api', paymentController);

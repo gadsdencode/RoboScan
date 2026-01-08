@@ -438,7 +438,8 @@ const TerminalDemo = ({
       setLines([...preflightSteps]);
 
       try {
-        const response = await fetch('/api/scan', {
+        // Use async mode by default for better reliability on Vercel
+        const response = await fetch('/api/scan?async=true', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: targetUrl }),
@@ -456,7 +457,65 @@ const TerminalDemo = ({
           return;
         }
 
-        const result: ScanResult = await response.json();
+        // Handle async mode (202 Accepted) vs sync mode (200 OK)
+        let result: ScanResult;
+        
+        if (response.status === 202) {
+          // Async mode: poll for results
+          const asyncData = await response.json();
+          const jobId = asyncData.jobId;
+          
+          setLines(prev => [
+            ...prev,
+            "> [INFO] Scan queued for background processing...",
+          ]);
+          
+          // Poll for completion
+          let pollAttempts = 0;
+          const maxPolls = 120; // 2 minutes max
+          
+          while (pollAttempts < maxPolls) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            pollAttempts++;
+            
+            const statusRes = await fetch(`/api/scan-jobs/${jobId}/status`, {
+              credentials: "include",
+            });
+            
+            if (!statusRes.ok) {
+              throw new Error('Failed to get scan status');
+            }
+            
+            const status = await statusRes.json();
+            
+            // Update progress message
+            if (status.progressMessage) {
+              setLines(prev => {
+                const lastLine = prev[prev.length - 1];
+                if (lastLine?.startsWith('> [PROGRESS]')) {
+                  return [...prev.slice(0, -1), `> [PROGRESS] ${status.progressMessage}`];
+                }
+                return [...prev, `> [PROGRESS] ${status.progressMessage}`];
+              });
+            }
+            
+            if (status.status === 'completed' && status.result) {
+              result = status.result;
+              break;
+            }
+            
+            if (status.status === 'failed') {
+              throw new Error(status.error || 'Scan failed');
+            }
+          }
+          
+          if (!result!) {
+            throw new Error('Scan timed out');
+          }
+        } else {
+          // Sync mode: result is immediate
+          result = await response.json();
+        }
         setScanResult(result);
 
         const newLines = [...preflightSteps];

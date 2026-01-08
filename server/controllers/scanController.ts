@@ -1,6 +1,13 @@
 // server/controllers/scanController.ts
 // Handles website scanning and scan management routes
 // NOTE: Free tier sees limited details; subscription/purchase unlocks full details
+// 
+// ASYNC SCANNING ARCHITECTURE:
+// - POST /api/scan now supports async mode via ?async=true query param
+// - Async mode creates a job and returns 202 Accepted with jobId immediately
+// - Background worker (QStash) performs actual scan
+// - Frontend polls GET /api/scan-jobs/:jobId/status for completion
+// - Sync mode (default) maintains backward compatibility
 
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -11,6 +18,7 @@ import { isAuthenticated, checkAuthentication } from "../auth.js";
 import { calculateLevel, calculateXpWithMultiplier } from "../gamification.js";
 import { normalizeDomainForCooldown } from "../domain-utils.js";
 import { isAdmin } from "../utils/admin.js";
+import { isQStashEnabled, publishScanJob } from "../utils/qstash.js";
 import {
   scanRequestSchema,
   tagsSchema,
@@ -106,6 +114,12 @@ router.get('/scans', isAuthenticated, async (req: any, res: Response) => {
 /**
  * POST /api/scan
  * Perform a website scan (works for both authenticated and anonymous users)
+ * 
+ * Query params:
+ * - async=true: Use async mode (returns 202 with jobId, frontend polls for result)
+ * - async=false (default): Use sync mode (blocks until scan complete, backward compatible)
+ * 
+ * Async mode is recommended for Vercel deployments to avoid serverless timeouts
  */
 router.post('/', async (req: any, res: Response) => {
   try {
@@ -123,6 +137,19 @@ router.post('/', async (req: any, res: Response) => {
       });
     }
 
+    // Check if async mode is requested
+    const useAsync = req.query.async === 'true' || req.query.async === '1';
+    
+    // Auto-enable async mode on Vercel if QStash is configured
+    const isVercel = !!process.env.VERCEL;
+    const shouldUseAsync = useAsync || (isVercel && isQStashEnabled());
+
+    if (shouldUseAsync && isQStashEnabled()) {
+      // ASYNC MODE: Create job and return immediately
+      return await handleAsyncScan(req, res, url, userId, tags || []);
+    }
+
+    // SYNC MODE: Original synchronous behavior (backward compatible)
     let isOnCooldown = false;
     if (userId) {
       isOnCooldown = await storage.checkDomainCooldown(userId, canonicalDomain);
@@ -281,6 +308,156 @@ router.post('/', async (req: any, res: Response) => {
       message: errorMessage,
       error: error instanceof Error ? error.message : "Unknown error"
     });
+  }
+});
+
+/**
+ * Handle async scan - creates a job and publishes to QStash
+ * Returns 202 Accepted with jobId for frontend polling
+ */
+async function handleAsyncScan(
+  req: any,
+  res: Response,
+  url: string,
+  userId: string | undefined,
+  tags: string[]
+): Promise<void> {
+  console.log(`[ScanController] Initiating async scan for ${url}`);
+
+  try {
+    // Create scan job in database
+    const scanJob = await storage.createScanJob({
+      userId,
+      url,
+      tags,
+      status: 'pending',
+      progress: 0,
+      progressMessage: 'Scan queued...',
+    });
+
+    console.log(`[ScanController] Created scan job: ${scanJob.id}`);
+
+    // Publish job to QStash for background processing
+    const qstashResult = await publishScanJob(scanJob.id, url, userId, tags);
+
+    if (qstashResult) {
+      // Update job with QStash message ID
+      await storage.updateScanJobStatus(scanJob.id, 'pending', {
+        qstashMessageId: qstashResult.messageId,
+        progressMessage: 'Scan queued, starting shortly...',
+      });
+
+      console.log(`[ScanController] Published to QStash: ${qstashResult.messageId}`);
+    } else {
+      // QStash publish failed - mark job as failed
+      await storage.updateScanJobStatus(scanJob.id, 'failed', {
+        error: 'Failed to queue scan job',
+        progressMessage: 'Failed to start scan',
+      });
+
+      res.status(500).json({
+        message: 'Failed to queue scan job',
+        error: 'QStash publish failed',
+      });
+      return;
+    }
+
+    // Return 202 Accepted with job info
+    res.status(202).json({
+      jobId: scanJob.id,
+      status: 'pending',
+      url,
+      message: 'Scan queued for processing',
+      // Include polling endpoint hint
+      _links: {
+        status: `/api/scan-jobs/${scanJob.id}/status`,
+      },
+    });
+  } catch (error) {
+    console.error('[ScanController] Async scan error:', error);
+    res.status(500).json({
+      message: 'Failed to initiate async scan',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * GET /api/scan-jobs/:jobId/status
+ * Poll endpoint for async scan job status
+ * Returns job status, progress, and result when completed
+ */
+router.get('/jobs/:jobId/status', async (req: any, res: Response) => {
+  try {
+    const { jobId } = req.params;
+
+    if (!jobId) {
+      return res.status(400).json({ message: 'Missing jobId parameter' });
+    }
+
+    const job = await storage.getScanJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({ message: 'Scan job not found' });
+    }
+
+    // Check if user has access to this job
+    const isAuth = checkAuthentication(req);
+    const userId = isAuth ? req.user?.claims?.sub : undefined;
+
+    // For non-authenticated requests, only allow access to anonymous jobs
+    // For authenticated requests, only allow access to their own jobs or anonymous jobs
+    if (job.userId && job.userId !== userId) {
+      return res.status(403).json({ message: 'Access denied to this scan job' });
+    }
+
+    // Build response based on job status
+    const response: any = {
+      jobId: job.id,
+      status: job.status,
+      url: job.url,
+      progress: job.progress,
+      progressMessage: job.progressMessage,
+      createdAt: job.createdAt,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+    };
+
+    // If completed, include scan data
+    if (job.status === 'completed' && job.scanId) {
+      const scan = await storage.getScan(job.scanId);
+      if (scan) {
+        response.scanId = scan.id;
+        response.result = {
+          id: scan.id,
+          url: scan.url,
+          robotsTxtFound: scan.robotsTxtFound,
+          robotsTxtContent: scan.robotsTxtContent,
+          llmsTxtFound: scan.llmsTxtFound,
+          llmsTxtContent: scan.llmsTxtContent,
+          sitemapXmlFound: scan.sitemapXmlFound,
+          securityTxtFound: scan.securityTxtFound,
+          manifestJsonFound: scan.manifestJsonFound,
+          adsTxtFound: scan.adsTxtFound,
+          humansTxtFound: scan.humansTxtFound,
+          aiTxtFound: scan.aiTxtFound,
+          botPermissions: scan.botPermissions,
+          errors: scan.errors,
+          warnings: scan.warnings,
+          score: scan.score,
+        };
+      }
+    }
+
+    // If failed, include error message
+    if (job.status === 'failed') {
+      response.error = job.error;
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('[ScanController] Get job status error:', error);
+    res.status(500).json({ message: 'Failed to get scan job status' });
   }
 });
 

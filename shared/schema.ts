@@ -393,3 +393,36 @@ export const insertPromotionalCodeRedemptionSchema = createInsertSchema(promotio
 
 export type InsertPromotionalCodeRedemption = z.infer<typeof insertPromotionalCodeRedemptionSchema>;
 export type PromotionalCodeRedemption = typeof promotionalCodeRedemptions.$inferSelect;
+
+// Scan Jobs table for async scanning architecture (QStash background processing)
+// Status: 'pending' -> 'processing' -> 'completed' | 'failed'
+export const scanJobs = pgTable("scan_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  url: text("url").notNull(),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  status: varchar("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  scanId: integer("scan_id").references(() => scans.id), // populated when scan completes
+  qstashMessageId: varchar("qstash_message_id"), // QStash message ID for tracking
+  error: text("error"), // Error message if failed
+  progress: integer("progress").default(0), // Progress percentage (0-100)
+  progressMessage: varchar("progress_message"), // Current progress status message
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"), // When processing started
+  completedAt: timestamp("completed_at"), // When processing completed/failed
+}, (table) => [
+  index("scan_job_user_idx").on(table.userId),
+  index("scan_job_status_idx").on(table.status),
+  index("scan_job_created_idx").on(table.createdAt),
+]);
+
+export const insertScanJobSchema = createInsertSchema(scanJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScanJob = z.infer<typeof insertScanJobSchema>;
+export type ScanJob = typeof scanJobs.$inferSelect;
+
+// Scan job status type for type safety
+export type ScanJobStatus = 'pending' | 'processing' | 'completed' | 'failed';

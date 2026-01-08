@@ -2,6 +2,7 @@
 // Barrel export for all controllers
 
 export { default as scanController } from './scanController.js';
+export { default as scanWorkerController } from './scanWorkerController.js';
 export { default as paymentController } from './paymentController.js';
 export { default as reportController } from './reportController.js';
 export { default as recurringScansController } from './recurringScansController.js';

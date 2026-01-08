@@ -16,6 +16,7 @@ import {
   subscriptionPlans,
   promotionalCodes,
   promotionalCodeRedemptions,
+  scanJobs,
   type User,
   type UpsertUser,
   type Scan,
@@ -46,6 +47,9 @@ import {
   type InsertPromotionalCode,
   type PromotionalCodeRedemption,
   type InsertPromotionalCodeRedemption,
+  type ScanJob,
+  type InsertScanJob,
+  type ScanJobStatus,
 } from "../shared/schema.js";
 import { db } from "./db.js";
 import { eq, desc, and, lte, arrayContains, sql } from "drizzle-orm";
@@ -159,6 +163,22 @@ export interface IStorage {
   getPromotionalCodeRedemptionCount(codeId: number): Promise<number>;
   createPromotionalCodeRedemption(redemption: InsertPromotionalCodeRedemption): Promise<PromotionalCodeRedemption>;
   getUserPromotionalCodeRedemptions(userId: string): Promise<PromotionalCodeRedemption[]>;
+  
+  // Scan job operations (async scanning with QStash)
+  createScanJob(job: InsertScanJob): Promise<ScanJob>;
+  getScanJob(id: string): Promise<ScanJob | undefined>;
+  updateScanJob(id: string, data: Partial<InsertScanJob>): Promise<ScanJob>;
+  updateScanJobStatus(
+    id: string, 
+    status: ScanJobStatus, 
+    data?: { 
+      scanId?: number; 
+      error?: string; 
+      progress?: number; 
+      progressMessage?: string;
+      qstashMessageId?: string;
+    }
+  ): Promise<ScanJob>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -912,6 +932,70 @@ export class DatabaseStorage implements IStorage {
       .from(promotionalCodeRedemptions)
       .where(eq(promotionalCodeRedemptions.userId, userId))
       .orderBy(desc(promotionalCodeRedemptions.redeemedAt));
+  }
+
+  // ============== Scan Job Operations (Async Scanning) ==============
+
+  async createScanJob(job: InsertScanJob): Promise<ScanJob> {
+    const [created] = await db
+      .insert(scanJobs)
+      .values(job)
+      .returning();
+    return created;
+  }
+
+  async getScanJob(id: string): Promise<ScanJob | undefined> {
+    const [job] = await db
+      .select()
+      .from(scanJobs)
+      .where(eq(scanJobs.id, id));
+    return job;
+  }
+
+  async updateScanJob(id: string, data: Partial<InsertScanJob>): Promise<ScanJob> {
+    const [updated] = await db
+      .update(scanJobs)
+      .set(data)
+      .where(eq(scanJobs.id, id))
+      .returning();
+    
+    if (!updated) throw new Error("Scan job not found");
+    return updated;
+  }
+
+  async updateScanJobStatus(
+    id: string,
+    status: ScanJobStatus,
+    data?: {
+      scanId?: number;
+      error?: string;
+      progress?: number;
+      progressMessage?: string;
+      qstashMessageId?: string;
+    }
+  ): Promise<ScanJob> {
+    const updateData: Record<string, unknown> = { status };
+
+    if (status === 'processing') {
+      updateData.startedAt = new Date();
+    } else if (status === 'completed' || status === 'failed') {
+      updateData.completedAt = new Date();
+    }
+
+    if (data?.scanId !== undefined) updateData.scanId = data.scanId;
+    if (data?.error !== undefined) updateData.error = data.error;
+    if (data?.progress !== undefined) updateData.progress = data.progress;
+    if (data?.progressMessage !== undefined) updateData.progressMessage = data.progressMessage;
+    if (data?.qstashMessageId !== undefined) updateData.qstashMessageId = data.qstashMessageId;
+
+    const [updated] = await db
+      .update(scanJobs)
+      .set(updateData)
+      .where(eq(scanJobs.id, id))
+      .returning();
+
+    if (!updated) throw new Error("Scan job not found");
+    return updated;
   }
 }
 

@@ -90,7 +90,8 @@ export function ImportUrlDialog({ isOpen, onClose, onImport, type }: ImportUrlDi
     setScanState('scanning');
 
     try {
-      const response = await fetch('/api/scan', {
+      // Use async mode for better reliability on Vercel
+      const response = await fetch('/api/scan?async=true', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: targetUrl.trim() }),
@@ -102,7 +103,47 @@ export function ImportUrlDialog({ isOpen, onClose, onImport, type }: ImportUrlDi
         throw new Error(errorData.message || 'Failed to scan website');
       }
 
-      const result: ScanResult = await response.json();
+      let result: ScanResult;
+      
+      // Handle async mode (202) vs sync mode (200)
+      if (response.status === 202) {
+        const asyncData = await response.json();
+        const jobId = asyncData.jobId;
+        
+        // Poll for completion
+        let pollAttempts = 0;
+        const maxPolls = 120; // 2 minutes max
+        
+        while (pollAttempts < maxPolls) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          pollAttempts++;
+          
+          const statusRes = await fetch(`/api/scan-jobs/${jobId}/status`, {
+            credentials: 'include',
+          });
+          
+          if (!statusRes.ok) {
+            throw new Error('Failed to get scan status');
+          }
+          
+          const status = await statusRes.json();
+          
+          if (status.status === 'completed' && status.result) {
+            result = status.result;
+            break;
+          }
+          
+          if (status.status === 'failed') {
+            throw new Error(status.error || 'Scan failed');
+          }
+        }
+        
+        if (!result!) {
+          throw new Error('Scan timed out');
+        }
+      } else {
+        result = await response.json();
+      }
 
       // Check if the requested file type was found
       if (type === 'robots') {
