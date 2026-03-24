@@ -102,7 +102,7 @@ export default function Pricing() {
           <Link href="/">
             <a className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter">
               <Shield className="w-6 h-6" />
-              <span>ROBOSCAN</span>
+              <span>AI BotCheck</span>
             </a>
           </Link>
           <div className="flex items-center gap-4">

@@ -102,7 +102,7 @@ export default function SetPassword() {
           <div className="text-center space-y-2">
             <div className="flex items-center justify-center gap-2 mb-4">
               <Shield className="w-8 h-8 text-primary" />
-              <span className="text-2xl font-bold font-mono text-primary">ROBOSCAN</span>
+              <span className="text-2xl font-bold font-mono text-primary">AI BotCheck</span>
             </div>
             <h1 className="text-2xl font-bold">Set Your Password</h1>
             <p className="text-muted-foreground text-sm">

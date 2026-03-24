@@ -345,7 +345,7 @@ export default function RobotsBuilder() {
   };
 
   const generateRobotsTxt = (): string => {
-    let content = `# robots.txt for ${formData.websiteUrl}\n# Generated with ROBOSCAN Builder\n\n`;
+    let content = `# robots.txt for ${formData.websiteUrl}\n# Generated with AI BotCheck Builder\n\n`;
 
     if (formData.defaultAccess === 'allow-all') {
       content += `User-agent: *\nAllow: /\n`;

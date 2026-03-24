@@ -67,7 +67,7 @@ export const dashboardTourSteps: DriveStep[] = [
   {
     popover: {
       title: "📈 Track Your Progress",
-      description: "As you use ROBOSCAN, you'll build expertise and unlock new milestones. Every scan contributes to your knowledge score, and completing different tasks reveals achievements in your Trophy Case. The more you explore AI bot permissions, the more you'll discover!"
+      description: "As you use AI BotCheck, you'll build expertise and unlock new milestones. Every scan contributes to your knowledge score, and completing different tasks reveals achievements in your Trophy Case. The more you explore AI bot permissions, the more you'll discover!"
     }
   }
 ];

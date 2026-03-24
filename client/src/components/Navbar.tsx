@@ -148,7 +148,7 @@ export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: N
           onClick={() => window.location.href = '/'}
         >
           <Shield className="w-6 h-6" />
-          <span>ROBOSCAN</span>
+          <span>AI BotCheck</span>
         </div>
 
         {/* Desktop Navigation */}

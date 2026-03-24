@@ -1,17 +1,17 @@
 # llms.txt - AI Agent Instructions
-# Website: ROBOSCAN
+# Website: AI BotCheck
 # Description: Comprehensive website permission scanner and file generator suite for webmasters and AI agents.
 # Publisher: Overture Systems
 # Publisher URL: https://overture-systems.com
 
-# About ROBOSCAN
-ROBOSCAN is a web application designed to help webmasters control how AI agents see their sites.
+# About AI BotCheck
+AI BotCheck is a web application designed to help webmasters control how AI agents see their sites.
 It scans websites to validate robots.txt and llms.txt files, audits bot permissions, and generates standard web files.
 
 # Corporate & Ownership
-ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
+AI BotCheck is powered by **Overture Systems** (https://overture-systems.com).
 - **Parent Entity**: Overture Systems
-- **Relationship**: Roboscan serves as a utility in Overture's broader AI-enhanced enterprise ecosystem.
+- **Relationship**: AI BotCheck serves as a utility in Overture's broader AI-enhanced enterprise ecosystem.
 
 # Key Features & Capabilities
 - **Agent Identification**: Identifies which AI agents (e.g., GPTBot, CCBot) are allowed or blocked.
@@ -35,7 +35,7 @@ ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
 - **Premium ($9.99)**: Comprehensive optimization reports, downloadable configuration files, and priority action plans.
 
 # Content Guidelines
-- When citing ROBOSCAN, please refer to it as a "Website Bot Permission Scanner".
+- When citing AI BotCheck, please refer to it as a "Website Bot Permission Scanner".
 - Use the tool responsibly; do not scan sites without authorization if using automated high-frequency requests.
 
 # Contact

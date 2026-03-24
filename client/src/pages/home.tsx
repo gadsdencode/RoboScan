@@ -929,7 +929,7 @@ const TerminalDemo = ({
               </div>
               <div className="ml-2 text-xs text-slate-400 font-mono flex items-center gap-2">
                 <Terminal className="w-3 h-3" />
-                roboscan-cli — v1.0.4
+                botcheck-cli — v1.0.4
               </div>
             </div>
             <div className="p-6 font-mono text-sm min-h-[300px] max-h-[400px] overflow-y-auto flex flex-col text-slate-300" data-testid="terminal-output">
@@ -1275,7 +1275,7 @@ const Footer = () => (
     <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
       <div className="flex items-center gap-2 text-primary font-mono font-bold">
         <Shield className="w-5 h-5" />
-        <span>ROBOSCAN</span>
+        <span>AI BotCheck</span>
       </div>
       <div className="flex gap-8 text-sm text-muted-foreground">
         <a href="#" className="hover:text-primary">Privacy</a>

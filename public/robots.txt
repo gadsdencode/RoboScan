@@ -1,4 +1,4 @@
-# robots.txt for ROBOSCAN
+# robots.txt for AI BotCheck
 # Optimized for SEO and AI/LLM Discovery
 # Powered by Overture Systems (https://overture-systems.com)
 
