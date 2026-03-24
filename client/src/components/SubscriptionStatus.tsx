@@ -66,7 +66,7 @@ export function SubscriptionStatus({ className = "", compact = false }: Subscrip
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Subscribe to unlock premium features and get the most out of RoboScan.
+            Subscribe to unlock premium features and get the most out of AI BotCheck.
           </p>
           <Button asChild>
             <a href="/pricing">View Plans</a>

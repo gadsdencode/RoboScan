@@ -197,7 +197,7 @@ const Hero = ({
                   <User className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left flex-1">
-                  <h3 className="font-bold text-lg mb-1">How will you use RoboScan?</h3>
+                  <h3 className="font-bold text-lg mb-1">How will you use AI BotCheck?</h3>
                   <p className="text-sm text-muted-foreground">
                     Select your path to get a tailored experience
                   </p>
@@ -991,13 +991,13 @@ const ValueProposition = ({ userType }: { userType: 'business' | 'agency' }) => 
     badgeIcon: <TrendingUp className="w-3 h-3" />,
     headline: "Eliminate the Technical Guesswork.",
     subheadline: "Deploy AI Standards Instantly.",
-    description: "AI standards evolve rapidly. Avoid spending hours decoding syntax rules and file formats. RoboScan standardizes your deployment automatically.",
+    description: "AI standards evolve rapidly. Avoid spending hours decoding syntax rules and file formats. AI BotCheck standardizes your deployment automatically.",
     comparisonLeft: {
       title: "Manual Implementation",
       items: ["4-8 hours research/setup", "Risk of syntax errors", "No version control"]
     },
     comparisonRight: {
-      title: "RoboScan Automation",
+      title: "AI BotCheck Automation",
       items: ["Instant generation", "Schema-validated syntax", "Real-time compliance updates"]
     },
     pricingLabel: "Standard License",
@@ -1230,7 +1230,7 @@ const HowItWorks = ({ userType }: { userType: 'business' | 'agency' }) => {
             <Cpu className="w-3 h-3" />
             Simple 4-Step Process
           </div>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">How RoboScan Works</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">How AI BotCheck Works</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
             From zero to AI-ready in under 3 minutes. No technical knowledge required.
           </p>

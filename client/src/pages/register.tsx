@@ -89,7 +89,7 @@ export default function Register() {
         
         toast({
           title: "Account Created!",
-          description: "Welcome to RoboScan. Your account is ready.",
+          description: "Welcome to AI BotCheck. Your account is ready.",
         });
         setLocation("/dashboard");
       } else {

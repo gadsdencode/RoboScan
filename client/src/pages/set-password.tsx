@@ -246,7 +246,7 @@ export default function SetPassword() {
           {/* Alternative Actions */}
           <div className="text-center text-sm space-y-2">
             <p className="text-muted-foreground">
-              New to RoboScan?{" "}
+              New to AI BotCheck?{" "}
               <Link href="/register" className="text-primary hover:underline font-medium">
                 Create an account
               </Link>
