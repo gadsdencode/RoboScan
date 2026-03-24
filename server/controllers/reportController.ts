@@ -6,6 +6,8 @@ import { storage } from "../storage.js";
 import { generateOptimizationReport } from "../report-generator.js";
 import { checkAuthentication } from "../auth.js";
 import { isAdmin } from "../utils/admin.js";
+import { checkFeatureAccess } from "../utils/accessControl.js";
+import { FEATURES } from "../../shared/tiers.js";
 
 const router = Router();
 
@@ -33,15 +35,27 @@ router.get('/:scanId', async (req: any, res: Response) => {
       }
     }
 
-    const purchase = await storage.getPurchaseByScanId(scanId);
-    
-    // GOD MODE: Allow access if purchase exists OR if user is admin
-    if (!purchase && !isAdmin(req)) {
+    // Admins always have access
+    if (isAdmin(req)) {
+      const report = generateOptimizationReport(scan);
+      if (scan.score !== null && scan.score !== undefined) {
+        report.percentileRank = await storage.getScorePercentile(scan.score);
+      }
+      const purchase = await storage.getPurchaseByScanId(scanId);
+      return res.json({ scan, report, purchasedAt: purchase?.createdAt || null });
+    }
+
+    // Check feature access — grants entry for active subscribers OR per-scan purchasers
+    const access = await checkFeatureAccess(req, FEATURES.FULL_SCAN_DETAILS, { scanId });
+
+    if (!access.hasAccess) {
       return res.status(403).json({ 
         message: "Payment required to access optimization report",
         requiresPayment: true 
       });
     }
+
+    const purchase = await storage.getPurchaseByScanId(scanId);
 
     const report = generateOptimizationReport(scan);
     

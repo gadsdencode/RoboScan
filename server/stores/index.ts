@@ -158,6 +158,10 @@ export class DatabaseStorage implements IStorage {
   getPurchaseByPaymentIntent(paymentIntentId: string): Promise<Purchase | undefined> {
     return billingStore.getPurchaseByPaymentIntent(paymentIntentId);
   }
+
+  getUserHasScanPurchase(userId: string): Promise<boolean> {
+    return billingStore.getUserHasScanPurchase(userId);
+  }
   
   createSubscription(subscription: InsertSubscription): Promise<Subscription> {
     return billingStore.createSubscription(subscription);

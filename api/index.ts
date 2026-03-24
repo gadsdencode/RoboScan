@@ -98,8 +98,10 @@ async function initializeApp(): Promise<void> {
 
 // Initialize immediately (this runs at cold start)
 // The promise will be awaited on first request if not complete
+let initError: Error | null = null;
 const initPromiseResult = initializeApp().catch(err => {
   console.error('[Vercel] Background init failed:', err);
+  initError = err instanceof Error ? err : new Error(String(err));
 });
 
 // Export the Express app - Vercel handles the rest automatically
@@ -109,7 +111,14 @@ export default async function handler(req: any, res: any) {
     // Wait for initialization to complete
     await initPromiseResult;
     
-    // If initialization failed, try again
+    // If initialization failed, propagate the error (triggers retry in catch block)
+    if (initError) {
+      const err = initError;
+      initError = null; // Clear so retry can succeed
+      throw err;
+    }
+    
+    // If initialization succeeded but flag not set (shouldn't happen), retry
     if (!appInitialized) {
       console.log('[Vercel] Retrying initialization...');
       await initializeApp();

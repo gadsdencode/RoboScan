@@ -99,15 +99,23 @@ export class NotificationStore implements INotificationStore {
 
   async getDueRecurringScans(): Promise<RecurringScan[]> {
     const now = new Date();
+    // Atomically claim due rows by advancing nextRunAt by 15 minutes before returning them.
+    // If two cron invocations overlap, the second UPDATE finds next_run_at > now and
+    // returns 0 rows — preventing duplicate scan execution. On successful processing,
+    // processRecurringScan overwrites nextRunAt with the correct next scheduled time.
+    // 15 minutes provides headroom for slow external-site fetches with no enforced timeout.
+    // On failure, the claim expires naturally and the row becomes re-eligible after 15 minutes.
+    const claimUntil = new Date(now.getTime() + 15 * 60 * 1000);
     return await db
-      .select()
-      .from(recurringScans)
+      .update(recurringScans)
+      .set({ nextRunAt: claimUntil, updatedAt: new Date() })
       .where(
         and(
           eq(recurringScans.isActive, true),
           lte(recurringScans.nextRunAt, now)
         )
-      );
+      )
+      .returning();
   }
 
   // ============== Notification Preference Operations ==============

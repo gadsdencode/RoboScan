@@ -6,6 +6,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth.js";
 import { storage } from "./storage.js";
 import { ACHIEVEMENTS } from "./gamification.js";
+import { csrfProtection } from "./middleware/csrfProtection.js";
 
 // Import all controllers
 import {
@@ -72,13 +73,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[Routes] SEED_DB=true detected. For Guardian plan seeding, use: npm run seed:plans');
   }
 
+  // ============== CSRF Protection ==============
+  // Apply CSRF protection to all API routes that mutate state (POST, PUT, PATCH, DELETE)
+  // This validates Origin header in production to prevent cross-site request forgery
+  // Note: Webhooks are excluded as they use signature verification instead
+  app.use('/api', csrfProtection());
+
   // ============== Mount Controllers ==============
   
   // Scan routes: POST /api/scan, GET /api/user/scans, GET /api/scans/:id, PATCH /api/scans/:id/tags
   // Also includes: GET /api/scan-jobs/:jobId/status for async scan polling
   app.use('/api/scan', scanController);           // POST /api/scan (route: /)
   app.use('/api/scans', scanController);          // GET /api/scans/:id, PATCH /api/scans/:id/tags
-  app.use('/api/scan-jobs', scanController);      // GET /api/scan-jobs/:jobId/status (route: /jobs/:jobId/status)
+  app.use('/api/scan-jobs', scanController);      // GET /api/scan-jobs/:jobId/status (route: /:jobId/status)
   app.use('/api/user', scanController);           // GET /api/user/scans (route: /scans)
   
   // Scan worker routes: POST /api/scan-worker (QStash background job endpoint)

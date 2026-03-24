@@ -234,6 +234,7 @@ export default function Dashboard() {
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
     fetchScans();
+    queryClient.invalidateQueries({ queryKey: ["scan-purchases"] });
   };
 
   const downloadFile = (content: string, filename: string) => {
@@ -564,6 +565,40 @@ export default function Dashboard() {
     }
   };
 
+  /**
+   * Run a scan and return the result regardless of whether the server responds
+   * with a synchronous 200 or an asynchronous 202 + polling flow (Vercel mode).
+   */
+  const scanUrlForComparison = async (url: string): Promise<ScanWithPurchase> => {
+    const res = await fetch('/api/scan?async=true', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || `Failed to scan ${url}`);
+    }
+
+    if (res.status === 202) {
+      const { jobId } = await res.json();
+      const maxAttempts = 120;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const statusRes = await fetch(`/api/scan-jobs/${jobId}/status`, { credentials: "include" });
+        if (!statusRes.ok) throw new Error('Failed to poll scan status');
+        const status = await statusRes.json();
+        if (status.status === 'completed' && status.result) return status.result as ScanWithPurchase;
+        if (status.status === 'failed') throw new Error(status.error || 'Scan failed');
+      }
+      throw new Error('Scan timed out');
+    }
+
+    return res.json() as Promise<ScanWithPurchase>;
+  };
+
   const handleCompetitorAnalysis = async () => {
     if (!competitorUrl.trim() || !myUrlForCompare.trim()) return;
     
@@ -571,45 +606,17 @@ export default function Dashboard() {
     setCompetitorError(null);
     
     try {
-      const resA = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: myUrlForCompare }),
-        credentials: "include",
-      });
+      const [dataA, dataB] = await Promise.all([
+        scanUrlForComparison(myUrlForCompare.trim()),
+        scanUrlForComparison(competitorUrl.trim()),
+      ]);
 
-      if (!resA.ok) {
-        const errorData = await resA.json().catch(() => ({ message: 'Failed to scan your website' }));
-        setCompetitorError(errorData.message || 'Failed to scan your website');
-        setIsAnalyzingCompetitor(false);
-        return;
-      }
-
-      const dataA = await resA.json();
-      if (!dataA || !dataA.url) {
+      if (!dataA?.url) {
         setCompetitorError('Invalid response from your website scan');
-        setIsAnalyzingCompetitor(false);
         return;
       }
-
-      const resB = await fetch('/api/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: competitorUrl }),
-        credentials: "include",
-      });
-
-      if (!resB.ok) {
-        const errorData = await resB.json().catch(() => ({ message: 'Failed to scan competitor website' }));
-        setCompetitorError(errorData.message || 'Failed to scan competitor website');
-        setIsAnalyzingCompetitor(false);
-        return;
-      }
-
-      const dataB = await resB.json();
-      if (!dataB || !dataB.url) {
+      if (!dataB?.url) {
         setCompetitorError('Invalid response from competitor website scan');
-        setIsAnalyzingCompetitor(false);
         return;
       }
 

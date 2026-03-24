@@ -9,22 +9,27 @@
 // - Frontend polls GET /api/scan-jobs/:jobId/status for completion
 // - Sync mode (default) maintains backward compatibility
 
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage.js";
-import { scanWebsite } from "../scanner.js";
-import { calculateScanScore } from "../report-generator.js";
 import { isAuthenticated, checkAuthentication } from "../auth.js";
-import { calculateLevel, calculateXpWithMultiplier } from "../gamification.js";
-import { normalizeDomainForCooldown } from "../domain-utils.js";
 import { isAdmin } from "../utils/admin.js";
-import { isQStashEnabled, publishScanJob } from "../utils/qstash.js";
 import {
   scanRequestSchema,
   tagsSchema,
   parsePositiveInt,
   parseNonNegativeInt,
 } from "../utils/validation.js";
+
+// Import services
+import {
+  performSyncScan,
+  initializeAsyncScan,
+  validateScanUrl,
+  shouldUseAsyncMode,
+  formatScanError,
+} from "../services/scanService.js";
+import { awardScanXP } from "../services/gamificationService.js";
 
 const router = Router();
 
@@ -56,6 +61,22 @@ async function getScanAccessLevel(
 
   return { isPurchased, isSubscriber, hasFullAccess };
 }
+
+/**
+ * GET /api/user/scan-purchases
+ * Returns whether the authenticated user has made any scan-report purchases.
+ * Used by useAccessControl to populate hasAnyPurchase for tier calculation.
+ */
+router.get('/scan-purchases', isAuthenticated, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+    const hasPurchase = await storage.getUserHasScanPurchase(userId);
+    res.json({ hasPurchase });
+  } catch (error) {
+    console.error('Get scan purchases error:', error);
+    res.status(500).json({ message: 'Failed to fetch scan purchases' });
+  }
+});
 
 /**
  * GET /api/user/scans
@@ -129,7 +150,8 @@ router.post('/', async (req: any, res: Response) => {
     const isAuth = checkAuthentication(req);
     const userId = isAuth ? req.user?.claims?.sub : undefined;
 
-    const canonicalDomain = normalizeDomainForCooldown(url);
+    // Validate URL format
+    const canonicalDomain = validateScanUrl(url);
     if (!canonicalDomain) {
       return res.status(400).json({
         message: "Invalid URL format",
@@ -137,134 +159,37 @@ router.post('/', async (req: any, res: Response) => {
       });
     }
 
-    // Check if async mode is requested
-    const useAsync = req.query.async === 'true' || req.query.async === '1';
-    
-    // Auto-enable async mode on Vercel if QStash is configured
-    const isVercel = !!process.env.VERCEL;
-    const shouldUseAsync = useAsync || (isVercel && isQStashEnabled());
-
-    if (shouldUseAsync && isQStashEnabled()) {
+    // Determine scan mode (async vs sync)
+    if (shouldUseAsyncMode(req.query.async)) {
       // ASYNC MODE: Create job and return immediately
-      return await handleAsyncScan(req, res, url, userId, tags || []);
-    }
-
-    // SYNC MODE: Original synchronous behavior (backward compatible)
-    let isOnCooldown = false;
-    if (userId) {
-      isOnCooldown = await storage.checkDomainCooldown(userId, canonicalDomain);
-    }
-
-    let result;
-    try {
-      result = await scanWebsite(url);
-    } catch (scanError) {
-      // If scanWebsite throws a critical error (DNS, timeout, etc.), return it immediately
-      console.error('[ScanController] Critical scan error:', scanError);
-      const errorMessage = scanError instanceof Error ? scanError.message : 'Failed to scan website';
-      return res.status(500).json({ 
-        message: errorMessage,
-        error: errorMessage
-      });
-    }
-
-    // Calculate score immediately
-    const tempScanObj = { 
-      ...result, 
-      url,
-      id: 0,
-      userId,
-      createdAt: new Date(),
-      tags: tags || [],
-      score: 0,
-      // Ensure all new fields are included for score calculation
-      sitemapXmlFound: result.sitemapXmlFound ?? false,
-      securityTxtFound: result.securityTxtFound ?? false,
-      manifestJsonFound: result.manifestJsonFound ?? false,
-      adsTxtFound: result.adsTxtFound ?? false,
-      humansTxtFound: result.humansTxtFound ?? false,
-      aiTxtFound: result.aiTxtFound ?? false,
-    };
-    const score = calculateScanScore(tempScanObj as any);
-
-    const scan = await storage.createScan({
-      userId,
-      url,
-      robotsTxtFound: result.robotsTxtFound,
-      robotsTxtContent: result.robotsTxtContent,
-      llmsTxtFound: result.llmsTxtFound,
-      llmsTxtContent: result.llmsTxtContent,
-      // 6 additional technical files
-      sitemapXmlFound: result.sitemapXmlFound,
-      sitemapXmlContent: result.sitemapXmlContent,
-      securityTxtFound: result.securityTxtFound,
-      securityTxtContent: result.securityTxtContent,
-      manifestJsonFound: result.manifestJsonFound,
-      manifestJsonContent: result.manifestJsonContent,
-      adsTxtFound: result.adsTxtFound,
-      adsTxtContent: result.adsTxtContent,
-      humansTxtFound: result.humansTxtFound,
-      humansTxtContent: result.humansTxtContent,
-      aiTxtFound: result.aiTxtFound,
-      aiTxtContent: result.aiTxtContent,
-      botPermissions: result.botPermissions,
-      errors: result.errors,
-      warnings: result.warnings,
-      score,
-      tags: tags || [],
-    });
-
-    let gamificationUpdates = null;
-    
-    if (userId) {
-      const [currentUser, subscription] = await Promise.all([
-        storage.getUser(userId),
-        storage.getUserActiveSubscription(userId),
-      ]);
-      const isSubscriber = !!subscription;
-      
-      if (currentUser) {
-        if (!isOnCooldown) {
-          let baseXpGain = 10;
-
-          if (result.robotsTxtFound && result.llmsTxtFound) {
-            baseXpGain += 40; 
-          }
-
-          // Apply 2x multiplier for subscribers (Guardian tier)
-          const xpGain = calculateXpWithMultiplier(baseXpGain, isSubscriber);
-
-          const currentXp = currentUser.xp || 0;
-          const newXp = currentXp + xpGain;
-          const newLevel = calculateLevel(newXp);
-          const oldLevel = currentUser.level || 1;
-
-          await storage.updateUserGamificationStats(userId, newXp, newLevel);
-
-          await storage.upsertDomainCooldown(userId, canonicalDomain);
-
-          gamificationUpdates = {
-            xpGained: xpGain,
-            baseXp: baseXpGain,
-            multiplier: isSubscriber ? 2 : 1,
-            totalXp: newXp,
-            newLevel: newLevel,
-            levelUp: newLevel > oldLevel,
-            isSubscriber,
-          };
-        } else {
-          gamificationUpdates = {
-            xpGained: 0,
-            totalXp: currentUser.xp || 0,
-            newLevel: currentUser.level || 1,
-            levelUp: false,
-            cooldownActive: true,
-            isSubscriber,
-          };
-        }
+      try {
+        const asyncResult = await initializeAsyncScan(url, userId, tags || []);
+        return res.status(202).json(asyncResult);
+      } catch (asyncError) {
+        console.error('[ScanController] Async scan error:', asyncError);
+        return res.status(500).json({
+          message: 'Failed to initiate async scan',
+          error: asyncError instanceof Error ? asyncError.message : 'Unknown error',
+        });
       }
     }
 
+    // SYNC MODE: Perform scan and return results
+    const scanResult = await performSyncScan(url, userId, tags || []);
+
+    // Award XP for authenticated users
+    let gamificationUpdates = null;
+    if (userId) {
+      gamificationUpdates = await awardScanXP(
+        userId,
+        scanResult.scanData,
+        scanResult.canonicalDomain,
+        scanResult.isOnCooldown
+      );
+    }
+
+    // Return scan results
+    const { scan } = scanResult;
     res.json({
       id: scan.id,
       url: scan.url,
@@ -278,6 +203,7 @@ router.post('/', async (req: any, res: Response) => {
       gamification: gamificationUpdates,
     });
   } catch (error) {
+    // Handle Zod validation errors
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
         message: "Invalid request", 
@@ -287,22 +213,8 @@ router.post('/', async (req: any, res: Response) => {
     
     console.error('[ScanController] Scan endpoint error:', error);
     
-    // Provide more specific error messages
-    let errorMessage = "Failed to scan website";
-    if (error instanceof Error) {
-      errorMessage = error.message;
-      
-      // Enhance common error messages
-      if (error.message.includes('DNS')) {
-        errorMessage = "DNS resolution failed: Unable to resolve the domain name. Please check if the website URL is correct.";
-      } else if (error.message.includes('timeout')) {
-        errorMessage = "Connection timeout: The website did not respond within the time limit. The server may be down or unreachable.";
-      } else if (error.message.includes('refused') || error.message.includes('ECONNREFUSED')) {
-        errorMessage = "Connection refused: The website server is not accepting connections. The server may be down or blocking requests.";
-      } else if (error.message.includes('certificate') || error.message.includes('SSL') || error.message.includes('TLS')) {
-        errorMessage = "SSL/TLS certificate error: Unable to establish a secure connection. The website's certificate may be invalid or expired.";
-      }
-    }
+    // Format user-friendly error message
+    const errorMessage = formatScanError(error);
     
     res.status(500).json({ 
       message: errorMessage,
@@ -312,82 +224,11 @@ router.post('/', async (req: any, res: Response) => {
 });
 
 /**
- * Handle async scan - creates a job and publishes to QStash
- * Returns 202 Accepted with jobId for frontend polling
- */
-async function handleAsyncScan(
-  req: any,
-  res: Response,
-  url: string,
-  userId: string | undefined,
-  tags: string[]
-): Promise<void> {
-  console.log(`[ScanController] Initiating async scan for ${url}`);
-
-  try {
-    // Create scan job in database
-    const scanJob = await storage.createScanJob({
-      userId,
-      url,
-      tags,
-      status: 'pending',
-      progress: 0,
-      progressMessage: 'Scan queued...',
-    });
-
-    console.log(`[ScanController] Created scan job: ${scanJob.id}`);
-
-    // Publish job to QStash for background processing
-    const qstashResult = await publishScanJob(scanJob.id, url, userId, tags);
-
-    if (qstashResult) {
-      // Update job with QStash message ID
-      await storage.updateScanJobStatus(scanJob.id, 'pending', {
-        qstashMessageId: qstashResult.messageId,
-        progressMessage: 'Scan queued, starting shortly...',
-      });
-
-      console.log(`[ScanController] Published to QStash: ${qstashResult.messageId}`);
-    } else {
-      // QStash publish failed - mark job as failed
-      await storage.updateScanJobStatus(scanJob.id, 'failed', {
-        error: 'Failed to queue scan job',
-        progressMessage: 'Failed to start scan',
-      });
-
-      res.status(500).json({
-        message: 'Failed to queue scan job',
-        error: 'QStash publish failed',
-      });
-      return;
-    }
-
-    // Return 202 Accepted with job info
-    res.status(202).json({
-      jobId: scanJob.id,
-      status: 'pending',
-      url,
-      message: 'Scan queued for processing',
-      // Include polling endpoint hint
-      _links: {
-        status: `/api/scan-jobs/${scanJob.id}/status`,
-      },
-    });
-  } catch (error) {
-    console.error('[ScanController] Async scan error:', error);
-    res.status(500).json({
-      message: 'Failed to initiate async scan',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-/**
  * GET /api/scan-jobs/:jobId/status
  * Poll endpoint for async scan job status
  * Returns job status, progress, and result when completed
  */
-router.get('/jobs/:jobId/status', async (req: any, res: Response) => {
+router.get('/:jobId/status', async (req: any, res: Response) => {
   try {
     const { jobId } = req.params;
 
@@ -517,7 +358,18 @@ router.patch('/:id/tags', isAuthenticated, async (req: any, res: Response) => {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const { tags } = tagsSchema.parse(req.body);
+    let tags: string[];
+    try {
+      ({ tags } = tagsSchema.parse(req.body));
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid tags format",
+          errors: validationError.errors,
+        });
+      }
+      throw validationError;
+    }
 
     // Normalize tags: trim, lowercase, deduplicate
     const normalizedTags = Array.from(

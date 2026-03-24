@@ -107,6 +107,14 @@ const CheckoutForm = ({ onSuccess, onClose, amount }: { onSuccess: () => void, o
           setError('Payment succeeded but confirmation failed. Please contact support.');
         }
         setIsProcessing(false);
+      } else {
+        // Covers: paymentIntent with status 'processing', 'requires_action', or missing entirely.
+        // These are rare with redirect:'if_required' but must not leave the button stuck.
+        const statusMsg = paymentIntent?.status
+          ? `Payment status: ${paymentIntent.status}. Please check your email for confirmation.`
+          : 'Payment did not complete. Please try again.';
+        setError(statusMsg);
+        setIsProcessing(false);
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -158,21 +166,27 @@ const CheckoutForm = ({ onSuccess, onClose, amount }: { onSuccess: () => void, o
 export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: PaymentModalProps) {
   const [clientSecret, setClientSecret] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [alreadyPurchased, setAlreadyPurchased] = useState(false);
   // Use server-provided amount, fallback to centralized PRICING constant
   const [amount, setAmount] = useState<number>(PRICING.REPORT_UNLOCK);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
+  const initPayment = () => {
     setLoading(true);
+    setInitError(null);
     fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scanId }),
       credentials: "include",
     })
-      .then(res => res.json())
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'Failed to initialize payment');
+        }
+        return data;
+      })
       .then(data => {
         if (data.alreadyPurchased) {
           setAlreadyPurchased(true);
@@ -188,10 +202,19 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
         }
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        setInitError(err instanceof Error ? err.message : 'Failed to initialize payment. Please try again.');
         setLoading(false);
       });
-  }, [isOpen, scanId, onSuccess]);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setClientSecret("");
+    setAlreadyPurchased(false);
+    initPayment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, scanId]);
 
   if (!isOpen) return null;
 
@@ -290,15 +313,24 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
                       <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
                       <p className="text-sm text-muted-foreground">Preparing secure checkout...</p>
                     </div>
+                  ) : initError ? (
+                    <div className="text-center py-8 space-y-4">
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                        {initError}
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={initPayment}
+                        className="gap-2"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
                   ) : clientSecret ? (
                     <Elements stripe={stripePromise} options={{ clientSecret }}>
                       <CheckoutForm onSuccess={onSuccess} onClose={onClose} amount={amount} />
                     </Elements>
-                  ) : (
-                    <div className="text-center py-8 text-red-400">
-                      Failed to initialize payment. Please try again.
-                    </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>

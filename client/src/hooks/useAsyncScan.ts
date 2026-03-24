@@ -107,7 +107,9 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
 
   const queryClient = useQueryClient();
   const pollCountRef = useRef(0);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Generation counter: incremented on each new scan() call to invalidate stale poll chains
+  const generationRef = useRef(0);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [state, setState] = useState<UseAsyncScanState>({
     isScanning: false,
@@ -121,8 +123,9 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
+      generationRef.current++;
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
       }
     };
   }, []);
@@ -208,35 +211,39 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
   }, [queryClient, onProgress, onComplete, onError]);
 
   /**
-   * Start polling for job status
+   * Start polling for job status using recursive setTimeout.
+   * A generation number is captured at start; if a newer scan() call
+   * increments generationRef, this polling chain self-terminates.
    */
-  const startPolling = useCallback((jobId: string) => {
+  const startPolling = useCallback((jobId: string, generation: number) => {
     pollCountRef.current = 0;
-    
-    pollIntervalRef.current = setInterval(async () => {
-      pollCountRef.current++;
 
-      if (pollCountRef.current > maxPollAttempts) {
-        // Timeout
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
+    const schedulePoll = () => {
+      pollTimeoutRef.current = setTimeout(async () => {
+        // Bail out if a newer scan has started
+        if (generationRef.current !== generation) return;
+
+        pollCountRef.current++;
+
+        if (pollCountRef.current > maxPollAttempts) {
+          setState(prev => ({
+            ...prev,
+            isScanning: false,
+            error: 'Scan timed out. Please try again.',
+          }));
+          onError?.('Scan timed out. Please try again.');
+          return;
         }
-        setState(prev => ({
-          ...prev,
-          isScanning: false,
-          error: 'Scan timed out. Please try again.',
-        }));
-        onError?.('Scan timed out. Please try again.');
-        return;
-      }
 
-      const isComplete = await pollJobStatus(jobId);
-      if (isComplete && pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    }, pollInterval);
+        const isDone = await pollJobStatus(jobId);
+        // Schedule next poll only if still in this generation and not finished
+        if (!isDone && generationRef.current === generation) {
+          schedulePoll();
+        }
+      }, pollInterval);
+    };
+
+    schedulePoll();
   }, [pollInterval, maxPollAttempts, pollJobStatus, onError]);
 
   /**
@@ -274,10 +281,12 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
       jobId: null,
     });
 
-    // Stop any existing polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+    // Invalidate any in-flight polling chain from a previous scan
+    generationRef.current++;
+    const currentGeneration = generationRef.current;
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
     }
 
     // Optimistic UI update
@@ -313,7 +322,7 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
         }));
 
         // Start polling for job status
-        startPolling(asyncResponse.jobId);
+        startPolling(asyncResponse.jobId, currentGeneration);
       } else {
         // Sync mode - result is immediate
         const syncResult: SyncScanResult = await res.json();
@@ -352,9 +361,10 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
    * Cancel any ongoing scan polling
    */
   const cancel = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+    generationRef.current++;
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
     }
     setState(prev => ({
       ...prev,
@@ -367,9 +377,10 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
    * Reset state
    */
   const reset = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+    generationRef.current++;
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
     }
     setState({
       isScanning: false,

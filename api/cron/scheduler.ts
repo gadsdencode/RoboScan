@@ -5,9 +5,17 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // Verify this is a cron request (optional security check)
+  // Verify this is a cron request (mandatory security check)
+  const cronSecret = process.env.CRON_SECRET;
+  
+  // Require CRON_SECRET to be configured - fail secure if missing
+  if (!cronSecret) {
+    console.error('[Cron] CRON_SECRET environment variable is not configured');
+    return res.status(500).json({ message: 'Server misconfiguration' });
+  }
+  
   const authHeader = req.headers.authorization;
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 

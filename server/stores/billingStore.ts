@@ -3,6 +3,7 @@
 
 import {
   purchases,
+  scans,
   subscriptions,
   subscriptionEvents,
   subscriptionPlans,
@@ -29,6 +30,7 @@ export interface IBillingStore {
   createPurchase(purchase: InsertPurchase): Promise<Purchase>;
   getPurchaseByScanId(scanId: number): Promise<Purchase | undefined>;
   getPurchaseByPaymentIntent(paymentIntentId: string): Promise<Purchase | undefined>;
+  getUserHasScanPurchase(userId: string): Promise<boolean>;
   
   // Subscription CRUD
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
@@ -81,6 +83,17 @@ export class BillingStore implements IBillingStore {
       .from(purchases)
       .where(eq(purchases.stripePaymentIntentId, paymentIntentId));
     return purchase;
+  }
+
+  async getUserHasScanPurchase(userId: string): Promise<boolean> {
+    // purchases.scanId → scans.id → scans.userId (no direct userId on purchases)
+    const [row] = await db
+      .select({ id: purchases.id })
+      .from(purchases)
+      .innerJoin(scans, eq(purchases.scanId, scans.id))
+      .where(eq(scans.userId, userId))
+      .limit(1);
+    return row !== undefined;
   }
 
   // ============== Subscription Operations ==============

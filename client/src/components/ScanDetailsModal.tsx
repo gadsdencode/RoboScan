@@ -27,8 +27,8 @@ export function ScanDetailsModal({ open, onClose, scan, onUnlockClick, onSubscri
   };
 
   // Determine access level
-  const hasFullAccess = scan.hasFullAccess ?? (scan.isPurchased || isAdmin);
   const isSubscriber = scan.isSubscriber ?? false;
+  const hasFullAccess = scan.hasFullAccess ?? (scan.isPurchased || isSubscriber || isAdmin);
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>

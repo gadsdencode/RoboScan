@@ -135,6 +135,17 @@ router.post('/confirm-payment', async (req: any, res: Response) => {
     
     if (paymentIntent.status === 'succeeded') {
       const scanId = parseInt(paymentIntent.metadata.scanId);
+
+      // SECURITY: Verify the charged amount matches the authoritative server-side price.
+      // The PI is always created server-side, so a mismatch indicates a tampered or
+      // recycled PI — reject it rather than unlocking the report.
+      const expectedAmountInCents = Math.round(PRICING.REPORT_UNLOCK * 100);
+      if (paymentIntent.amount !== expectedAmountInCents) {
+        console.error(
+          `[Payment] Amount mismatch on confirm: expected ${expectedAmountInCents} cents, got ${paymentIntent.amount} for PI ${paymentIntentId}`
+        );
+        return res.status(400).json({ message: "Payment amount does not match report price" });
+      }
       
       const existingPurchase = await storage.getPurchaseByPaymentIntent(paymentIntentId);
       if (!existingPurchase) {

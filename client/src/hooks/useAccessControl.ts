@@ -70,6 +70,22 @@ async function fetchRobotsFieldPurchases(): Promise<{
   return response.json();
 }
 
+// Fetch whether the user has made any scan-report purchases
+async function fetchScanPurchases(): Promise<{ hasPurchase: boolean }> {
+  const response = await fetch("/api/user/scan-purchases", {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      return { hasPurchase: false };
+    }
+    throw new Error("Failed to fetch scan purchases");
+  }
+
+  return response.json();
+}
+
 /**
  * Main access control hook
  * Combines subscription status, purchases, and admin status
@@ -78,20 +94,47 @@ export function useAccessControl() {
   const { user, isLoading: authLoading } = useAuth();
   const { hasActiveSubscription, subscriptionLoading } = useSubscription();
   
-  // Determine if user is admin (check user object)
   const isAdmin = user?.isAdmin || false;
-  
-  // Calculate tier
-  const tier = hasActiveSubscription || isAdmin ? 'guardian' : 'scout';
   const isSubscriber = hasActiveSubscription || isAdmin;
+
+  // Check whether the user has made any one-time purchases (field unlocks).
+  // Uses the same query keys as useLlmsFieldAccess / useRobotsFieldAccess so
+  // React Query serves results from cache with no extra network requests.
+  const { data: llmsPurchaseData, isLoading: llmsPurchaseLoading } = useQuery({
+    queryKey: ["llms-field-access"],
+    queryFn: fetchLlmsFieldPurchases,
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user && !isAdmin,
+  });
+
+  const { data: robotsPurchaseData, isLoading: robotsPurchaseLoading } = useQuery({
+    queryKey: ["robots-field-access"],
+    queryFn: fetchRobotsFieldPurchases,
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user && !isAdmin,
+  });
+
+  const { data: scanPurchaseData, isLoading: scanPurchaseLoading } = useQuery({
+    queryKey: ["scan-purchases"],
+    queryFn: fetchScanPurchases,
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user && !isAdmin,
+  });
+
+  const hasAnyPurchase =
+    isAdmin ||
+    (llmsPurchaseData?.purchases ?? []).length > 0 ||
+    (robotsPurchaseData?.purchases ?? []).length > 0 ||
+    scanPurchaseData?.hasPurchase === true;
+
+  // Tier: guardian (subscriber) > architect (any purchase) > scout (free)
+  const tier = isSubscriber ? 'guardian' : hasAnyPurchase ? 'architect' : 'scout';
   
-  // Feature access based on tier
   const accessLevel: AccessLevel = {
     tier,
     isSubscriber,
-    hasAnyPurchase: false, // Will be updated when we check purchases
+    hasAnyPurchase,
     isAdmin,
-    // Subscription-only features
     canAccessRecurringScans: isSubscriber,
     canAccessScanComparison: isSubscriber,
     canAccessUnlimitedHistory: isSubscriber,
@@ -101,7 +144,7 @@ export function useAccessControl() {
   
   return {
     accessLevel,
-    isLoading: authLoading || subscriptionLoading,
+    isLoading: authLoading || subscriptionLoading || llmsPurchaseLoading || robotsPurchaseLoading || scanPurchaseLoading,
     isSubscriber,
     isAdmin,
     tier,

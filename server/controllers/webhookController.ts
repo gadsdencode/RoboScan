@@ -153,6 +153,10 @@ router.post('/stripe', async (req: Request, res: Response) => {
         await handleCustomerCreated(event.data.object as Stripe.Customer);
         break;
 
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+        break;
+
       default:
         console.log(`[Webhook] Unhandled event type: ${event.type}`);
     }
@@ -439,6 +443,129 @@ async function handleCustomerCreated(customer: Stripe.Customer) {
       console.log(`[Webhook] Linked Stripe customer ${customer.id} to user ${userId}`);
     }
   }
+}
+
+/**
+ * Handle: payment_intent.succeeded
+ * 
+ * Safety-net for one-time purchases (scan reports, LLMS fields, robots fields).
+ * The primary fulfillment path is the client calling /api/confirm-payment after
+ * stripe.confirmPayment resolves. If that network request fails (browser crash,
+ * tab close, connectivity drop) after Stripe has already captured the charge,
+ * this webhook fires and reconciles the purchase so the user gets what they paid for.
+ * 
+ * All three branches are fully idempotent — they no-op if the purchase row
+ * already exists (written by the normal confirm-payment path).
+ */
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const { metadata } = paymentIntent;
+  const paymentIntentId = paymentIntent.id;
+
+  // --- Branch 1: Premium LLMs field purchase ---
+  if (metadata?.type === 'llms_premium_field') {
+    const { userId, fieldKey, xpReward } = metadata;
+
+    if (!userId || !fieldKey) {
+      throw new NonRetryableWebhookError(
+        `[Webhook] payment_intent.succeeded (llms): missing userId/fieldKey in metadata for ${paymentIntentId}`
+      );
+    }
+
+    const existing = await storage.getLlmsFieldPurchaseByPaymentIntent(paymentIntentId);
+    if (existing) {
+      console.log(`[Webhook] LLMS field purchase for PI ${paymentIntentId} already recorded, skipping`);
+      return;
+    }
+
+    await storage.createLlmsFieldPurchase({
+      userId,
+      fieldKey,
+      stripePaymentIntentId: paymentIntentId,
+      amount: paymentIntent.amount,
+    });
+
+    // Award XP — stored in metadata at PI creation so we don't need to re-import field config
+    const xp = parseInt(xpReward || '0', 10);
+    if (xp > 0) {
+      const user = await storage.getUser(userId);
+      if (user) {
+        const newXp = (user.xp || 0) + xp;
+        const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
+        await storage.updateUserGamificationStats(userId, newXp, newLevel);
+      }
+    }
+
+    console.log(`[Webhook] Reconciled LLMS field purchase: userId=${userId} fieldKey=${fieldKey}`);
+    return;
+  }
+
+  // --- Branch 2: Premium robots field purchase ---
+  if (metadata?.type === 'robots_premium_field') {
+    const { userId, fieldKey, xpReward } = metadata;
+
+    if (!userId || !fieldKey) {
+      throw new NonRetryableWebhookError(
+        `[Webhook] payment_intent.succeeded (robots): missing userId/fieldKey in metadata for ${paymentIntentId}`
+      );
+    }
+
+    const existing = await storage.getRobotsFieldPurchaseByPaymentIntent(paymentIntentId);
+    if (existing) {
+      console.log(`[Webhook] Robots field purchase for PI ${paymentIntentId} already recorded, skipping`);
+      return;
+    }
+
+    await storage.createRobotsFieldPurchase({
+      userId,
+      fieldKey,
+      stripePaymentIntentId: paymentIntentId,
+      amount: paymentIntent.amount,
+    });
+
+    const xp = parseInt(xpReward || '0', 10);
+    if (xp > 0) {
+      const user = await storage.getUser(userId);
+      if (user) {
+        const newXp = (user.xp || 0) + xp;
+        const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
+        await storage.updateUserGamificationStats(userId, newXp, newLevel);
+      }
+    }
+
+    console.log(`[Webhook] Reconciled robots field purchase: userId=${userId} fieldKey=${fieldKey}`);
+    return;
+  }
+
+  // --- Branch 3: Scan optimization report purchase (no 'type' in metadata) ---
+  const scanIdRaw = metadata?.scanId;
+  if (scanIdRaw) {
+    const scanId = parseInt(scanIdRaw, 10);
+    if (isNaN(scanId)) {
+      throw new NonRetryableWebhookError(
+        `[Webhook] payment_intent.succeeded (report): invalid scanId "${scanIdRaw}" for ${paymentIntentId}`
+      );
+    }
+
+    const existing = await storage.getPurchaseByPaymentIntent(paymentIntentId);
+    if (existing) {
+      console.log(`[Webhook] Report purchase for PI ${paymentIntentId} already recorded, skipping`);
+      return;
+    }
+
+    await storage.createPurchase({
+      scanId,
+      stripePaymentIntentId: paymentIntentId,
+      amount: (paymentIntent.amount / 100).toFixed(2),
+      currency: paymentIntent.currency,
+      status: paymentIntent.status,
+    });
+
+    console.log(`[Webhook] Reconciled report purchase: scanId=${scanId}`);
+    return;
+  }
+
+  // PI with no recognizable metadata — log and ignore
+  console.log(`[Webhook] payment_intent.succeeded: no recognizable metadata on ${paymentIntentId}, ignoring`);
 }
 
 /**

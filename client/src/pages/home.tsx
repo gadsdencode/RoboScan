@@ -425,6 +425,10 @@ const TerminalDemo = ({
     setScanResult(null);
     setIsComplete(false);
 
+    // Track cancellation so async work can bail out after unmount / re-render
+    let cancelled = false;
+    let typingInterval: ReturnType<typeof setInterval> | null = null;
+
     const performScan = async () => {
       // Enhanced pre-flight checklist
       const preflightSteps = [
@@ -475,6 +479,7 @@ const TerminalDemo = ({
           const maxPolls = 120; // 2 minutes max
           
           while (pollAttempts < maxPolls) {
+            if (cancelled) break;
             await new Promise(resolve => setTimeout(resolve, 1000));
             pollAttempts++;
             
@@ -489,7 +494,7 @@ const TerminalDemo = ({
             const status = await statusRes.json();
             
             // Update progress message
-            if (status.progressMessage) {
+            if (!cancelled && status.progressMessage) {
               setLines(prev => {
                 const lastLine = prev[prev.length - 1];
                 if (lastLine?.startsWith('> [PROGRESS]')) {
@@ -516,7 +521,7 @@ const TerminalDemo = ({
           // Sync mode: result is immediate
           result = await response.json();
         }
-        setScanResult(result);
+        if (!cancelled) setScanResult(result);
 
         const newLines = [...preflightSteps];
         newLines.push("> [SUCCESS] Connection established (200 OK)");
@@ -622,9 +627,13 @@ const TerminalDemo = ({
         newLines.push("> DONE.");
 
         let currentLine = 0;
-        const interval = setInterval(() => {
+        typingInterval = setInterval(() => {
+          if (cancelled) {
+            clearInterval(typingInterval!);
+            return;
+          }
           if (currentLine >= newLines.length) {
-            clearInterval(interval);
+            clearInterval(typingInterval!);
             setIsComplete(true);
             onScanComplete(result.id);
             return;
@@ -636,19 +645,24 @@ const TerminalDemo = ({
           });
           currentLine++;
         }, 200);
-
-        return () => clearInterval(interval);
       } catch (error) {
-        setLines(prev => [
-          ...prev,
-          `> [ERROR] Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          "> Scan aborted."
-        ]);
-        onScanError();
+        if (!cancelled) {
+          setLines(prev => [
+            ...prev,
+            `> [ERROR] Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            "> Scan aborted."
+          ]);
+          onScanError();
+        }
       }
     };
 
     performScan();
+
+    return () => {
+      cancelled = true;
+      if (typingInterval) clearInterval(typingInterval);
+    };
   }, [isScanning, targetUrl, onScanComplete, onScanError]);
 
   if (!isScanning && lines.length === 0) return null;
