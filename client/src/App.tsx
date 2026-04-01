@@ -1,4 +1,5 @@
 // Reference: blueprint:javascript_log_in_with_replit
+import { Analytics } from "@vercel/analytics/react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -63,6 +64,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        <Analytics />
       </TooltipProvider>
     </QueryClientProvider>
   );

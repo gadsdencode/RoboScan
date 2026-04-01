@@ -52,6 +52,7 @@
     "@types/canvas-confetti": "^1.9.0",
     "@types/memoizee": "^0.4.12",
     "@upstash/qstash": "^2.8.4",
+    "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
