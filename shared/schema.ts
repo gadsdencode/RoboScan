@@ -318,6 +318,9 @@ export const subscriptionEvents = pgTable("subscription_events", {
 export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({
   id: true,
   processedAt: true,
+}).extend({
+  // drizzle-zod can infer jsonb columns too narrowly for spread + extra keys; keep a plain object map
+  eventData: z.record(z.string(), z.any()),
 });
 
 export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;

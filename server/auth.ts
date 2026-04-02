@@ -3,14 +3,23 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage.js";
 import cookieParser from "cookie-parser";
+import { authRateLimiter } from "./middleware/rateLimiter.js";
 
-// SESSION_SECRET is required - no insecure defaults allowed
-const JWT_SECRET = process.env.SESSION_SECRET || process.env.NEXTAUTH_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('FATAL: SESSION_SECRET environment variable is required. The application cannot start without a secure session secret.');
-}
+/** Set in setupAuth() after validating JWT_SECRET (no module-load fallback). */
+let jwtSigningSecret: string | undefined;
+
 const COOKIE_NAME = "auth_token";
-const TOKEN_EXPIRY = "7d";
+/** Explicit JWT lifetime — never infinite. */
+const TOKEN_EXPIRY = "7d" as const;
+
+function getJwtSigningSecret(): string {
+  if (!jwtSigningSecret || jwtSigningSecret.length < 32) {
+    throw new Error(
+      "FATAL: JWT_SECRET must be set and at least 32 characters long"
+    );
+  }
+  return jwtSigningSecret;
+}
 
 // Detect production environment (Vercel always uses HTTPS)
 const isProduction = process.env.NODE_ENV === "production" || !!process.env.VERCEL;
@@ -25,13 +34,15 @@ interface JWTPayload {
 
 // Create a signed JWT token
 function createToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRY });
+  return jwt.sign(payload, getJwtSigningSecret(), {
+    expiresIn: TOKEN_EXPIRY,
+  });
 }
 
 // Verify and decode a JWT token
 function verifyToken(token: string): JWTPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, getJwtSigningSecret()) as unknown as JWTPayload;
   } catch {
     return null;
   }
@@ -91,12 +102,20 @@ function validateEmail(email: string): boolean {
 }
 
 export async function setupAuth(app: Express) {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "FATAL: JWT_SECRET must be set and at least 32 characters long"
+    );
+  }
+  jwtSigningSecret = secret;
+
   app.use(cookieParser());
 
   // Email/password login
   // NOTE: check-email endpoint was removed to prevent user enumeration attacks.
   // The login flow now uses generic error messages and handles legacy users via PASSWORD_REQUIRED code.
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authRateLimiter, async (req, res) => {
     let responseSent = false;
     const sendError = (status: number, message: string, code?: string, error?: any): void => {
       if (!responseSent && !res.headersSent) {
@@ -208,7 +227,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Register new user with email/password
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", authRateLimiter, async (req, res) => {
     let responseSent = false;
     const sendError = (status: number, message: string, error?: any): void => {
       if (!responseSent && !res.headersSent) {
@@ -349,7 +368,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Set password for existing users (legacy users without password)
-  app.post("/api/auth/set-password", async (req, res) => {
+  app.post("/api/auth/set-password", authRateLimiter, async (req, res) => {
     let responseSent = false;
     const sendError = (status: number, message: string, error?: any): void => {
       if (!responseSent && !res.headersSent) {

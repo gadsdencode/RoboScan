@@ -1,0 +1,52 @@
+# .cursorrules
+
+## Tech Stack
+- React 19 + TypeScript (strict)
+- Vite 7 with @tailwindcss/vite plugin
+- TailwindCSS v4 with CSS custom properties for theming
+- shadcn/ui (new-york variant) with Radix UI primitives
+- TanStack Query (React Query) for server state
+- Wouter for client-side routing
+- Express.js backend with TypeScript (ES modules)
+- Drizzle ORM with PostgreSQL (Neon serverless)
+- Zod for request validation
+- Stripe for payments
+- Deployed on Vercel (serverless functions)
+
+## Project Structure
+- `client/src/pages/` — Page components (one per route)
+- `client/src/components/` — Shared components
+- `client/src/components/ui/` — shadcn/ui primitives (DO NOT modify directly)
+- `client/src/hooks/` — Custom React hooks
+- `client/src/lib/` — Utilities and helpers
+- `server/controllers/` — Express Router controllers (one per domain)
+- `server/stores/` — Database access layer (domain-specific stores)
+- `server/services/` — Business logic (service layer)
+- `server/middleware/` — Express middleware
+- `server/errors/` — Custom error classes
+- `server/utils/` — Server utilities
+- `shared/` — Shared types, schema, and constants (used by both client and server)
+
+## Code Style
+- Use named exports from controllers (barrel export in `server/controllers/index.ts`)
+- Hooks follow `use[Domain]` naming convention
+- All API calls use `credentials: "include"` for cookie-based auth
+- Use `AppError` class from `server/errors/AppError.ts` for server errors
+- Use Zod schemas from `server/utils/validation.ts` for request validation
+- Never use `any` — use typed interfaces or `unknown`
+- Keep components under 300 lines; extract sub-components when larger
+- Use `cva` (class-variance-authority) for component variant styling
+
+## Commands
+- `npm run dev` — Start development server
+- `npm run build` — Build for production
+- `npm run db:push` — Push schema changes to database
+- `npx drizzle-kit generate` — Generate migrations
+
+## Important
+- We use Drizzle ORM — never suggest Prisma or other ORMs
+- We use wouter — never suggest react-router
+- We use TanStack Query — never suggest SWR
+- shadcn/ui components in `components/ui/` should not be modified directly
+- All payments go through Stripe — pricing is defined server-side in `shared/tiers.ts`
+- The app uses JWT cookie-based auth, NOT session-based auth
