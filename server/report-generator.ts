@@ -103,7 +103,6 @@ export function calculateScanScore(scan: Scan): number {
 
     // Advanced Quality Check
     const robotsQuality = analyzeRobotsTxtQuality(scan.robotsTxtContent);
-    score -= robotsQuality.scoreDeduced;
   }
 
   // --- 2. LLMs.txt Analysis (Important for AI - penalized if missing) ---
@@ -112,7 +111,6 @@ export function calculateScanScore(scan: Scan): number {
   } else {
     // Content Quality Check
     const llmsQuality = analyzeLlmsTxtQuality(scan.llmsTxtContent);
-    score -= llmsQuality.scoreDeduced;
   }
 
   // --- 3. Sitemap.xml (Important for SEO - penalized if missing) ---
@@ -169,11 +167,10 @@ export function calculateScanScore(scan: Scan): number {
 
 export function generateOptimizationReport(scan: Scan): OptimizationReport {
   const recommendations: Recommendation[] = [];
-  let score = 100;
+  let score = calculateScanScore(scan);
 
   // --- 1. Robots.txt Analysis ---
   if (!scan.robotsTxtFound) {
-    score -= 40; // Increased penalty
     recommendations.push({
       priority: 'high',
       category: 'Robots.txt',
@@ -184,7 +181,6 @@ export function generateOptimizationReport(scan: Scan): OptimizationReport {
   } else {
     // Check for Sitemap
     if (!scan.robotsTxtContent?.toLowerCase().includes('sitemap:')) {
-      score -= 10; // Reduced from 15
       recommendations.push({
         priority: 'medium',
         category: 'Robots.txt',
@@ -196,7 +192,6 @@ export function generateOptimizationReport(scan: Scan): OptimizationReport {
 
     // Advanced Quality Check
     const robotsQuality = analyzeRobotsTxtQuality(scan.robotsTxtContent);
-    score -= robotsQuality.scoreDeduced;
     robotsQuality.issues.forEach(issue => {
       recommendations.push({
         priority: 'high',
@@ -210,7 +205,6 @@ export function generateOptimizationReport(scan: Scan): OptimizationReport {
 
   // --- 2. LLMs.txt Analysis ---
   if (!scan.llmsTxtFound) {
-    score -= 15; // Reduced from 25 to reflect it's "nice to have"
     recommendations.push({
       priority: 'medium',
       category: 'AI Optimization',
@@ -221,7 +215,6 @@ export function generateOptimizationReport(scan: Scan): OptimizationReport {
   } else {
     // Content Quality Check
     const llmsQuality = analyzeLlmsTxtQuality(scan.llmsTxtContent);
-    score -= llmsQuality.scoreDeduced;
     llmsQuality.issues.forEach(issue => {
       recommendations.push({
         priority: 'medium',
@@ -247,7 +240,6 @@ export function generateOptimizationReport(scan: Scan): OptimizationReport {
       );
 
       if (blockedCrucial) {
-        score -= 20;
         recommendations.push({
           priority: 'high',
           category: 'AI Visibility',
@@ -257,7 +249,6 @@ export function generateOptimizationReport(scan: Scan): OptimizationReport {
         });
       } else {
         // Only minor/niche bots blocked
-        score -= 5;
         recommendations.push({
           priority: 'low',
           category: 'Crawler Management',
