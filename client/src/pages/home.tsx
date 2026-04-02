@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PremiumReport } from "@/components/PremiumReport";
 import { Navbar } from "@/components/Navbar";
+import { runScanToCompletion } from "@/lib/scan-client";
 
 // Enhanced StepTracker Component with Pre-flight Checklist
 type ScanStep = 'select-type' | 'input' | 'scanning' | 'report';
@@ -426,6 +427,7 @@ const TerminalDemo = ({
     setIsComplete(false);
 
     // Track cancellation so async work can bail out after unmount / re-render
+    const controller = new AbortController();
     let cancelled = false;
     let typingInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -442,85 +444,34 @@ const TerminalDemo = ({
       setLines([...preflightSteps]);
 
       try {
-        // Use async mode by default for better reliability on Vercel
-        const response = await fetch('/api/scan?async=true', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: targetUrl }),
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          setLines(prev => [
-            ...prev,
-            `> [ERROR] Connection failed: ${error.message || 'Unknown error'}`,
-            "> Scan aborted."
-          ]);
-          onScanError();
-          return;
-        }
-
-        // Handle async mode (202 Accepted) vs sync mode (200 OK)
-        let result: ScanResult;
-        
-        if (response.status === 202) {
-          // Async mode: poll for results
-          const asyncData = await response.json();
-          const jobId = asyncData.jobId;
-          
-          setLines(prev => [
-            ...prev,
-            "> [INFO] Scan queued for background processing...",
-          ]);
-          
-          // Poll for completion
-          let pollAttempts = 0;
-          const maxPolls = 120; // 2 minutes max
-          
-          while (pollAttempts < maxPolls) {
-            if (cancelled) break;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            pollAttempts++;
-            
-            const statusRes = await fetch(`/api/scan-jobs/${jobId}/status`, {
-              credentials: "include",
-            });
-            
-            if (!statusRes.ok) {
-              throw new Error('Failed to get scan status');
-            }
-            
-            const status = await statusRes.json();
-            
-            // Update progress message
-            if (!cancelled && status.progressMessage) {
-              setLines(prev => {
+        const result = await runScanToCompletion(
+          { url: targetUrl },
+          {
+            signal: controller.signal,
+            onQueued: () => {
+              if (!cancelled) {
+                setLines((prev) => [
+                  ...prev,
+                  "> [INFO] Scan queued for background processing...",
+                ]);
+              }
+            },
+            onProgress: (_progress, message) => {
+              if (cancelled || !message) return;
+              setLines((prev) => {
                 const lastLine = prev[prev.length - 1];
-                if (lastLine?.startsWith('> [PROGRESS]')) {
-                  return [...prev.slice(0, -1), `> [PROGRESS] ${status.progressMessage}`];
+                if (lastLine?.startsWith("> [PROGRESS]")) {
+                  return [
+                    ...prev.slice(0, -1),
+                    `> [PROGRESS] ${message}`,
+                  ];
                 }
-                return [...prev, `> [PROGRESS] ${status.progressMessage}`];
+                return [...prev, `> [PROGRESS] ${message}`];
               });
-            }
-            
-            if (status.status === 'completed' && status.result) {
-              result = status.result;
-              break;
-            }
-            
-            if (status.status === 'failed') {
-              throw new Error(status.error || 'Scan failed');
-            }
+            },
           }
-          
-          if (!result!) {
-            throw new Error('Scan timed out');
-          }
-        } else {
-          // Sync mode: result is immediate
-          result = await response.json();
-        }
+        );
+
         if (!cancelled) setScanResult(result);
 
         const newLines = [...preflightSteps];
@@ -646,14 +597,18 @@ const TerminalDemo = ({
           currentLine++;
         }, 200);
       } catch (error) {
-        if (!cancelled) {
-          setLines(prev => [
-            ...prev,
-            `> [ERROR] Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            "> Scan aborted."
-          ]);
-          onScanError();
+        if (
+          cancelled ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
         }
+        setLines((prev) => [
+          ...prev,
+          `> [ERROR] Network error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          "> Scan aborted.",
+        ]);
+        onScanError();
       }
     };
 
@@ -661,6 +616,7 @@ const TerminalDemo = ({
 
     return () => {
       cancelled = true;
+      controller.abort();
       if (typingInterval) clearInterval(typingInterval);
     };
   }, [isScanning, targetUrl, onScanComplete, onScanError]);
