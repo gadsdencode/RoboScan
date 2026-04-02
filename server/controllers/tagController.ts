@@ -14,7 +14,7 @@ const router = Router();
  * Get all unique tags used by the authenticated user
  */
 router.get(
-  "/",
+  "/tags",
   isAuthenticated,
   asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.claims.sub;
