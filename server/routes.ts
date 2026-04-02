@@ -7,6 +7,7 @@ import { setupAuth } from "./auth.js";
 import { storage } from "./storage.js";
 import { ACHIEVEMENTS } from "./gamification.js";
 import { csrfProtection } from "./middleware/csrfProtection.js";
+import { apiRateLimiter } from "./middleware/rateLimiter.js";
 
 // Import all controllers
 import {
@@ -78,6 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // This validates Origin header in production to prevent cross-site request forgery
   // Note: Webhooks are excluded as they use signature verification instead
   app.use('/api', csrfProtection());
+  app.use('/api', apiRateLimiter);
 
   // ============== Mount Controllers ==============
   
