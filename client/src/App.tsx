@@ -7,6 +7,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageLoader } from "@/components/PageLoader";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useAuth } from "@/hooks/useAuth";
 import Home from "@/pages/home";
 
@@ -35,10 +36,22 @@ function Router() {
         <Route path="/register" component={Register} />
         <Route path="/set-password" component={SetPassword} />
         <Route path="/">
-          {isLoading || !isAuthenticated ? <Home /> : <Dashboard />}
+          {isLoading ? (
+            <DashboardSkeleton />
+          ) : !isAuthenticated ? (
+            <Home />
+          ) : (
+            <Dashboard />
+          )}
         </Route>
         <Route path="/dashboard">
-          {isLoading || !isAuthenticated ? <Home /> : <Dashboard />}
+          {isLoading ? (
+            <DashboardSkeleton />
+          ) : !isAuthenticated ? (
+            <Home />
+          ) : (
+            <Dashboard />
+          )}
         </Route>
         <Route path="/tools/llms-builder" component={LLMsBuilder} />
         <Route path="/llms-builder">
