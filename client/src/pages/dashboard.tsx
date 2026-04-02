@@ -29,6 +29,7 @@ export default function Dashboard() {
                 onClick={() => d.setShowTrophyCase(true)}
                 className="btn-hover-scale text-muted-foreground hover:text-yellow-400"
                 title="View Achievements"
+                aria-label="View achievements"
                 data-testid="button-trophy-case"
               >
                 <Trophy className="w-5 h-5" />
@@ -41,6 +42,7 @@ export default function Dashboard() {
               onClick={d.runTour}
               className="btn-hover-scale text-muted-foreground hover:text-primary"
               title="Start Feature Tour"
+              aria-label="Start feature tour"
               data-testid="button-tour"
             >
               <HelpCircle className="w-5 h-5" />
@@ -50,6 +52,7 @@ export default function Dashboard() {
               type="button"
               onClick={() => d.setShowNotificationsSheet(true)}
               className="relative p-2 hover:bg-white/5 rounded-lg transition-smooth btn-hover-scale group"
+              aria-label="Open notifications"
               data-testid="button-notifications"
             >
               <Bell className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />

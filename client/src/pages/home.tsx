@@ -8,6 +8,7 @@ import { PaymentModal } from "@/components/PaymentModal";
 import { PremiumReport } from "@/components/PremiumReport";
 import { Navbar } from "@/components/Navbar";
 import { runScanToCompletion } from "@/lib/scan-client";
+import { getReportAccessToken } from "@/lib/reportAccess";
 
 // Enhanced StepTracker Component with Pre-flight Checklist
 type ScanStep = 'select-type' | 'input' | 'scanning' | 'report';
@@ -1293,7 +1294,12 @@ export default function Home() {
     
     if (currentScanId) {
       try {
-        const response = await fetch(`/api/optimization-report/${currentScanId}`, { credentials: "include" });
+        const accessToken = getReportAccessToken(currentScanId);
+        const reportUrl = accessToken
+          ? `/api/optimization-report/${currentScanId}?accessToken=${encodeURIComponent(accessToken)}`
+          : `/api/optimization-report/${currentScanId}`;
+
+        const response = await fetch(reportUrl, { credentials: "include" });
         if (response.ok) {
           const data = await response.json();
           setPremiumReportData(data);
