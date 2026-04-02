@@ -2,6 +2,7 @@
 // Hook for unified access control in the hybrid freemium model
 
 import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "./useAuth";
 
 // Types
@@ -46,8 +47,6 @@ interface AccessSummaryResponse {
   } | null;
 }
 
-export const USER_ACCESS_SUMMARY_QUERY_KEY = ["user-access-summary"] as const;
-
 async function fetchAccessSummary(): Promise<AccessSummaryResponse> {
   const response = await fetch("/api/user/access-summary", {
     credentials: "include",
@@ -82,7 +81,7 @@ export function useAccessControl() {
   const isAdmin = user?.isAdmin || false;
 
   const { data: accessSummary, isLoading: accessSummaryLoading } = useQuery({
-    queryKey: USER_ACCESS_SUMMARY_QUERY_KEY,
+    queryKey: queryKeys.userAccessSummary,
     queryFn: fetchAccessSummary,
     staleTime: 1000 * 60 * 5,
     enabled: !!user && !isAdmin,
@@ -146,7 +145,7 @@ export function useLlmsFieldAccess() {
   const { isSubscriber, isAdmin } = useAccessControl();
 
   const { data, isLoading } = useQuery({
-    queryKey: USER_ACCESS_SUMMARY_QUERY_KEY,
+    queryKey: queryKeys.userAccessSummary,
     queryFn: fetchAccessSummary,
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !isAdmin, // Admin doesn't need to fetch - has all access
@@ -180,7 +179,7 @@ export function useRobotsFieldAccess() {
   const { isSubscriber, isAdmin } = useAccessControl();
 
   const { data, isLoading } = useQuery({
-    queryKey: USER_ACCESS_SUMMARY_QUERY_KEY,
+    queryKey: queryKeys.userAccessSummary,
     queryFn: fetchAccessSummary,
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !isAdmin, // Admin doesn't need to fetch - has all access

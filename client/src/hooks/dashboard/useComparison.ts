@@ -1,12 +1,14 @@
 import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ScanWithPurchase } from "@/components/dashboard/ScanList";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface UseComparisonOptions {
-  fetchScans: (tagFilter?: string[]) => void | Promise<void>;
   getScansForUrl: (url: string) => ScanWithPurchase[];
 }
 
-export function useComparison({ fetchScans, getScansForUrl }: UseComparisonOptions) {
+export function useComparison({ getScansForUrl }: UseComparisonOptions) {
+  const queryClient = useQueryClient();
   const [comparisonMode, setComparisonMode] = useState(false);
   const [selectedScanForComparison, setSelectedScanForComparison] =
     useState<ScanWithPurchase | null>(null);
@@ -142,7 +144,7 @@ export function useComparison({ fetchScans, getScansForUrl }: UseComparisonOptio
       setMyUrlForCompare("");
       setCompetitorError(null);
 
-      void fetchScans();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
     } catch (error) {
       console.error("Comparison failed", error);
       setCompetitorError(

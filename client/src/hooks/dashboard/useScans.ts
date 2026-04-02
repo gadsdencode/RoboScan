@@ -1,55 +1,61 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ScanWithPurchase } from "@/components/dashboard/ScanList";
+import {
+  fetchUserScans,
+  fetchUserTags,
+  patchScanTags,
+} from "@/lib/api/dashboard";
+import { queryKeys } from "@/lib/queryKeys";
 
 export function useScans(hasActiveSubscription: boolean) {
-  const [scans, setScans] = useState<ScanWithPurchase[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [expandedScan, setExpandedScan] = useState<number | null>(null);
 
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
 
-  const fetchScans = useCallback(async (tagFilter?: string[]) => {
-    try {
-      const params = new URLSearchParams();
-      if (tagFilter && tagFilter.length > 0) {
-        tagFilter.forEach((tag) => params.append("tags", tag));
-      }
-      const queryString = params.toString();
-      const url = queryString
-        ? `/api/user/scans?${queryString}`
-        : "/api/user/scans";
+  const tagFilterForQuery = useMemo(
+    () => (selectedTags.length > 0 ? selectedTags : undefined),
+    [selectedTags]
+  );
 
-      const response = await fetch(url, { credentials: "include" });
-      if (response.ok) {
-        const data = await response.json();
-        const scanData = Array.isArray(data) ? data : (data.scans || []);
-        setScans(scanData);
-      }
-    } catch (error) {
-      console.error("Failed to fetch scans:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const scansQuery = useQuery({
+    queryKey: queryKeys.userScans.list(tagFilterForQuery),
+    queryFn: () => fetchUserScans(tagFilterForQuery),
+    placeholderData: (previousData) => previousData,
+  });
 
-  const fetchAllTags = useCallback(async () => {
-    try {
-      const response = await fetch("/api/user/tags", { credentials: "include" });
-      if (response.ok) {
-        const data = (await response.json()) as string[];
-        setAllTags(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch tags:", error);
-    }
-  }, []);
+  const tagsQuery = useQuery({
+    queryKey: queryKeys.userTags,
+    queryFn: fetchUserTags,
+  });
 
-  useEffect(() => {
-    void fetchScans();
-    void fetchAllTags();
-  }, [fetchScans, fetchAllTags]);
+  const updateTagsMutation = useMutation({
+    mutationFn: ({
+      scanId,
+      tags,
+    }: {
+      scanId: number;
+      tags: string[];
+    }) => patchScanTags(scanId, tags),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userTags });
+    },
+  });
+
+  const scans = scansQuery.data ?? [];
+  const loading = scansQuery.isLoading;
+  const allTags = tagsQuery.data ?? [];
+
+  const fetchScans = useCallback(() => {
+    return queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
+  }, [queryClient]);
+
+  const fetchAllTags = useCallback(() => {
+    return queryClient.invalidateQueries({ queryKey: queryKeys.userTags });
+  }, [queryClient]);
 
   const getScansForUrl = useCallback(
     (url: string) => {
@@ -67,20 +73,13 @@ export function useScans(hasActiveSubscription: boolean) {
   );
 
   const handleToggleTagFilter = async (tag: string) => {
-    const newSelectedTags = selectedTags.includes(tag)
-      ? selectedTags.filter((t) => t !== tag)
-      : [...selectedTags, tag];
-    setSelectedTags(newSelectedTags);
-    setLoading(true);
-    await fetchScans(newSelectedTags.length > 0 ? newSelectedTags : undefined);
-    setLoading(false);
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
   };
 
   const handleClearTagFilter = async () => {
     setSelectedTags([]);
-    setLoading(true);
-    await fetchScans();
-    setLoading(false);
   };
 
   const handleAddTag = async (scanId: number, tag: string) => {
@@ -90,22 +89,7 @@ export function useScans(hasActiveSubscription: boolean) {
     if (!scan) return;
 
     const updatedTags = [...(scan.tags || []), tag.trim()];
-
-    try {
-      const response = await fetch(`/api/scans/${scanId}/tags`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tags: updatedTags }),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        await fetchScans(selectedTags.length > 0 ? selectedTags : undefined);
-        await fetchAllTags();
-      }
-    } catch (error) {
-      console.error("Failed to add tag:", error);
-    }
+    await updateTagsMutation.mutateAsync({ scanId, tags: updatedTags });
   };
 
   const handleRemoveTag = async (scanId: number, tagToRemove: string) => {
@@ -113,27 +97,12 @@ export function useScans(hasActiveSubscription: boolean) {
     if (!scan) return;
 
     const updatedTags = (scan.tags || []).filter((t) => t !== tagToRemove);
-
-    try {
-      const response = await fetch(`/api/scans/${scanId}/tags`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tags: updatedTags }),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        await fetchScans(selectedTags.length > 0 ? selectedTags : undefined);
-        await fetchAllTags();
-      }
-    } catch (error) {
-      console.error("Failed to remove tag:", error);
-    }
+    await updateTagsMutation.mutateAsync({ scanId, tags: updatedTags });
   };
 
   const handleScanComplete = useCallback(() => {
-    void fetchScans();
-  }, [fetchScans]);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
+  }, [queryClient]);
 
   return {
     scans,

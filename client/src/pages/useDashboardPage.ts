@@ -4,6 +4,7 @@ import type { ScanWithPurchase } from "@/components/dashboard/ScanList";
 import type { SettingsPanelHandle } from "@/components/dashboard/SettingsPanel";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
 import { downloadFile } from "@/lib/downloadFile";
+import { queryKeys } from "@/lib/queryKeys";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useScans } from "@/hooks/dashboard/useScans";
@@ -22,7 +23,6 @@ export function useDashboardPage() {
   const scansApi = useScans(hasActiveSubscription);
   const notificationsApi = useNotifications();
   const comparisonApi = useComparison({
-    fetchScans: scansApi.fetchScans,
     getScansForUrl: scansApi.getScansForUrl,
   });
   const recurringApi = useRecurringScans(settingsPanelRef);
@@ -49,8 +49,10 @@ export function useDashboardPage() {
 
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
-    void scansApi.fetchScans();
-    queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.userAccessSummary,
+    });
   };
 
   return {

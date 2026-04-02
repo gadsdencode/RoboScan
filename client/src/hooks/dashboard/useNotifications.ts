@@ -1,90 +1,69 @@
-import { useCallback, useEffect, useState } from "react";
-import type { Notification } from "@/components/dashboard/NotificationSheet";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import {
+  fetchNotifications,
+  fetchUnreadNotificationCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "@/lib/api/dashboard";
+import { queryKeys } from "@/lib/queryKeys";
+
+const NOTIFICATION_POLL_MS = 30_000;
 
 export function useNotifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const queryClient = useQueryClient();
   const [showNotificationsSheet, setShowNotificationsSheet] = useState(false);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const response = await fetch("/api/notifications", {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = (await response.json()) as Notification[];
-        setNotifications(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-    }
-  }, []);
+  const notificationsQuery = useQuery({
+    queryKey: queryKeys.notifications.list,
+    queryFn: fetchNotifications,
+    refetchInterval: NOTIFICATION_POLL_MS,
+  });
 
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const response = await fetch("/api/notifications/unread-count", {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = (await response.json()) as { count: number };
-        setUnreadCount(data.count);
-      }
-    } catch (error) {
-      console.error("Failed to fetch unread count:", error);
-    }
-  }, []);
+  const unreadQuery = useQuery({
+    queryKey: queryKeys.notifications.unreadCount,
+    queryFn: fetchUnreadNotificationCount,
+    refetchInterval: NOTIFICATION_POLL_MS,
+  });
 
-  useEffect(() => {
-    void fetchNotifications();
-    void fetchUnreadCount();
+  const invalidateNotifications = () => {
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.notifications.list,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.notifications.unreadCount,
+    });
+  };
 
-    const interval = setInterval(() => {
-      void fetchNotifications();
-      void fetchUnreadCount();
-    }, 30000);
+  const markOneMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: invalidateNotifications,
+  });
 
-    return () => clearInterval(interval);
-  }, [fetchNotifications, fetchUnreadCount]);
+  const markAllMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: invalidateNotifications,
+  });
 
   const handleMarkNotificationRead = async (id: number) => {
-    try {
-      const response = await fetch(`/api/notifications/${id}/read`, {
-        method: "PATCH",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        await fetchNotifications();
-        await fetchUnreadCount();
-      }
-    } catch (error) {
-      console.error("Mark notification read error:", error);
-    }
+    await markOneMutation.mutateAsync(id);
   };
 
   const handleMarkAllRead = async () => {
-    try {
-      const response = await fetch("/api/notifications/mark-all-read", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        await fetchNotifications();
-        await fetchUnreadCount();
-      }
-    } catch (error) {
-      console.error("Mark all read error:", error);
-    }
+    await markAllMutation.mutateAsync();
   };
 
   return {
-    notifications,
-    unreadCount,
+    notifications: notificationsQuery.data ?? [],
+    unreadCount: unreadQuery.data ?? 0,
     showNotificationsSheet,
     setShowNotificationsSheet,
-    fetchNotifications,
-    fetchUnreadCount,
+    fetchNotifications: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list }),
+    fetchUnreadCount: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.notifications.unreadCount,
+      }),
     handleMarkNotificationRead,
     handleMarkAllRead,
   };
