@@ -1283,7 +1283,7 @@ const Footer = () => (
         <a href="https://overture-systems.com" className="hover:text-primary">Overture Systems</a>
       </div>
       <div className="text-xs text-muted-foreground/50">
-        © 2025 Overture Systems Inc. All rights reserved.
+        © 2026 Overture Systems Solutions, LLC All rights reserved.
       </div>
     </div>
   </footer>
