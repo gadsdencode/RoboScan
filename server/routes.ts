@@ -27,6 +27,7 @@ import {
   subscriptionController,
   webhookController,
   promotionalCodeController,
+  accessController,
 } from "./controllers/index.js";
 
 // Guard against duplicate auth setup
@@ -90,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/scans', scanController);          // GET /api/scans/:id, PATCH /api/scans/:id/tags
   app.use('/api/scan-jobs', scanController);      // GET /api/scan-jobs/:jobId/status (route: /:jobId/status)
   app.use('/api/user', scanController);           // GET /api/user/scans (route: /scans)
+  app.use('/api/user', accessController);         // GET /api/user/access-summary
   
   // Scan worker routes: POST /api/scan-worker (QStash background job endpoint)
   // These endpoints are called by QStash, not by users directly

@@ -183,7 +183,7 @@ export function useDashboardPage() {
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
     void fetchScans();
-    queryClient.invalidateQueries({ queryKey: ["scan-purchases"] });
+    queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
   };
 
   const downloadFile = (content: string, filename: string) => {

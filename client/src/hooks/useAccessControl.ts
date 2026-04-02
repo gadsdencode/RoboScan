@@ -2,7 +2,6 @@
 // Hook for unified access control in the hybrid freemium model
 
 import { useQuery } from "@tanstack/react-query";
-import { useSubscription } from "./useSubscription";
 import { useAuth } from "./useAuth";
 
 // Types
@@ -30,57 +29,44 @@ export interface FieldAccess {
   reason: 'admin' | 'subscription' | 'purchase' | 'none';
 }
 
-// Fetch field purchases for LLMS
-async function fetchLlmsFieldPurchases(): Promise<{
-  purchases: Array<{ fieldKey: string }>;
-  hasSubscription: boolean;
-  hasAllFieldsAccess: boolean;
-}> {
-  const response = await fetch("/api/llms-fields/purchases", {
-    credentials: "include",
-  });
-  
-  if (!response.ok) {
-    if (response.status === 401) {
-      return { purchases: [], hasSubscription: false, hasAllFieldsAccess: false };
-    }
-    throw new Error("Failed to fetch LLMS field purchases");
-  }
-  
-  return response.json();
+/** Matches GET /api/user/access-summary */
+interface AccessSummaryResponse {
+  tier: 'scout' | 'architect' | 'guardian';
+  /** Active paid subscription only (excludes admin); combine with `user.isAdmin` for full access checks */
+  isSubscriber: boolean;
+  isAdmin: boolean;
+  hasAnyPurchase: boolean;
+  llmsFieldPurchases: string[];
+  robotsFieldPurchases: string[];
+  hasScanPurchase: boolean;
+  subscription: {
+    status: string;
+    planName: string | null;
+    currentPeriodEnd: string | null;
+  } | null;
 }
 
-// Fetch field purchases for Robots
-async function fetchRobotsFieldPurchases(): Promise<{
-  purchases: Array<{ fieldKey: string }>;
-  hasSubscription: boolean;
-  hasAllFieldsAccess: boolean;
-}> {
-  const response = await fetch("/api/robots-fields/purchases", {
-    credentials: "include",
-  });
-  
-  if (!response.ok) {
-    if (response.status === 401) {
-      return { purchases: [], hasSubscription: false, hasAllFieldsAccess: false };
-    }
-    throw new Error("Failed to fetch robots field purchases");
-  }
-  
-  return response.json();
-}
+export const USER_ACCESS_SUMMARY_QUERY_KEY = ["user-access-summary"] as const;
 
-// Fetch whether the user has made any scan-report purchases
-async function fetchScanPurchases(): Promise<{ hasPurchase: boolean }> {
-  const response = await fetch("/api/user/scan-purchases", {
+async function fetchAccessSummary(): Promise<AccessSummaryResponse> {
+  const response = await fetch("/api/user/access-summary", {
     credentials: "include",
   });
 
   if (!response.ok) {
     if (response.status === 401) {
-      return { hasPurchase: false };
+      return {
+        tier: "scout",
+        isSubscriber: false,
+        isAdmin: false,
+        hasAnyPurchase: false,
+        llmsFieldPurchases: [],
+        robotsFieldPurchases: [],
+        hasScanPurchase: false,
+        subscription: null,
+      };
     }
-    throw new Error("Failed to fetch scan purchases");
+    throw new Error("Failed to fetch access summary");
   }
 
   return response.json();
@@ -92,44 +78,27 @@ async function fetchScanPurchases(): Promise<{ hasPurchase: boolean }> {
  */
 export function useAccessControl() {
   const { user, isLoading: authLoading } = useAuth();
-  const { hasActiveSubscription, subscriptionLoading } = useSubscription();
-  
+
   const isAdmin = user?.isAdmin || false;
-  const isSubscriber = hasActiveSubscription || isAdmin;
 
-  // Check whether the user has made any one-time purchases (field unlocks).
-  // Uses the same query keys as useLlmsFieldAccess / useRobotsFieldAccess so
-  // React Query serves results from cache with no extra network requests.
-  const { data: llmsPurchaseData, isLoading: llmsPurchaseLoading } = useQuery({
-    queryKey: ["llms-field-access"],
-    queryFn: fetchLlmsFieldPurchases,
+  const { data: accessSummary, isLoading: accessSummaryLoading } = useQuery({
+    queryKey: USER_ACCESS_SUMMARY_QUERY_KEY,
+    queryFn: fetchAccessSummary,
     staleTime: 1000 * 60 * 5,
     enabled: !!user && !isAdmin,
   });
 
-  const { data: robotsPurchaseData, isLoading: robotsPurchaseLoading } = useQuery({
-    queryKey: ["robots-field-access"],
-    queryFn: fetchRobotsFieldPurchases,
-    staleTime: 1000 * 60 * 5,
-    enabled: !!user && !isAdmin,
-  });
-
-  const { data: scanPurchaseData, isLoading: scanPurchaseLoading } = useQuery({
-    queryKey: ["scan-purchases"],
-    queryFn: fetchScanPurchases,
-    staleTime: 1000 * 60 * 5,
-    enabled: !!user && !isAdmin,
-  });
+  const isSubscriber = isAdmin || (accessSummary?.isSubscriber ?? false);
 
   const hasAnyPurchase =
     isAdmin ||
-    (llmsPurchaseData?.purchases ?? []).length > 0 ||
-    (robotsPurchaseData?.purchases ?? []).length > 0 ||
-    scanPurchaseData?.hasPurchase === true;
+    (accessSummary?.llmsFieldPurchases?.length ?? 0) > 0 ||
+    (accessSummary?.robotsFieldPurchases?.length ?? 0) > 0 ||
+    accessSummary?.hasScanPurchase === true;
 
   // Tier: guardian (subscriber) > architect (any purchase) > scout (free)
   const tier = isSubscriber ? 'guardian' : hasAnyPurchase ? 'architect' : 'scout';
-  
+
   const accessLevel: AccessLevel = {
     tier,
     isSubscriber,
@@ -141,10 +110,10 @@ export function useAccessControl() {
     hasXpMultiplier: isSubscriber,
     xpMultiplier: isSubscriber ? 2 : 1,
   };
-  
+
   return {
     accessLevel,
-    isLoading: authLoading || subscriptionLoading || llmsPurchaseLoading || robotsPurchaseLoading || scanPurchaseLoading,
+    isLoading: authLoading || accessSummaryLoading,
     isSubscriber,
     isAdmin,
     tier,
@@ -156,11 +125,11 @@ export function useAccessControl() {
  */
 export function useScanAccess(scanId: number | undefined, isPurchased?: boolean) {
   const { isSubscriber, isAdmin } = useAccessControl();
-  
+
   // Admin or subscriber has full access to all scans
   // For specific scans, we also check if purchased
   const hasFullAccess = isAdmin || isSubscriber || isPurchased === true;
-  
+
   return {
     hasFullAccess,
     isPurchased: isPurchased === true,
@@ -175,18 +144,18 @@ export function useScanAccess(scanId: number | undefined, isPurchased?: boolean)
  */
 export function useLlmsFieldAccess() {
   const { isSubscriber, isAdmin } = useAccessControl();
-  
+
   const { data, isLoading } = useQuery({
-    queryKey: ["llms-field-access"],
-    queryFn: fetchLlmsFieldPurchases,
+    queryKey: USER_ACCESS_SUMMARY_QUERY_KEY,
+    queryFn: fetchAccessSummary,
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !isAdmin, // Admin doesn't need to fetch - has all access
   });
-  
+
   // If admin or subscriber, they have access to all fields
-  const hasAllFieldsAccess = isAdmin || isSubscriber || data?.hasAllFieldsAccess || false;
-  const purchasedFields = data?.purchases?.map(p => p.fieldKey) || [];
-  
+  const hasAllFieldsAccess = isAdmin || isSubscriber;
+  const purchasedFields = data?.llmsFieldPurchases ?? [];
+
   /**
    * Check if user has access to a specific field
    */
@@ -194,7 +163,7 @@ export function useLlmsFieldAccess() {
     if (hasAllFieldsAccess) return true;
     return purchasedFields.includes(fieldKey);
   };
-  
+
   return {
     hasAllFieldsAccess,
     purchasedFields,
@@ -209,18 +178,18 @@ export function useLlmsFieldAccess() {
  */
 export function useRobotsFieldAccess() {
   const { isSubscriber, isAdmin } = useAccessControl();
-  
+
   const { data, isLoading } = useQuery({
-    queryKey: ["robots-field-access"],
-    queryFn: fetchRobotsFieldPurchases,
+    queryKey: USER_ACCESS_SUMMARY_QUERY_KEY,
+    queryFn: fetchAccessSummary,
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: !isAdmin, // Admin doesn't need to fetch - has all access
   });
-  
+
   // If admin or subscriber, they have access to all fields
-  const hasAllFieldsAccess = isAdmin || isSubscriber || data?.hasAllFieldsAccess || false;
-  const purchasedFields = data?.purchases?.map(p => p.fieldKey) || [];
-  
+  const hasAllFieldsAccess = isAdmin || isSubscriber;
+  const purchasedFields = data?.robotsFieldPurchases ?? [];
+
   /**
    * Check if user has access to a specific field
    */
@@ -228,7 +197,7 @@ export function useRobotsFieldAccess() {
     if (hasAllFieldsAccess) return true;
     return purchasedFields.includes(fieldKey);
   };
-  
+
   return {
     hasAllFieldsAccess,
     purchasedFields,
@@ -244,7 +213,7 @@ export function useRobotsFieldAccess() {
  */
 export function useRecurringScanAccess() {
   const { isSubscriber, isAdmin, isLoading } = useAccessControl();
-  
+
   return {
     canCreateRecurringScans: isSubscriber || isAdmin,
     canViewRecurringScans: isSubscriber || isAdmin,
@@ -253,4 +222,3 @@ export function useRecurringScanAccess() {
     requiresSubscription: !isSubscriber && !isAdmin,
   };
 }
-
