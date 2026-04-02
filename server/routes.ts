@@ -93,9 +93,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/scan', scanController);           // POST /api/scan (route: /)
   app.use('/api/scans', scanController);          // GET /api/scans/:id, PATCH /api/scans/:id/tags
   app.use('/api/scan-jobs', scanController);      // GET /api/scan-jobs/:jobId/status (route: /:jobId/status)
-  app.use('/api/user', scanController);           // GET /api/user/scans (route: /scans)
+  // Specific /api/user/* routes MUST mount before scanController: it registers GET /:id which
+  // would otherwise match "tags", "achievements", "access-summary" and return 400 Invalid scan ID.
   app.use('/api/user', accessController);         // GET /api/user/access-summary
-  
+  app.use('/api/user', tagController);          // GET /api/user/tags
+  app.use('/api/user', gamificationController);   // GET /api/user/achievements
+  app.use('/api/user', scanController);           // GET /api/user/scans, GET /api/user/:id, …
+
   // Scan worker routes: POST /api/scan-worker (QStash background job endpoint)
   // These endpoints are called by QStash, not by users directly
   app.use('/api/scan-worker', scanWorkerController);
@@ -112,12 +116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Notification routes: /api/notifications/*
   app.use('/api/notifications', notificationController);
-
-  // Tag routes: GET /api/user/tags
-  app.use('/api/user', tagController);
-
-  // Gamification routes: GET /api/user/achievements
-  app.use('/api/user', gamificationController);
 
   // LLMs.txt builder routes: /api/validate-llms-txt, /api/llms-fields/*
   app.use('/api', llmsBuilderController);
