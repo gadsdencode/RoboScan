@@ -103,10 +103,16 @@ export async function checkFeatureAccess(
   switch (feature) {
     case FEATURES.FULL_SCAN_DETAILS:
     case FEATURES.PDF_EXPORT:
-      // Check if specific scan is purchased
+      // Scan-level purchases are bound to owned scans only.
+      // Anonymous purchases are validated via signed guest access token in reportController.
       if (resourceId?.scanId) {
-        const purchase = await storage.getPurchaseByScanId(resourceId.scanId);
-        isPurchased = !!purchase;
+        const scan = await storage.getScan(resourceId.scanId);
+        if (scan && scan.userId && scan.userId === userId) {
+          const purchase = await storage.getPurchaseByScanId(resourceId.scanId);
+          isPurchased = !!purchase;
+        } else {
+          isPurchased = false;
+        }
       }
       break;
 

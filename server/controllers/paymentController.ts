@@ -9,6 +9,7 @@ import { getStripe } from "../utils/stripe.js";
 import { isAdmin } from "../utils/admin.js";
 import { createPaymentSchema, paymentIntentIdSchema } from "../utils/validation.js";
 import { PRICING } from "../../shared/tiers.js";
+import { createGuestReportAccessToken } from "../utils/reportAccessToken.js";
 
 const router = Router();
 
@@ -52,13 +53,19 @@ router.post('/create-payment-intent', async (req: any, res: Response) => {
     }
 
     const existingPurchase = await storage.getPurchaseByScanId(scanId);
-    
-    // GOD MODE: If admin, tell the frontend it's already paid
+
+    // GOD MODE or owner shortcut: this user can directly access an already-purchased owned scan
     if (existingPurchase || isAdmin(req)) {
-      return res.status(400).json({ 
-        message: "Report already purchased",
-        alreadyPurchased: true 
-      });
+      const isOwner = !!(isAuth && scan.userId && req.user.claims.sub === scan.userId);
+      if (isAdmin(req) || isOwner) {
+        return res.status(400).json({
+          message: "Report already purchased",
+          alreadyPurchased: true
+        });
+      }
+
+      // Prevent leaking purchase state for scans the requester does not control.
+      return res.status(409).json({ message: "Report already purchased for this scan" });
     }
 
     const metadata: Record<string, string> = {
@@ -158,7 +165,12 @@ router.post('/confirm-payment', async (req: any, res: Response) => {
         });
       }
 
-      res.json({ success: true, scanId });
+      const scan = await storage.getScan(scanId);
+      const accessToken = scan && !scan.userId
+        ? createGuestReportAccessToken(scanId, paymentIntentId)
+        : null;
+
+      res.json({ success: true, scanId, accessToken });
     } else {
       res.json({ success: false, status: paymentIntent.status });
     }

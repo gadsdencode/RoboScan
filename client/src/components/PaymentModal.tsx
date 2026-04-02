@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import confetti from "canvas-confetti";
 import { PRICING } from "../../../shared/tiers";
+import { setReportAccessToken } from "@/lib/reportAccess";
 
 /**
  * Format price for display with currency symbol
@@ -109,6 +110,10 @@ const CheckoutForm = ({ onSuccess, onClose, amount }: { onSuccess: () => void, o
         });
 
         if (response.ok) {
+          const payload = (await response.json()) as { accessToken?: string; scanId?: number };
+          if (payload.accessToken && payload.scanId) {
+            setReportAccessToken(payload.scanId, payload.accessToken);
+          }
           triggerPurchaseConfetti();
           onSuccess();
         } else {
@@ -240,6 +245,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
             <div className="relative bg-card p-6 border-b border-border">
               <button
                 title="Close"
+                aria-label="Close payment modal"
                 onClick={onClose}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-close-modal"
