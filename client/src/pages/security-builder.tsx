@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface SecurityTxtFormData {
   // Required fields
@@ -27,6 +28,7 @@ interface SecurityTxtFormData {
 
 export default function SecurityBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -164,6 +166,7 @@ export default function SecurityBuilder() {
         title: "Validation Successful",
         description: "Your security.txt file is RFC 9116 compliant!",
       });
+      await rewardBuilderValidation("security", generateSecurityTxt());
     } else {
       toast({
         title: "Validation Issues Found",

@@ -1,20 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
-  DialogDescription 
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { FileCode, Shield, Zap, Lock, Trophy } from "lucide-react";
-import { ACHIEVEMENTS } from "@shared/gamification";
+import { FileCode, Shield, Zap, Lock, Trophy, Flag, Award, Layers, Crown } from "lucide-react";
+import { ACHIEVEMENTS, type AchievementKey } from "@shared/gamification";
 
-const IconMap: Record<string, any> = {
+const IconMap: Record<string, typeof Trophy> = {
   FileCode,
   Shield,
-  Zap
+  Zap,
+  Flag,
+  Award,
+  Layers,
+  Crown,
 };
 
 interface UnlockedAchievement {
@@ -29,24 +33,40 @@ interface UnlockedAchievement {
   unlockedAt: string | null;
 }
 
+interface AchievementProgressEntry {
+  current: number;
+  target: number;
+  hint: string;
+}
+
+interface AchievementsApiResponse {
+  unlocked: UnlockedAchievement[];
+  progress: Partial<Record<AchievementKey, AchievementProgressEntry>>;
+  totalDefined: number;
+}
+
 interface TrophyCaseProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function TrophyCase({ open, onOpenChange }: TrophyCaseProps) {
-  const { data: unlocked = [], isLoading } = useQuery<UnlockedAchievement[]>({
+  const { data, isLoading } = useQuery({
     queryKey: ["/api/user/achievements"],
-    queryFn: async () => {
-      const response = await fetch('/api/user/achievements', { credentials: "include" });
-      if (!response.ok) throw new Error('Failed to fetch achievements');
+    queryFn: async (): Promise<AchievementsApiResponse> => {
+      const response = await fetch("/api/user/achievements", {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch achievements");
       return response.json();
     },
     enabled: open,
   });
 
-  const unlockedKeys = new Set(unlocked.map(a => a.achievementKey));
-  
+  const unlocked = data?.unlocked ?? [];
+  const progress = data?.progress ?? {};
+  const unlockedKeys = new Set(unlocked.map((a) => a.achievementKey));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl bg-card border-primary/20">
@@ -70,52 +90,76 @@ export function TrophyCase({ open, onOpenChange }: TrophyCaseProps) {
               {Object.values(ACHIEVEMENTS).map((achievement) => {
                 const Icon = IconMap[achievement.icon] || Trophy;
                 const isUnlocked = unlockedKeys.has(achievement.key);
-                
+                const p = progress[achievement.key as AchievementKey];
+
                 return (
-                  <div 
+                  <div
                     key={achievement.key}
                     data-testid={`achievement-${achievement.key.toLowerCase()}`}
                     className={`
                       relative overflow-hidden rounded-xl border p-4 transition-all
-                      ${isUnlocked 
-                        ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(0,255,255,0.15)]" 
-                        : "bg-muted/30 border-white/5 opacity-70 grayscale"
+                      ${
+                        isUnlocked
+                          ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_rgba(0,255,255,0.15)]"
+                          : "bg-muted/30 border-white/5 opacity-70 grayscale"
                       }
                     `}
                   >
                     <div className="flex items-start gap-4">
-                      <div className={`
+                      <div
+                        className={`
                         p-3 rounded-lg shrink-0
                         ${isUnlocked ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}
-                      `}>
+                      `}
+                      >
                         <Icon className="w-6 h-6" />
                       </div>
-                      
-                      <div className="space-y-1 flex-1">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-bold font-mono text-sm tracking-tight" data-testid={`text-achievement-name-${achievement.key.toLowerCase()}`}>
+
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4
+                            className="font-bold font-mono text-sm tracking-tight"
+                            data-testid={`text-achievement-name-${achievement.key.toLowerCase()}`}
+                          >
                             {achievement.name}
                           </h4>
                           {isUnlocked ? (
-                            <Badge 
-                              variant="default" 
-                              className="bg-primary/20 text-primary border-primary/30 h-5 text-[10px]"
+                            <Badge
+                              variant="default"
+                              className="bg-primary/20 text-primary border-primary/30 h-5 text-[10px] shrink-0"
                               data-testid={`badge-unlocked-${achievement.key.toLowerCase()}`}
                             >
                               UNLOCKED
                             </Badge>
                           ) : (
-                            <Lock className="w-3 h-3 text-muted-foreground" data-testid={`icon-locked-${achievement.key.toLowerCase()}`} />
+                            <Lock
+                              className="w-3 h-3 text-muted-foreground shrink-0"
+                              data-testid={`icon-locked-${achievement.key.toLowerCase()}`}
+                            />
                           )}
                         </div>
-                        
-                        <p className="text-xs text-muted-foreground line-clamp-2" data-testid={`text-achievement-description-${achievement.key.toLowerCase()}`}>
+
+                        <p
+                          className="text-xs text-muted-foreground line-clamp-2"
+                          data-testid={`text-achievement-description-${achievement.key.toLowerCase()}`}
+                        >
                           {achievement.description}
                         </p>
-                        
+
+                        {!isUnlocked && p && (
+                          <p
+                            className="text-[10px] font-mono text-primary/80 pt-1"
+                            data-testid={`text-achievement-progress-${achievement.key.toLowerCase()}`}
+                          >
+                            {p.hint}
+                          </p>
+                        )}
+
                         <div className="pt-2 flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
                           <Zap className="w-3 h-3" />
-                          <span data-testid={`text-achievement-xp-${achievement.key.toLowerCase()}`}>{achievement.xpReward} XP Reward</span>
+                          <span data-testid={`text-achievement-xp-${achievement.key.toLowerCase()}`}>
+                            {achievement.xpReward} XP Reward
+                          </span>
                         </div>
                       </div>
                     </div>

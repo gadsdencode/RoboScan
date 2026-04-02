@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface TeamMember {
   role: string;
@@ -41,6 +42,7 @@ interface HumansFormData {
 
 export default function HumansBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -168,6 +170,7 @@ export default function HumansBuilder() {
         title: "Validation Successful",
         description: "Your humans.txt file is properly formatted!",
       });
+      await rewardBuilderValidation("humans", generateHumansTxt());
     } else {
       toast({
         title: "Validation Issues Found",

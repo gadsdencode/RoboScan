@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface AdRecord {
   domain: string;
@@ -40,6 +41,7 @@ const AD_NETWORK_PRESETS = [
 
 export default function AdsBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -135,6 +137,7 @@ export default function AdsBuilder() {
         title: "Validation Successful",
         description: "Your ads.txt file is IAB compliant!",
       });
+      await rewardBuilderValidation("ads", generateAdsTxt());
     } else {
       toast({
         title: "Validation Issues Found",

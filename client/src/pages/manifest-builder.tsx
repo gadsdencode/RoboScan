@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Smartphone, Palette, Image, Plus, Trash2, Globe, Layout } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
+import { BuilderPageLayout } from "@/components/builders/BuilderPageLayout";
+import { useBuilderActions } from "@/hooks/useBuilderActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface ManifestIcon {
   src: string;
@@ -38,6 +39,19 @@ interface ManifestFormData {
 
 export default function ManifestBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
+  const { handleCopy, handleDownload } = useBuilderActions({
+    fileName: "manifest.json",
+    mimeType: "application/json",
+    copySuccess: {
+      title: "Copied to Clipboard",
+      description: "The manifest.json content has been copied successfully.",
+    },
+    downloadSuccess: {
+      title: "Download Started",
+      description: "Your manifest.json file is being downloaded.",
+    },
+  });
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -159,6 +173,7 @@ export default function ManifestBuilder() {
         title: "Validation Successful",
         description: "Your manifest.json file is properly formatted!",
       });
+      await rewardBuilderValidation("manifest", generateManifest());
     } else {
       toast({
         title: "Validation Issues Found",
@@ -168,33 +183,6 @@ export default function ManifestBuilder() {
     }
 
     setIsValidating(false);
-  };
-
-  const handleCopy = async () => {
-    const content = generateManifest();
-    await navigator.clipboard.writeText(content);
-    toast({
-      title: "Copied to Clipboard",
-      description: "The manifest.json content has been copied successfully.",
-    });
-  };
-
-  const handleDownload = () => {
-    const content = generateManifest();
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'manifest.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: "Download Started",
-      description: "Your manifest.json file is being downloaded.",
-    });
   };
 
   const addIcon = () => {
@@ -207,34 +195,19 @@ export default function ManifestBuilder() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-
-      {/* Main Content */}
-      <div className="container mx-auto px-6 pt-24 pb-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 text-purple-500 mb-4">
-              <Smartphone className="w-4 h-4" />
-              <span className="text-sm font-medium">PWA Metadata Tool</span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              manifest.json Builder
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Create a Web App Manifest to make your website installable as a Progressive Web App (PWA).
-            </p>
-            <Badge variant="secondary" className="mt-4">
-              W3C Web App Manifest Standard
-            </Badge>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-8">
+    <BuilderPageLayout
+      title="manifest.json Builder"
+      description="Create a Web App Manifest to make your website installable as a Progressive Web App (PWA)."
+      icon={Smartphone}
+      badgeText="PWA Metadata Tool"
+      badgeClassName="bg-purple-500/10 text-purple-500"
+      headerExtra={
+        <Badge variant="secondary" className="mt-4">
+          W3C Web App Manifest Standard
+        </Badge>
+      }
+    >
+      <div className="grid lg:grid-cols-2 gap-8">
             {/* Form Section */}
             <Card>
               <CardHeader>
@@ -376,6 +349,7 @@ export default function ManifestBuilder() {
                           className="font-mono text-sm"
                         />
                         <input
+                          title="Theme Color"
                           type="color"
                           value={formData.themeColor}
                           onChange={(e) => setValue("themeColor", e.target.value)}
@@ -393,6 +367,7 @@ export default function ManifestBuilder() {
                           className="font-mono text-sm"
                         />
                         <input
+                          title="Background Color"
                           type="color"
                           value={formData.backgroundColor}
                           onChange={(e) => setValue("backgroundColor", e.target.value)}
@@ -568,7 +543,7 @@ export default function ManifestBuilder() {
                   {isValidating ? "Validating..." : "Validate"}
                 </Button>
                 <Button
-                  onClick={handleCopy}
+                  onClick={() => handleCopy(generateManifest)}
                   variant="secondary"
                   className="flex-1"
                 >
@@ -576,7 +551,7 @@ export default function ManifestBuilder() {
                   Copy to Clipboard
                 </Button>
                 <Button
-                  onClick={handleDownload}
+                  onClick={() => handleDownload(generateManifest)}
                   variant="secondary"
                   className="flex-1"
                 >
@@ -614,9 +589,7 @@ export default function ManifestBuilder() {
               </Card>
             </div>
           </div>
-        </motion.div>
-      </div>
-    </div>
+    </BuilderPageLayout>
   );
 }
 

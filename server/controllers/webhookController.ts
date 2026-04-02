@@ -4,6 +4,8 @@
 import { Router, Request, Response } from "express";
 import { storage } from "../storage.js";
 import { getStripe } from "../utils/stripe.js";
+import { ACHIEVEMENTS, XP_ACTION_AMOUNTS } from "../gamification.js";
+import { awardActionXP } from "../services/gamificationService.js";
 import Stripe from "stripe";
 
 const router = Router();
@@ -299,6 +301,17 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
   });
 
+  if (
+    subscription.status === 'active' ||
+    subscription.status === 'trialing'
+  ) {
+    try {
+      await storage.unlockAchievement(userId, ACHIEVEMENTS.SUBSCRIBER.key);
+    } catch (e) {
+      console.error('[Webhook] SUBSCRIBER achievement unlock failed:', e);
+    }
+  }
+
   console.log(`[Webhook] Created subscription ${subscription.id} for user ${userId}`);
 }
 
@@ -463,7 +476,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
   // --- Branch 1: Premium LLMs field purchase ---
   if (metadata?.type === 'llms_premium_field') {
-    const { userId, fieldKey, xpReward } = metadata;
+    const { userId, fieldKey } = metadata;
 
     if (!userId || !fieldKey) {
       throw new NonRetryableWebhookError(
@@ -484,16 +497,11 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       amount: paymentIntent.amount,
     });
 
-    // Award XP — stored in metadata at PI creation so we don't need to re-import field config
-    const xp = parseInt(xpReward || '0', 10);
-    if (xp > 0) {
-      const user = await storage.getUser(userId);
-      if (user) {
-        const newXp = (user.xp || 0) + xp;
-        const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
-        await storage.updateUserGamificationStats(userId, newXp, newLevel);
-      }
-    }
+    await awardActionXP(
+      userId,
+      "premium_field_purchase",
+      XP_ACTION_AMOUNTS.PREMIUM_FIELD_PURCHASE
+    );
 
     console.log(`[Webhook] Reconciled LLMS field purchase: userId=${userId} fieldKey=${fieldKey}`);
     return;
@@ -501,7 +509,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
   // --- Branch 2: Premium robots field purchase ---
   if (metadata?.type === 'robots_premium_field') {
-    const { userId, fieldKey, xpReward } = metadata;
+    const { userId, fieldKey } = metadata;
 
     if (!userId || !fieldKey) {
       throw new NonRetryableWebhookError(
@@ -522,15 +530,11 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       amount: paymentIntent.amount,
     });
 
-    const xp = parseInt(xpReward || '0', 10);
-    if (xp > 0) {
-      const user = await storage.getUser(userId);
-      if (user) {
-        const newXp = (user.xp || 0) + xp;
-        const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
-        await storage.updateUserGamificationStats(userId, newXp, newLevel);
-      }
-    }
+    await awardActionXP(
+      userId,
+      "premium_field_purchase",
+      XP_ACTION_AMOUNTS.PREMIUM_FIELD_PURCHASE
+    );
 
     console.log(`[Webhook] Reconciled robots field purchase: userId=${userId} fieldKey=${fieldKey}`);
     return;

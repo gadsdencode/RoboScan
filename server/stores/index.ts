@@ -101,6 +101,22 @@ export class DatabaseStorage implements IStorage {
   getUserScans(userId: string, tagFilter?: string[], limit?: number, offset?: number): Promise<Scan[]> {
     return scanStore.getUserScans(userId, tagFilter, limit, offset);
   }
+
+  countUserScans(userId: string): Promise<number> {
+    return scanStore.countUserScans(userId);
+  }
+
+  countUserScansSince(userId: string, since: Date): Promise<number> {
+    return scanStore.countUserScansSince(userId, since);
+  }
+
+  getMaxScanScoreForUser(userId: string): Promise<number | null> {
+    return scanStore.getMaxScanScoreForUser(userId);
+  }
+
+  getMaxFileCoverageForUser(userId: string): Promise<number> {
+    return scanStore.getMaxFileCoverageForUser(userId);
+  }
   
   getScanById(scanId: number, userId: string): Promise<Scan | null> {
     return scanStore.getScanById(scanId, userId);
@@ -313,6 +329,17 @@ export class DatabaseStorage implements IStorage {
     icon: string;
   }>> {
     return notificationStore.getUserAchievements(userId);
+  }
+
+  getScanGamificationNotification(
+    userId: string,
+    scanId: number
+  ): Promise<import("./notificationStore.js").ScanGamificationPayload | null> {
+    return notificationStore.getScanGamificationNotification(userId, scanId);
+  }
+
+  hasBuilderValidationRecorded(userId: string, builderKey: string): Promise<boolean> {
+    return notificationStore.hasBuilderValidationRecorded(userId, builderKey);
   }
   
   // ============== Field Purchase Operations (delegated to FieldPurchaseStore) ==============

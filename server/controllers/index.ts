@@ -17,3 +17,4 @@ export { default as subscriptionController } from './subscriptionController.js';
 export { default as webhookController } from './webhookController.js';
 export { default as promotionalCodeController } from './promotionalCodeController.js';
 export { default as accessController } from './accessController.js';
+export { default as buildersValidationController } from './buildersValidationController.js';

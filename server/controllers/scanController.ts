@@ -29,7 +29,10 @@ import {
   shouldUseAsyncMode,
   formatScanError,
 } from "../services/scanService.js";
-import { awardScanXP } from "../services/gamificationService.js";
+import {
+  awardScanXP,
+  evaluateScanAchievementsAfterScan,
+} from "../services/gamificationService.js";
 
 const router = Router();
 
@@ -186,6 +189,13 @@ router.post('/', async (req: any, res: Response) => {
         scanResult.canonicalDomain,
         scanResult.isOnCooldown
       );
+      const achievementsUnlocked = await evaluateScanAchievementsAfterScan(
+        userId,
+        scanResult.scan
+      );
+      if (gamificationUpdates && achievementsUnlocked.length > 0) {
+        gamificationUpdates.achievementsUnlocked = achievementsUnlocked;
+      }
     }
 
     // Return scan results
@@ -287,6 +297,31 @@ router.get('/:jobId/status', async (req: any, res: Response) => {
           warnings: scan.warnings,
           score: scan.score,
         };
+
+        if (userId) {
+          const payload = await storage.getScanGamificationNotification(
+            userId,
+            scan.id
+          );
+          if (
+            payload &&
+            (payload.gamification ||
+              (payload.achievementsUnlocked &&
+                payload.achievementsUnlocked.length > 0))
+          ) {
+            response.gamification = {
+              xpGained: payload.gamification?.xpGained ?? 0,
+              baseXp: payload.gamification?.baseXp,
+              multiplier: payload.gamification?.multiplier,
+              totalXp: payload.gamification?.totalXp ?? 0,
+              newLevel: payload.gamification?.newLevel ?? 1,
+              levelUp: payload.gamification?.levelUp ?? false,
+              cooldownActive: payload.gamification?.cooldownActive,
+              isSubscriber: payload.gamification?.isSubscriber,
+              achievementsUnlocked: payload.achievementsUnlocked ?? [],
+            };
+          }
+        }
       }
     }
 

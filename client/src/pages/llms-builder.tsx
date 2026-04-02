@@ -17,10 +17,12 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAchievementToast } from "@/hooks/useAchievementToast";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useQueryClient } from "@tanstack/react-query";
+import { emitGamificationEvent } from "@/lib/gamification-events";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -151,6 +153,7 @@ function PaymentForm({
 
 export default function LLMsBuilder() {
   const { toast } = useToast();
+  const showAchievementToasts = useAchievementToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isValidating, setIsValidating] = useState(false);
@@ -426,13 +429,33 @@ For AI partnership inquiries: ${formData.contactEmail}
           description: "Your llms.txt file is properly formatted!",
         });
 
+        const actionXp = result.gamification?.actionXp as
+          | {
+              xpGained?: number;
+              newLevel?: number;
+              levelUp?: boolean;
+            }
+          | null
+          | undefined;
+        if (actionXp?.xpGained) {
+          toast({
+            title: `+${actionXp.xpGained} XP`,
+            description: "Builder validation reward",
+          });
+          emitGamificationEvent("xp_gained", {
+            amount: actionXp.xpGained,
+            source: "builder_validation",
+          });
+          if (actionXp.levelUp) {
+            emitGamificationEvent("level_up", { newLevel: actionXp.newLevel });
+          }
+          await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/user/achievements"] });
+        }
+
         if (result.gamification?.achievementUnlocked) {
           setTimeout(() => {
-            toast({
-              title: "🏆 Achievement Unlocked!",
-              description: `You earned the "${result.gamification.achievement.name}" badge and ${result.gamification.achievement.xpReward} XP!`,
-              className: "border-yellow-500/50 bg-yellow-500/10",
-            });
+            showAchievementToasts(result.gamification);
             queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
           }, 500);
         }

@@ -11,7 +11,20 @@ import {
   type ScanJobStatus,
 } from "../../shared/schema.js";
 import { db } from "../db.js";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, gte, count, max } from "drizzle-orm";
+
+function countScanFileCoverage(s: Scan): number {
+  let n = 0;
+  if (s.robotsTxtFound) n++;
+  if (s.llmsTxtFound) n++;
+  if (s.sitemapXmlFound) n++;
+  if (s.securityTxtFound) n++;
+  if (s.manifestJsonFound) n++;
+  if (s.adsTxtFound) n++;
+  if (s.humansTxtFound) n++;
+  if (s.aiTxtFound) n++;
+  return n;
+}
 
 export interface IScanStore {
   // Scan operations
@@ -21,6 +34,18 @@ export interface IScanStore {
   getScanById(scanId: number, userId: string): Promise<Scan | null>;
   updateScanTags(id: number, tags: string[]): Promise<Scan>;
   getAllUserTags(userId: string): Promise<string[]>;
+
+  /** Total scans owned by the user (for gamification milestones). */
+  countUserScans(userId: string): Promise<number>;
+
+  /** Scans with createdAt >= since (rolling window checks). */
+  countUserScansSince(userId: string, since: Date): Promise<number>;
+
+  /** Highest scan score for user (for achievement progress). */
+  getMaxScanScoreForUser(userId: string): Promise<number | null>;
+
+  /** Max count of detected file-type flags (0–8) across user's scans. */
+  getMaxFileCoverageForUser(userId: string): Promise<number>;
   
   // Score percentile operations
   getScorePercentile(score: number): Promise<number>;
@@ -110,6 +135,46 @@ export class ScanStore implements IScanStore {
     });
 
     return Array.from(allTags).sort();
+  }
+
+  async countUserScans(userId: string): Promise<number> {
+    const [row] = await db
+      .select({ value: count() })
+      .from(scans)
+      .where(eq(scans.userId, userId));
+    return Number(row?.value ?? 0);
+  }
+
+  async countUserScansSince(userId: string, since: Date): Promise<number> {
+    const [row] = await db
+      .select({ value: count() })
+      .from(scans)
+      .where(and(eq(scans.userId, userId), gte(scans.createdAt, since)));
+    return Number(row?.value ?? 0);
+  }
+
+  async getMaxScanScoreForUser(userId: string): Promise<number | null> {
+    const [row] = await db
+      .select({ value: max(scans.score) })
+      .from(scans)
+      .where(eq(scans.userId, userId));
+    const v = row?.value;
+    return v === null || v === undefined ? null : Number(v);
+  }
+
+  async getMaxFileCoverageForUser(userId: string): Promise<number> {
+    const rows = await db
+      .select()
+      .from(scans)
+      .where(eq(scans.userId, userId))
+      .limit(100);
+
+    let maxCov = 0;
+    for (const s of rows) {
+      const c = countScanFileCoverage(s);
+      if (c > maxCov) maxCov = c;
+    }
+    return maxCov;
   }
 
   async getScorePercentile(score: number): Promise<number> {

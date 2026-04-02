@@ -5,6 +5,8 @@
 import { Router, Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage.js";
+import { XP_ACTION_AMOUNTS } from "../gamification.js";
+import { awardActionXP } from "../services/gamificationService.js";
 import { isAuthenticated } from "../auth.js";
 import { requireSubscription } from "../utils/accessControl.js";
 import { isAdmin } from "../utils/admin.js";
@@ -58,6 +60,12 @@ router.post('/', isAuthenticated, async (req: any, res: Response) => {
       notifyOnNewErrors: notificationPreferences?.notifyOnNewErrors ?? true,
       notificationMethod: notificationPreferences?.notificationMethod ?? 'in-app',
     });
+
+    await awardActionXP(
+      userId,
+      "recurring_scan_created",
+      XP_ACTION_AMOUNTS.RECURRING_SCAN_CREATED
+    );
 
     res.json(recurringScan);
   } catch (error) {

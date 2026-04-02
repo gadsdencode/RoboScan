@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useQueryClient } from "@tanstack/react-query";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -152,6 +153,7 @@ export default function RobotsBuilder() {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -447,6 +449,7 @@ export default function RobotsBuilder() {
         title: "Validation Successful",
         description: "Your robots.txt file is properly formatted!",
       });
+      await rewardBuilderValidation("robots", robotsTxtContent);
     } else {
       toast({
         title: "Validation Issues Found",

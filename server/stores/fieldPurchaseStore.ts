@@ -12,6 +12,7 @@ import {
 } from "../../shared/schema.js";
 import { db } from "../db.js";
 import { eq, and } from "drizzle-orm";
+import { DOMAIN_COOLDOWN_HOURS } from "../../shared/gamification.js";
 
 export interface IFieldPurchaseStore {
   // Premium LLMs Field operations
@@ -112,7 +113,7 @@ export class FieldPurchaseStore implements IFieldPurchaseStore {
     if (!cooldown) return false;
 
     const now = new Date();
-    const cooldownPeriod = 24 * 60 * 60 * 1000;
+    const cooldownPeriod = DOMAIN_COOLDOWN_HOURS * 60 * 60 * 1000;
     const timeSinceLastScan = now.getTime() - cooldown.lastScanAt.getTime();
 
     return timeSinceLastScan < cooldownPeriod;

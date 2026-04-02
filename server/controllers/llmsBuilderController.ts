@@ -6,7 +6,11 @@ import { Router, Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage.js";
 import { isAuthenticated, checkAuthentication } from "../auth.js";
-import { ACHIEVEMENTS } from "../gamification.js";
+import { ACHIEVEMENTS, XP_ACTION_AMOUNTS } from "../gamification.js";
+import {
+  awardActionXP,
+  awardBuilderValidationXpIfUnique,
+} from "../services/gamificationService.js";
 import { getStripe } from "../utils/stripe.js";
 import { isAdmin } from "../utils/admin.js";
 import { validateLlmsTxtSchema, fieldKeySchema, paymentIntentIdSchema } from "../utils/validation.js";
@@ -72,8 +76,9 @@ router.post('/validate-llms-txt', async (req: any, res: Response) => {
     const isValid = errors.length === 0;
     let achievementUnlocked = false;
     let achievementDetails = null;
+    let actionXp = null;
 
-    // [GAMIFICATION] Unlock Achievement if valid
+    // [GAMIFICATION] Unlock Achievement + one-time validation XP if valid
     if (isValid && checkAuthentication(req)) {
       const userId = req.user.claims.sub;
       const result = await storage.unlockAchievement(userId, ACHIEVEMENTS.ARCHITECT.key);
@@ -81,6 +86,7 @@ router.post('/validate-llms-txt', async (req: any, res: Response) => {
         achievementUnlocked = true;
         achievementDetails = result.achievement;
       }
+      actionXp = await awardBuilderValidationXpIfUnique(userId, "llms");
     }
 
     res.json({
@@ -88,8 +94,9 @@ router.post('/validate-llms-txt', async (req: any, res: Response) => {
       errors,
       gamification: {
         achievementUnlocked,
-        achievement: achievementDetails
-      }
+        achievement: achievementDetails,
+        actionXp,
+      },
     });
   } catch (error) {
     console.error('Validation error:', error);
@@ -268,14 +275,11 @@ router.post('/llms-fields/confirm-payment', isAuthenticated, async (req: any, re
       amount: paymentIntent.amount,
     });
 
-    // Award XP for the purchase using authoritative XP reward
-    const user = await storage.getUser(userId);
-    if (user) {
-      const currentXp = user.xp || 0;
-      const newXp = currentXp + field.xpReward;
-      const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
-      await storage.updateUserGamificationStats(userId, newXp, newLevel);
-    }
+    await awardActionXP(
+      userId,
+      "premium_field_purchase",
+      XP_ACTION_AMOUNTS.PREMIUM_FIELD_PURCHASE
+    );
 
     res.json({ success: true, fieldKey });
   } catch (error) {
