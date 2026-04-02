@@ -159,6 +159,28 @@
 /* Driver.js Enterprise Theme Overrides */
 .roboscan-driver-popover.driver-popover {
   @apply bg-white border border-border text-foreground rounded-xl shadow-2xl;
+  /* Stay inside viewport on phones / notches / landscape */
+  box-sizing: border-box;
+  max-width: min(100vw - 1.5rem, 22rem);
+  max-height: min(70dvh, 28rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-left: max(0.5rem, env(safe-area-inset-left, 0px));
+  margin-right: max(0.5rem, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 640px) {
+  .roboscan-driver-popover.driver-popover {
+    max-width: min(100vw - 2rem, 26rem);
+    max-height: min(75dvh, 32rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .roboscan-driver-popover.driver-popover {
+    max-width: min(100vw - 3rem, 28rem);
+  }
 }
 
 .roboscan-driver-popover .driver-popover-title {

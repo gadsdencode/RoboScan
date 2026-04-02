@@ -144,19 +144,23 @@ export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: N
       <div className="container mx-auto px-6 h-16 flex items-center justify-between">
         {/* Brand / Logo */}
         <div 
-          className="flex items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter cursor-pointer" 
+          className="flex shrink-0 items-center gap-2 text-primary font-heading text-xl font-bold tracking-tighter cursor-pointer" 
           onClick={() => window.location.href = '/'}
         >
           <Shield className="w-6 h-6" />
           <span>AI BotCheck</span>
         </div>
 
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-2">
-          {/* Additional Toolbar Items */}
-          {toolbarItems}
+        {/* Toolbar + Tools: toolbar visible on all breakpoints (dashboard tour + mobile UX) */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 justify-end">
+          {toolbarItems && (
+            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto min-w-0 max-w-[min(100%,calc(100vw-7rem))] sm:max-w-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {toolbarItems}
+            </div>
+          )}
 
-          {/* Tools Dropdown */}
+          {/* Tools dropdown — md+ only; mobile uses slide-down menu (see hamburger below) */}
+          <div className="hidden md:flex items-center gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -245,15 +249,19 @@ export function Navbar({ showDashboard = true, toolbarItems, onCompareSites }: N
               Dashboard
             </Button>
           )}
-        </div>
+          </div>
 
-        {/* Mobile Menu Toggle */}
-        <button 
-          className="md:hidden text-foreground p-2" 
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+          {/* Mobile: open slide-down for builders + Compare (tour target: button-tools-mobile) */}
+          <button
+            type="button"
+            className="md:hidden shrink-0 text-foreground p-2 rounded-lg hover:bg-white/5"
+            data-testid="button-tools-mobile"
+            aria-label="Open tools and navigation menu"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu Dropdown */}
