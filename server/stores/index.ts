@@ -75,6 +75,19 @@ export class DatabaseStorage implements IStorage {
   updateUserGamificationStats(userId: string, xp: number, level: number): Promise<User> {
     return userStore.updateUserGamificationStats(userId, xp, level);
   }
+
+  incrementUserXpByDelta(userId: string, deltaXp: number): Promise<User> {
+    return userStore.incrementUserXpByDelta(userId, deltaXp);
+  }
+
+  awardScanXpWithCooldown(
+    userId: string,
+    domain: string,
+    xpDelta: number,
+    cooldownHours?: number
+  ) {
+    return userStore.awardScanXpWithCooldown(userId, domain, xpDelta, cooldownHours);
+  }
   
   updateUserPassword(userId: string, passwordHash: string): Promise<User> {
     return userStore.updateUserPassword(userId, passwordHash);
@@ -108,6 +121,10 @@ export class DatabaseStorage implements IStorage {
 
   countUserScansSince(userId: string, since: Date): Promise<number> {
     return scanStore.countUserScansSince(userId, since);
+  }
+
+  countUserScansWithSecurityTxt(userId: string): Promise<number> {
+    return scanStore.countUserScansWithSecurityTxt(userId);
   }
 
   getMaxScanScoreForUser(userId: string): Promise<number | null> {

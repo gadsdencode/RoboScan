@@ -38,6 +38,9 @@ export interface IScanStore {
   /** Total scans owned by the user (for gamification milestones). */
   countUserScans(userId: string): Promise<number>;
 
+  /** Scans where security.txt was found (GUARDIAN achievement). */
+  countUserScansWithSecurityTxt(userId: string): Promise<number>;
+
   /** Scans with createdAt >= since (rolling window checks). */
   countUserScansSince(userId: string, since: Date): Promise<number>;
 
@@ -142,6 +145,16 @@ export class ScanStore implements IScanStore {
       .select({ value: count() })
       .from(scans)
       .where(eq(scans.userId, userId));
+    return Number(row?.value ?? 0);
+  }
+
+  async countUserScansWithSecurityTxt(userId: string): Promise<number> {
+    const [row] = await db
+      .select({ value: count() })
+      .from(scans)
+      .where(
+        and(eq(scans.userId, userId), eq(scans.securityTxtFound, true))
+      );
     return Number(row?.value ?? 0);
   }
 

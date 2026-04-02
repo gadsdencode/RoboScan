@@ -4,8 +4,8 @@
 import { storage } from "../storage.js";
 import {
   ACHIEVEMENTS,
-  calculateLevel,
   calculateXpWithMultiplier,
+  DOMAIN_COOLDOWN_HOURS,
   SPEED_DEMON_WINDOW_MS,
   XP_ACTION_AMOUNTS,
 } from "../gamification.js";
@@ -86,21 +86,17 @@ export async function updateCooldown(
  * - Bonus: +40 XP if both robots.txt and llms.txt are found
  * - Multiplier: 2x for subscribers (Guardian tier)
  *
- * Does not award XP if:
- * - User is on cooldown for this domain
- * - User does not exist
+ * Cooldown and XP are applied atomically in the database (award_scan_xp_with_cooldown).
+ * Does not award XP if the user does not exist or is on domain cooldown.
  *
  * @param userId - The user ID to award XP to
  * @param scanResult - Scan data needed for XP calculation
  * @param canonicalDomain - The normalized domain (for cooldown tracking)
- * @param isOnCooldown - Whether the user is on cooldown for this domain
- * @returns Gamification update object with XP changes
  */
 export async function awardScanXP(
   userId: string,
   scanResult: ScanResultForXP,
-  canonicalDomain: string,
-  isOnCooldown: boolean
+  canonicalDomain: string
 ): Promise<GamificationUpdate | null> {
   const [currentUser, subscription] = await Promise.all([
     storage.getUser(userId),
@@ -114,17 +110,6 @@ export async function awardScanXP(
 
   const isSubscriber = !!subscription;
 
-  if (isOnCooldown) {
-    return {
-      xpGained: 0,
-      totalXp: currentUser.xp || 0,
-      newLevel: currentUser.level || 1,
-      levelUp: false,
-      cooldownActive: true,
-      isSubscriber,
-    };
-  }
-
   let baseXpGain = XP_CONFIG.BASE_SCAN_XP;
 
   if (scanResult.robotsTxtFound && scanResult.llmsTxtFound) {
@@ -133,22 +118,35 @@ export async function awardScanXP(
 
   const xpGain = calculateXpWithMultiplier(baseXpGain, isSubscriber);
 
-  const currentXp = currentUser.xp || 0;
-  const newXp = currentXp + xpGain;
-  const newLevel = calculateLevel(newXp);
-  const oldLevel = currentUser.level || 1;
+  const row = await storage.awardScanXpWithCooldown(
+    userId,
+    canonicalDomain,
+    xpGain,
+    DOMAIN_COOLDOWN_HOURS
+  );
 
-  await storage.updateUserGamificationStats(userId, newXp, newLevel);
+  if (!row.userFound) {
+    return null;
+  }
 
-  await storage.upsertDomainCooldown(userId, canonicalDomain);
+  if (row.cooldownActive) {
+    return {
+      xpGained: 0,
+      totalXp: row.totalXp,
+      newLevel: row.newLevel,
+      levelUp: false,
+      cooldownActive: true,
+      isSubscriber,
+    };
+  }
 
   return {
     xpGained: xpGain,
     baseXp: baseXpGain,
     multiplier: isSubscriber ? 2 : 1,
-    totalXp: newXp,
-    newLevel: newLevel,
-    levelUp: newLevel > oldLevel,
+    totalXp: row.totalXp,
+    newLevel: row.newLevel,
+    levelUp: row.levelUp,
     isSubscriber,
   };
 }
@@ -182,20 +180,17 @@ export async function awardActionXP(
 
   const isSubscriber = !!subscription;
   const xpGain = calculateXpWithMultiplier(baseXp, isSubscriber);
-  const currentXp = currentUser.xp || 0;
-  const newXp = currentXp + xpGain;
-  const newLevel = calculateLevel(newXp);
   const oldLevel = currentUser.level || 1;
 
-  await storage.updateUserGamificationStats(userId, newXp, newLevel);
+  const updated = await storage.incrementUserXpByDelta(userId, xpGain);
 
   return {
     xpGained: xpGain,
     baseXp,
     multiplier: isSubscriber ? 2 : 1,
-    totalXp: newXp,
-    newLevel,
-    levelUp: newLevel > oldLevel,
+    totalXp: updated.xp,
+    newLevel: updated.level,
+    levelUp: updated.level > oldLevel,
     isSubscriber,
   };
 }
@@ -227,18 +222,15 @@ export async function applyFlatXp(
   }
 
   const isSubscriber = !!subscription;
-  const currentXp = user.xp || 0;
-  const newXp = currentXp + amount;
-  const newLevel = calculateLevel(newXp);
   const oldLevel = user.level || 1;
 
-  await storage.updateUserGamificationStats(userId, newXp, newLevel);
+  const updated = await storage.incrementUserXpByDelta(userId, amount);
 
   return {
     xpGained: amount,
-    totalXp: newXp,
-    newLevel,
-    levelUp: newLevel > oldLevel,
+    totalXp: updated.xp,
+    newLevel: updated.level,
+    levelUp: updated.level > oldLevel,
     isSubscriber,
   };
 }
@@ -317,7 +309,8 @@ export async function evaluateScanAchievementsAfterScan(
     );
   }
 
-  if (totalScans >= 10) {
+  const securityTxtScans = await storage.countUserScansWithSecurityTxt(userId);
+  if (securityTxtScans >= 10) {
     appendUnlock(
       await storage.unlockAchievement(userId, ACHIEVEMENTS.GUARDIAN.key),
       unlocked
@@ -410,22 +403,24 @@ export interface AchievementProgressEntry {
 export async function getAchievementProgressForUser(
   userId: string
 ): Promise<Record<string, AchievementProgressEntry>> {
-  const [totalScans, recentCount, maxScore, maxCoverage, subscription] = await Promise.all([
-    storage.countUserScans(userId),
-    storage.countUserScansSince(userId, new Date(Date.now() - SPEED_DEMON_WINDOW_MS)),
-    storage.getMaxScanScoreForUser(userId),
-    storage.getMaxFileCoverageForUser(userId),
-    storage.getUserActiveSubscription(userId),
-  ]);
+  const [totalScans, securityTxtScans, recentCount, maxScore, maxCoverage, subscription] =
+    await Promise.all([
+      storage.countUserScans(userId),
+      storage.countUserScansWithSecurityTxt(userId),
+      storage.countUserScansSince(userId, new Date(Date.now() - SPEED_DEMON_WINDOW_MS)),
+      storage.getMaxScanScoreForUser(userId),
+      storage.getMaxFileCoverageForUser(userId),
+      storage.getUserActiveSubscription(userId),
+    ]);
 
   const isSub = !!subscription;
   const best = maxScore ?? 0;
 
   return {
     GUARDIAN: {
-      current: Math.min(totalScans, 10),
+      current: Math.min(securityTxtScans, 10),
       target: 10,
-      hint: `${Math.min(totalScans, 10)}/10 scans`,
+      hint: `${Math.min(securityTxtScans, 10)}/10 scans with security.txt found`,
     },
     SPEED_DEMON: {
       current: Math.min(recentCount, 3),
