@@ -7,38 +7,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import { calculateLevel } from "@shared/gamification";
 
-// Scan job status response type
-export interface ScanJobStatus {
-  jobId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  url: string;
-  progress: number;
-  progressMessage: string | null;
-  createdAt: string;
-  startedAt: string | null;
-  completedAt: string | null;
-  scanId?: number;
-  error?: string;
-  result?: {
-    id: number;
-    url: string;
-    robotsTxtFound: boolean;
-    robotsTxtContent: string | null;
-    llmsTxtFound: boolean;
-    llmsTxtContent: string | null;
-    sitemapXmlFound?: boolean;
-    securityTxtFound?: boolean;
-    manifestJsonFound?: boolean;
-    adsTxtFound?: boolean;
-    humansTxtFound?: boolean;
-    aiTxtFound?: boolean;
-    botPermissions: Record<string, string>;
-    errors: string[];
-    warnings: string[];
-    score?: number;
-  };
-}
-
 // Sync scan response type (original format)
 export interface SyncScanResult {
   id: number;
@@ -59,6 +27,40 @@ export interface SyncScanResult {
     levelUp: boolean;
     cooldownActive?: boolean;
     isSubscriber?: boolean;
+    achievementsUnlocked?: Array<{ key: string; name: string; xpReward: number }>;
+  };
+}
+
+// Scan job status response type
+export interface ScanJobStatus {
+  jobId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  url: string;
+  progress: number;
+  progressMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  scanId?: number;
+  error?: string;
+  gamification?: SyncScanResult['gamification'];
+  result?: {
+    id: number;
+    url: string;
+    robotsTxtFound: boolean;
+    robotsTxtContent: string | null;
+    llmsTxtFound: boolean;
+    llmsTxtContent: string | null;
+    sitemapXmlFound?: boolean;
+    securityTxtFound?: boolean;
+    manifestJsonFound?: boolean;
+    adsTxtFound?: boolean;
+    humansTxtFound?: boolean;
+    aiTxtFound?: boolean;
+    botPermissions: Record<string, string>;
+    errors: string[];
+    warnings: string[];
+    score?: number;
   };
 }
 
@@ -167,6 +169,7 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
           botPermissions: jobStatus.result.botPermissions,
           errors: jobStatus.result.errors,
           warnings: jobStatus.result.warnings,
+          gamification: jobStatus.gamification,
         };
 
         setState(prev => ({

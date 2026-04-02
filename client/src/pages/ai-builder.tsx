@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface AIRule {
   userAgent: string;
@@ -51,6 +52,7 @@ const AI_CRAWLERS = [
 
 export default function AIBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -206,6 +208,7 @@ export default function AIBuilder() {
         title: "Validation Successful",
         description: "Your ai.txt file is properly formatted!",
       });
+      await rewardBuilderValidation("ai", generateAITxt());
     } else {
       toast({
         title: "Validation Issues Found",

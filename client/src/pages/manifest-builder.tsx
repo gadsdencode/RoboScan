@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface ManifestIcon {
   src: string;
@@ -38,6 +39,7 @@ interface ManifestFormData {
 
 export default function ManifestBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const { handleCopy, handleDownload } = useBuilderActions({
     fileName: "manifest.json",
     mimeType: "application/json",
@@ -171,6 +173,7 @@ export default function ManifestBuilder() {
         title: "Validation Successful",
         description: "Your manifest.json file is properly formatted!",
       });
+      await rewardBuilderValidation("manifest", generateManifest());
     } else {
       toast({
         title: "Validation Issues Found",

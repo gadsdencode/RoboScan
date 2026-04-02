@@ -28,6 +28,7 @@ import {
   webhookController,
   promotionalCodeController,
   accessController,
+  buildersValidationController,
 } from "./controllers/index.js";
 
 // Guard against duplicate auth setup
@@ -60,10 +61,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[Routes] Authentication setup complete');
   }
 
-  // [GAMIFICATION] Seed achievements on startup (lightweight, single record with onConflictDoNothing)
+  // [GAMIFICATION] Seed achievements on startup (onConflictDoNothing per row)
   try {
     console.log('[Routes] Seeding achievements...');
-    await storage.createAchievement(ACHIEVEMENTS.ARCHITECT);
+    for (const achievement of Object.values(ACHIEVEMENTS)) {
+      await storage.createAchievement(achievement);
+    }
     console.log('[Routes] Achievements seeded');
   } catch (error) {
     console.error('[Routes] Error seeding achievements:', error);
@@ -121,6 +124,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Robots fields routes: /api/robots-fields/*
   app.use('/api/robots-fields', robotsFieldsController);
+
+  // Builder validation (non-llms): POST /api/builders/validate
+  app.use('/api', buildersValidationController);
 
   // Tools routes: POST /api/test-bot-access
   app.use('/api', toolsController);

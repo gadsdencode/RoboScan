@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
 
 interface SitemapUrl {
   loc: string;
@@ -26,6 +27,7 @@ interface SitemapFormData {
 
 export default function SitemapBuilder() {
   const { toast } = useToast();
+  const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<{
     isValid: boolean;
@@ -127,6 +129,7 @@ export default function SitemapBuilder() {
         title: "Validation Successful",
         description: "Your sitemap.xml file is properly formatted!",
       });
+      await rewardBuilderValidation("sitemap", generateSitemap());
     } else {
       toast({
         title: "Validation Issues Found",

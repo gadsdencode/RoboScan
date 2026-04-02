@@ -25,7 +25,10 @@ async function pollForScanCompletion(jobId: string, maxAttempts = 120): Promise<
     const status = await res.json();
     
     if (status.status === 'completed' && status.result) {
-      return status.result;
+      return {
+        ...status.result,
+        gamification: status.gamification,
+      };
     }
     
     if (status.status === 'failed') {

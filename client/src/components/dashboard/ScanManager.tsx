@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { useScan } from "@/hooks/useScan";
+import { useAchievementToast } from "@/hooks/useAchievementToast";
+import { emitGamificationEvent } from "@/lib/gamification-events";
 import { toast } from "sonner";
 
 export interface ScanManagerProps {
@@ -21,6 +23,7 @@ export interface ScanManagerProps {
 
 export function ScanManager({ allTags, onScanComplete }: ScanManagerProps) {
   const { user } = useAuth();
+  const showAchievementToasts = useAchievementToast();
   const { mutate: scanUrl, isPending: isScanningMutation } = useScan();
   const [scanUrlInput, setScanUrlInput] = useState("");
   const [scanError, setScanError] = useState<string | null>(null);
@@ -52,7 +55,12 @@ export function ScanManager({ allTags, onScanComplete }: ScanManagerProps) {
                 description: `You earned ${xpGained} XP and reached a new level! Keep scanning!`,
                 duration: 5000,
               });
-            } else {
+              emitGamificationEvent("xp_gained", {
+                amount: xpGained,
+                source: "scan",
+              });
+              emitGamificationEvent("level_up", { newLevel });
+            } else if (xpGained > 0) {
               const isPerfectScan = xpGained >= 50;
               toast.success(
                 isPerfectScan
@@ -65,7 +73,13 @@ export function ScanManager({ allTags, onScanComplete }: ScanManagerProps) {
                   duration: 3000,
                 }
               );
+              emitGamificationEvent("xp_gained", {
+                amount: xpGained,
+                source: "scan",
+              });
             }
+
+            showAchievementToasts(data.gamification);
           }
 
           onScanComplete();

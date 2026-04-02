@@ -3,6 +3,34 @@ export function calculateLevel(totalXp: number): number {
 }
 
 /**
+ * Hours before the same domain can grant scan XP again for a user.
+ * Limits farming by re-scanning one site; aligns with a “once per day” cadence.
+ */
+export const DOMAIN_COOLDOWN_HOURS = 24;
+
+/** Rolling window (ms) for Speed Demon: 3 scans within this duration */
+export const SPEED_DEMON_WINDOW_MS = 60_000;
+
+/**
+ * Conservative XP for non-scan actions (multiplied for Guardian subscribers in awardActionXP).
+ */
+export const XP_ACTION_AMOUNTS = {
+  PREMIUM_FIELD_PURCHASE: 15,
+  RECURRING_SCAN_CREATED: 10,
+  BUILDER_VALIDATION: 5,
+} as const;
+
+export type BuilderValidationKey =
+  | "llms"
+  | "robots"
+  | "sitemap"
+  | "manifest"
+  | "security"
+  | "humans"
+  | "ads"
+  | "ai";
+
+/**
  * XP multiplier for subscribers (Guardian tier)
  * Subscribers earn 2x XP on all actions
  */
@@ -43,6 +71,34 @@ export const ACHIEVEMENTS = {
     description: 'Scanned 3 sites in under 1 minute',
     xpReward: 30,
     icon: 'Zap'
+  },
+  FIRST_SCAN: {
+    key: 'FIRST_SCAN',
+    name: 'First Scan',
+    description: 'Performed your first website scan',
+    xpReward: 10,
+    icon: 'Flag'
+  },
+  PERFECT_SCORE: {
+    key: 'PERFECT_SCORE',
+    name: 'Perfect Score',
+    description: 'Achieved a scan score of 90 or above',
+    xpReward: 75,
+    icon: 'Award'
+  },
+  FULL_AUDIT: {
+    key: 'FULL_AUDIT',
+    name: 'Full Audit',
+    description: 'Scanned a site with all 8 file types detected',
+    xpReward: 100,
+    icon: 'Layers'
+  },
+  SUBSCRIBER: {
+    key: 'SUBSCRIBER',
+    name: 'Guardian Subscriber',
+    description: 'Upgraded to Guardian tier',
+    xpReward: 25,
+    icon: 'Crown'
   }
 } as const;
 

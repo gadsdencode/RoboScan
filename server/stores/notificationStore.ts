@@ -16,9 +16,7 @@ import {
   type Achievement,
 } from "../../shared/schema.js";
 import { db } from "../db.js";
-import { eq, desc, and, lte } from "drizzle-orm";
-import { userStore } from "./userStore.js";
-
+import { eq, desc, and, lte, sql } from "drizzle-orm";
 export interface INotificationStore {
   // Recurring scan operations
   createRecurringScan(recurringScan: InsertRecurringScan): Promise<RecurringScan>;
@@ -55,6 +53,30 @@ export interface INotificationStore {
     xpReward: number;
     icon: string;
   }>>;
+
+  /** Payload stored on notifications.changes for async scan gamification polling */
+  getScanGamificationNotification(
+    userId: string,
+    scanId: number
+  ): Promise<ScanGamificationPayload | null>;
+
+  /** Whether user already received one-time builder validation XP for this builder key */
+  hasBuilderValidationRecorded(userId: string, builderKey: string): Promise<boolean>;
+}
+
+/** Shape of `notifications.changes` for type `scan_gamification` */
+export interface ScanGamificationPayload {
+  gamification?: {
+    xpGained: number;
+    baseXp?: number;
+    multiplier?: number;
+    totalXp: number;
+    newLevel: number;
+    levelUp: boolean;
+    cooldownActive?: boolean;
+    isSubscriber?: boolean;
+  };
+  achievementsUnlocked?: Array<{ key: string; name: string; xpReward: number }>;
 }
 
 export class NotificationStore implements INotificationStore {
@@ -240,13 +262,8 @@ export class NotificationStore implements INotificationStore {
     // If no row was inserted, it means it was already unlocked
     if (!inserted) return { unlocked: false };
 
-    // Award XP for the achievement
-    const user = await userStore.getUser(userId);
-    if (user) {
-      const newXp = (user.xp || 0) + achievement.xpReward;
-      const newLevel = Math.floor(Math.sqrt(newXp / 100)) + 1;
-      await userStore.updateUserGamificationStats(userId, newXp, newLevel);
-    }
+    const { applyFlatXp } = await import("../services/gamificationService.js");
+    await applyFlatXp(userId, achievement.xpReward);
 
     return { unlocked: true, achievement };
   }
@@ -280,6 +297,48 @@ export class NotificationStore implements INotificationStore {
       xpReward: row.achievements.xpReward,
       icon: row.achievements.icon,
     }));
+  }
+
+  async getScanGamificationNotification(
+    userId: string,
+    scanId: number
+  ): Promise<ScanGamificationPayload | null> {
+    const [row] = await db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.scanId, scanId),
+          eq(notifications.type, "scan_gamification")
+        )
+      )
+      .orderBy(desc(notifications.id))
+      .limit(1);
+
+    if (!row?.changes) {
+      return null;
+    }
+
+    return row.changes as ScanGamificationPayload;
+  }
+
+  async hasBuilderValidationRecorded(
+    userId: string,
+    builderKey: string
+  ): Promise<boolean> {
+    const rows = await db
+      .select({ id: notifications.id })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.type, "builder_validation"),
+          sql`${notifications.changes}->>'builderKey' = ${builderKey}`
+        )
+      )
+      .limit(1);
+    return rows.length > 0;
   }
 }
 

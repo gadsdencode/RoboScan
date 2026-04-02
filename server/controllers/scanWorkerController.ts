@@ -7,8 +7,12 @@ import { Receiver } from "@upstash/qstash";
 import { storage } from "../storage.js";
 import { scanWebsite } from "../scanner.js";
 import { calculateScanScore } from "../report-generator.js";
-import { calculateLevel, calculateXpWithMultiplier } from "../gamification.js";
 import { normalizeDomainForCooldown } from "../domain-utils.js";
+import {
+  awardScanXP,
+  evaluateScanAchievementsAfterScan,
+  recordScanGamificationNotification,
+} from "../services/gamificationService.js";
 import type { ScanJobStatus } from "../../shared/schema.js";
 
 const router = Router();
@@ -172,46 +176,43 @@ router.post('/', async (req: Request, res: Response) => {
       progressMessage: 'Calculating gamification...',
     });
 
-    // Handle gamification for authenticated users
+    // Handle gamification for authenticated users (same path as sync scanController)
     let gamificationUpdates = null;
+
     if (userId) {
       const canonicalDomain = normalizeDomainForCooldown(url);
-      
+
       if (canonicalDomain) {
-        const [currentUser, subscription, isOnCooldown] = await Promise.all([
-          storage.getUser(userId),
-          storage.getUserActiveSubscription(userId),
-          storage.checkDomainCooldown(userId, canonicalDomain),
-        ]);
-        const isSubscriber = !!subscription;
-
-        if (currentUser && !isOnCooldown) {
-          let baseXpGain = 10;
-
-          if (result.robotsTxtFound && result.llmsTxtFound) {
-            baseXpGain += 40;
-          }
-
-          const xpGain = calculateXpWithMultiplier(baseXpGain, isSubscriber);
-          const currentXp = currentUser.xp || 0;
-          const newXp = currentXp + xpGain;
-          const newLevel = calculateLevel(newXp);
-          const oldLevel = currentUser.level || 1;
-
-          await storage.updateUserGamificationStats(userId, newXp, newLevel);
-          await storage.upsertDomainCooldown(userId, canonicalDomain);
-
-          gamificationUpdates = {
-            xpGained: xpGain,
-            baseXp: baseXpGain,
-            multiplier: isSubscriber ? 2 : 1,
-            totalXp: newXp,
-            newLevel: newLevel,
-            levelUp: newLevel > oldLevel,
-            isSubscriber,
-          };
-        }
+        const isOnCooldown = await storage.checkDomainCooldown(
+          userId,
+          canonicalDomain
+        );
+        gamificationUpdates = await awardScanXP(
+          userId,
+          {
+            robotsTxtFound: result.robotsTxtFound,
+            llmsTxtFound: result.llmsTxtFound,
+          },
+          canonicalDomain,
+          isOnCooldown
+        );
       }
+
+      const achievementsUnlocked = await evaluateScanAchievementsAfterScan(
+        userId,
+        scan
+      );
+
+      if (gamificationUpdates && achievementsUnlocked.length > 0) {
+        gamificationUpdates.achievementsUnlocked = achievementsUnlocked;
+      }
+
+      await recordScanGamificationNotification(
+        userId,
+        scan.id,
+        gamificationUpdates,
+        achievementsUnlocked
+      );
     }
 
     // Mark job as completed
