@@ -199,6 +199,7 @@ export function useSubscription() {
     mutationFn: cancelSubscription,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
+      queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
       toast({
         title: "Subscription Canceled",
         description: "Your subscription will end at the current billing period.",
@@ -218,6 +219,7 @@ export function useSubscription() {
     mutationFn: reactivateSubscription,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
+      queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
       toast({
         title: "Subscription Reactivated",
         description: "Your subscription has been reactivated.",
@@ -267,7 +269,13 @@ export function useSubscription() {
     
     // Helpers
     formatPrice,
-    refetchSubscription: () => queryClient.invalidateQueries({ queryKey: ["current-subscription"] }),
-    refreshSubscription: () => queryClient.invalidateQueries({ queryKey: ["current-subscription"] }),
+    refetchSubscription: () => {
+      void queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
+      void queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+    },
+    refreshSubscription: () => {
+      void queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
+      void queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+    },
   };
 }
