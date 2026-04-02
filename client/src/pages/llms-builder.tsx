@@ -23,7 +23,14 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import { useQueryClient } from "@tanstack/react-query";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
-const stripePromise = loadStripe(PUBLISHABLE_KEY);
+
+let stripePromiseSingleton: ReturnType<typeof loadStripe> | null = null;
+function getStripePromise() {
+  if (!stripePromiseSingleton) {
+    stripePromiseSingleton = loadStripe(PUBLISHABLE_KEY);
+  }
+  return stripePromiseSingleton;
+}
 
 // Icons mapping
 const iconMap: Record<string, any> = {
@@ -286,6 +293,7 @@ export default function LLMsBuilder() {
       }
 
       const data = await response.json();
+      getStripePromise();
       setClientSecret(data.clientSecret);
       setShowPaymentModal(true);
     } catch (error) {
@@ -895,7 +903,7 @@ For AI partnership inquiries: ${formData.contactEmail}
           </DialogHeader>
 
           {clientSecret && selectedField && (
-            <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <Elements stripe={getStripePromise()} options={{ clientSecret }}>
               <PaymentForm
                 clientSecret={clientSecret}
                 onSuccess={handlePaymentSuccess}

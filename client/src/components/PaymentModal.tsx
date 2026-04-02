@@ -23,7 +23,15 @@ if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
 }
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+
+let stripePromiseSingleton: ReturnType<typeof loadStripe> | null = null;
+function getStripePromise() {
+  if (!stripePromiseSingleton) {
+    stripePromiseSingleton = loadStripe(STRIPE_PUBLIC_KEY);
+  }
+  return stripePromiseSingleton;
+}
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -194,6 +202,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
             onSuccess();
           }, 1500);
         } else {
+          getStripePromise();
           setClientSecret(data.clientSecret);
           // Use server-provided amount for consistency
           if (data.amount) {
@@ -327,7 +336,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
                       </Button>
                     </div>
                   ) : clientSecret ? (
-                    <Elements stripe={stripePromise} options={{ clientSecret }}>
+                    <Elements stripe={getStripePromise()} options={{ clientSecret }}>
                       <CheckoutForm onSuccess={onSuccess} onClose={onClose} amount={amount} />
                     </Elements>
                   ) : null}
