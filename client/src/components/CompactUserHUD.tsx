@@ -111,7 +111,10 @@ export function CompactUserHUD() {
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs">
+      <TooltipContent
+        side="bottom"
+        className="max-w-xs border border-border bg-popover px-3 py-2.5 text-popover-foreground shadow-lg"
+      >
         <div className="space-y-2">
           <div className="font-semibold text-sm">
             Bot Hunter — {tierLabel} — Level {level}
