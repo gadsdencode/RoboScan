@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle } from "lucide-react";
+import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Clock, Map, Bot, Settings, Globe, Gauge, Zap, HelpCircle, Upload } from "lucide-react";
+import { ImportUrlDialog } from "@/components/ImportUrlDialog";
+import { type ParsedRobotsTxt, type ParsedLLMsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { robotsBuilderTourSteps } from "@/lib/tour-config";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -129,7 +132,7 @@ function PaymentForm({
         <Button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="flex-1 bg-primary"
+          className="flex-1 btn-cta"
         >
           {isProcessing ? "Processing..." : "Complete Purchase"}
         </Button>
@@ -154,6 +157,7 @@ export default function RobotsBuilder() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { register, watch, setValue } = useForm<RobotsTxtFormData>({
     defaultValues: {
@@ -216,12 +220,22 @@ export default function RobotsBuilder() {
     }
   };
 
+  // Track if user has subscription (grants all fields)
+  const [hasAllFieldsAccess, setHasAllFieldsAccess] = useState(false);
+
   const loadPurchasedFields = async () => {
     try {
-      const response = await fetch('/api/robots-fields/purchases');
+      const response = await fetch('/api/robots-fields/purchases', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
-        setPurchasedFields(data);
+        // Handle new response format with subscription status
+        if (data.purchases) {
+          setPurchasedFields(data.purchases);
+          setHasAllFieldsAccess(data.hasAllFieldsAccess || false);
+        } else {
+          // Legacy format: array of purchases
+          setPurchasedFields(data);
+        }
       }
     } catch (error) {
       console.error('Failed to load purchased fields:', error);
@@ -229,6 +243,8 @@ export default function RobotsBuilder() {
   };
 
   const isPurchased = (fieldKey: string): boolean => {
+    // Subscribers have access to all fields
+    if (hasAllFieldsAccess) return true;
     return purchasedFields.some(p => p.fieldKey === fieldKey);
   };
 
@@ -253,6 +269,7 @@ export default function RobotsBuilder() {
         body: JSON.stringify({
           fieldKey: field.key
         }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -284,6 +301,7 @@ export default function RobotsBuilder() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentIntentId }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -327,7 +345,7 @@ export default function RobotsBuilder() {
   };
 
   const generateRobotsTxt = (): string => {
-    let content = `# robots.txt for ${formData.websiteUrl}\n# Generated with ROBOSCAN Builder\n\n`;
+    let content = `# robots.txt for ${formData.websiteUrl}\n# Generated with AI BotCheck Builder\n\n`;
 
     if (formData.defaultAccess === 'allow-all') {
       content += `User-agent: *\nAllow: /\n`;
@@ -459,15 +477,38 @@ export default function RobotsBuilder() {
     });
   };
 
+  const handleImport = (data: ParsedRobotsTxt | ParsedLLMsTxt) => {
+    // Type guard: we know this is ParsedRobotsTxt because we set type="robots" in ImportUrlDialog
+    if (!('sitemapUrl' in data)) return;
+    const robotsData = data as ParsedRobotsTxt;
+    // Populate form fields with parsed data
+    setValue('sitemapUrl', robotsData.sitemapUrl);
+    setValue('crawlDelay', robotsData.crawlDelay || '0');
+    setValue('disallowedPaths', robotsData.disallowedPaths);
+    setValue('allowedPaths', robotsData.allowedPaths);
+    setValue('defaultAccess', robotsData.defaultAccess);
+    
+    toast({
+      title: "Configuration Imported",
+      description: `Imported ${robotsData.metadata.totalRules} rules from external robots.txt`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-primary font-mono text-xl font-bold tracking-tighter">
-            <Shield className="w-6 h-6" />
-            <span>ROBOSCAN</span>
-          </a>
-          <div className="flex items-center gap-4">
+      <Navbar 
+        toolbarItems={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportModal(true)}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="button-import-url"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import from URL
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -477,12 +518,9 @@ export default function RobotsBuilder() {
             >
               <HelpCircle className="w-5 h-5" />
             </Button>
-            <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </a>
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       <div className="container mx-auto px-6 pt-24 pb-12">
         <motion.div
@@ -646,7 +684,7 @@ export default function RobotsBuilder() {
                           return (
                             <Card
                               key={field.key}
-                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-white/10'}`}
+                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-border'}`}
                             >
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-4">
@@ -855,6 +893,13 @@ export default function RobotsBuilder() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ImportUrlDialog
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImport}
+        type="robots"
+      />
     </div>
   );
 }

@@ -14,7 +14,7 @@ export function CompactUserHUD() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card">
         <Skeleton className="h-6 w-6 rounded" />
         <div className="space-y-1">
           <Skeleton className="h-3 w-16" />
@@ -38,7 +38,7 @@ export function CompactUserHUD() {
     <Tooltip>
       <TooltipTrigger asChild>
         <div 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-smooth cursor-help btn-hover-scale"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-card/80 transition-smooth cursor-help btn-hover-scale"
           data-testid="hud-level-display"
         >
           {/* Level Badge */}
@@ -91,7 +91,7 @@ export function CompactUserHUD() {
               <span className="font-mono">{nextLevelXp.toLocaleString()} XP</span>
             </div>
           </div>
-          <div className="text-[10px] text-muted-foreground pt-1 border-t border-white/10">
+          <div className="text-[10px] text-muted-foreground pt-1 border-t border-border">
             💡 Earn 10 XP per scan, +40 XP for perfect scans!
           </div>
         </div>

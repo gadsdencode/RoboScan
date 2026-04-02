@@ -2,6 +2,26 @@ export function calculateLevel(totalXp: number): number {
   return Math.floor(Math.sqrt(totalXp / 100)) + 1;
 }
 
+/**
+ * XP multiplier for subscribers (Guardian tier)
+ * Subscribers earn 2x XP on all actions
+ */
+export const SUBSCRIBER_XP_MULTIPLIER = 2.0;
+
+/**
+ * Get XP multiplier based on subscription status
+ */
+export function getXpMultiplier(isSubscriber: boolean): number {
+  return isSubscriber ? SUBSCRIBER_XP_MULTIPLIER : 1.0;
+}
+
+/**
+ * Calculate XP with multiplier applied
+ */
+export function calculateXpWithMultiplier(baseXp: number, isSubscriber: boolean): number {
+  return Math.floor(baseXp * getXpMultiplier(isSubscriber));
+}
+
 export const ACHIEVEMENTS = {
   ARCHITECT: {
     key: 'ARCHITECT',

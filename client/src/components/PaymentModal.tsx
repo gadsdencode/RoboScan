@@ -6,6 +6,18 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import confetti from "canvas-confetti";
+import { PRICING } from "../../../shared/tiers";
+
+/**
+ * Format price for display with currency symbol
+ * Uses server-provided amount when available, falls back to PRICING constant
+ */
+function formatPrice(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+}
 
 if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
@@ -52,7 +64,7 @@ const triggerPurchaseConfetti = () => {
   }, 250);
 };
 
-const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: () => void }) => {
+const CheckoutForm = ({ onSuccess, onClose, amount }: { onSuccess: () => void, onClose: () => void, amount: number }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -85,6 +97,7 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
+          credentials: "include",
         });
 
         if (response.ok) {
@@ -93,6 +106,14 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
         } else {
           setError('Payment succeeded but confirmation failed. Please contact support.');
         }
+        setIsProcessing(false);
+      } else {
+        // Covers: paymentIntent with status 'processing', 'requires_action', or missing entirely.
+        // These are rare with redirect:'if_required' but must not leave the button stuck.
+        const statusMsg = paymentIntent?.status
+          ? `Payment status: ${paymentIntent.status}. Please check your email for confirmation.`
+          : 'Payment did not complete. Please try again.';
+        setError(statusMsg);
         setIsProcessing(false);
       }
     } catch (err) {
@@ -125,7 +146,7 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
         <Button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+          className="flex-1 btn-cta"
           data-testid="button-submit-payment"
         >
           {isProcessing ? (
@@ -134,7 +155,7 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
               Processing...
             </span>
           ) : (
-            `Pay $9.99`
+            `Pay ${formatPrice(amount)}`
           )}
         </Button>
       </div>
@@ -145,18 +166,27 @@ const CheckoutForm = ({ onSuccess, onClose }: { onSuccess: () => void, onClose: 
 export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: PaymentModalProps) {
   const [clientSecret, setClientSecret] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const [alreadyPurchased, setAlreadyPurchased] = useState(false);
+  // Use server-provided amount, fallback to centralized PRICING constant
+  const [amount, setAmount] = useState<number>(PRICING.REPORT_UNLOCK);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
+  const initPayment = () => {
     setLoading(true);
+    setInitError(null);
     fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scanId }),
+      credentials: "include",
     })
-      .then(res => res.json())
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'Failed to initialize payment');
+        }
+        return data;
+      })
       .then(data => {
         if (data.alreadyPurchased) {
           setAlreadyPurchased(true);
@@ -165,28 +195,42 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
           }, 1500);
         } else {
           setClientSecret(data.clientSecret);
+          // Use server-provided amount for consistency
+          if (data.amount) {
+            setAmount(data.amount);
+          }
         }
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        setInitError(err instanceof Error ? err.message : 'Failed to initialize payment. Please try again.');
         setLoading(false);
       });
-  }, [isOpen, scanId, onSuccess]);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setClientSecret("");
+    setAlreadyPurchased(false);
+    initPayment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, scanId]);
 
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           className="w-full max-w-2xl"
         >
-          <Card className="bg-card border-primary/20 p-0 overflow-hidden">
-            <div className="relative bg-gradient-to-r from-primary/10 to-blue-500/10 p-6 border-b border-white/10">
+          <Card className="bg-card border border-border p-0 overflow-hidden">
+            <div className="relative bg-card p-6 border-b border-border">
               <button
+                title="Close"
                 onClick={onClose}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-close-modal"
@@ -242,7 +286,7 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
                     <div className="space-y-4">
                       <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl">
                         <div className="flex items-baseline gap-2 mb-2">
-                          <span className="text-3xl font-bold">$9.99</span>
+                          <span className="text-3xl font-bold">{formatPrice(amount)}</span>
                           <span className="text-muted-foreground text-sm">one-time</span>
                         </div>
                         <div className="text-xs text-muted-foreground space-y-1">
@@ -269,15 +313,24 @@ export function PaymentModal({ isOpen, onClose, scanId, url, onSuccess }: Paymen
                       <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
                       <p className="text-sm text-muted-foreground">Preparing secure checkout...</p>
                     </div>
+                  ) : initError ? (
+                    <div className="text-center py-8 space-y-4">
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                        {initError}
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={initPayment}
+                        className="gap-2"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
                   ) : clientSecret ? (
                     <Elements stripe={stripePromise} options={{ clientSecret }}>
-                      <CheckoutForm onSuccess={onSuccess} onClose={onClose} />
+                      <CheckoutForm onSuccess={onSuccess} onClose={onClose} amount={amount} />
                     </Elements>
-                  ) : (
-                    <div className="text-center py-8 text-red-400">
-                      Failed to initialize payment. Please try again.
-                    </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>

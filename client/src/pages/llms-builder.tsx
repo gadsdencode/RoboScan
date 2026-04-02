@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Lock, Unlock, DollarSign, Package, Share2, Code, MessageSquare, Users, Zap, HelpCircle, Upload } from "lucide-react";
+import { ImportUrlDialog } from "@/components/ImportUrlDialog";
+import { type ParsedLLMsTxt, type ParsedRobotsTxt } from "@/lib/parsers";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { builderTourSteps } from "@/lib/tour-config";
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -130,7 +133,7 @@ function PaymentForm({
         <Button
           type="submit"
           disabled={!stripe || isProcessing}
-          className="flex-1 bg-primary"
+          className="flex-1 btn-cta"
         >
           {isProcessing ? "Processing..." : "Complete Purchase"}
         </Button>
@@ -155,6 +158,7 @@ export default function LLMsBuilder() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [clientSecret, setClientSecret] = useState("");
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { register, watch, setValue } = useForm<LLMsTxtFormData>({
     defaultValues: {
@@ -224,12 +228,22 @@ export default function LLMsBuilder() {
     }
   };
 
+  // Track if user has subscription (grants all fields)
+  const [hasAllFieldsAccess, setHasAllFieldsAccess] = useState(false);
+
   const loadPurchasedFields = async () => {
     try {
-      const response = await fetch('/api/llms-fields/purchases');
+      const response = await fetch('/api/llms-fields/purchases', { credentials: "include" });
       if (response.ok) {
         const data = await response.json();
-        setPurchasedFields(data);
+        // Handle new response format with subscription status
+        if (data.purchases) {
+          setPurchasedFields(data.purchases);
+          setHasAllFieldsAccess(data.hasAllFieldsAccess || false);
+        } else {
+          // Legacy format: array of purchases
+          setPurchasedFields(data);
+        }
       }
     } catch (error) {
       console.error('Failed to load purchased fields:', error);
@@ -237,6 +251,8 @@ export default function LLMsBuilder() {
   };
 
   const isPurchased = (fieldKey: string): boolean => {
+    // Subscribers have access to all fields
+    if (hasAllFieldsAccess) return true;
     return purchasedFields.some(p => p.fieldKey === fieldKey);
   };
 
@@ -261,6 +277,7 @@ export default function LLMsBuilder() {
         body: JSON.stringify({
           fieldKey: field.key
         }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -292,6 +309,7 @@ export default function LLMsBuilder() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentIntentId }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -384,6 +402,7 @@ For AI partnership inquiries: ${formData.contactEmail}
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: llmsTxtContent }),
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -454,16 +473,41 @@ For AI partnership inquiries: ${formData.contactEmail}
     });
   };
 
+  const handleImport = (data: ParsedRobotsTxt | ParsedLLMsTxt) => {
+    // Type guard: we know this is ParsedLLMsTxt because we set type="llms" in ImportUrlDialog
+    if (!('websiteName' in data)) return;
+    const llmsData = data as ParsedLLMsTxt;
+    // Populate form fields with parsed data
+    if (llmsData.websiteName) setValue('websiteName', llmsData.websiteName);
+    if (llmsData.websiteUrl) setValue('websiteUrl', llmsData.websiteUrl);
+    if (llmsData.contentDescription) setValue('contentDescription', llmsData.contentDescription);
+    if (llmsData.citationFormat) setValue('citationFormat', llmsData.citationFormat);
+    if (llmsData.allowedBots) setValue('allowedBots', llmsData.allowedBots);
+    if (llmsData.keyAreas) setValue('keyAreas', llmsData.keyAreas);
+    if (llmsData.contentGuidelines) setValue('contentGuidelines', llmsData.contentGuidelines);
+    if (llmsData.contactEmail) setValue('contactEmail', llmsData.contactEmail);
+    
+    toast({
+      title: "Configuration Imported",
+      description: `Imported ${llmsData.metadata.totalSections} sections from external llms.txt`,
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-primary font-mono text-xl font-bold tracking-tighter">
-            <Shield className="w-6 h-6" />
-            <span>ROBOSCAN</span>
-          </a>
-          <div className="flex items-center gap-4">
+      <Navbar 
+        toolbarItems={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowImportModal(true)}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="button-import-url"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import from URL
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -473,12 +517,9 @@ For AI partnership inquiries: ${formData.contactEmail}
             >
               <HelpCircle className="w-5 h-5" />
             </Button>
-            <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </a>
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <div className="container mx-auto px-6 pt-24 pb-12">
@@ -655,7 +696,7 @@ For AI partnership inquiries: ${formData.contactEmail}
                           return (
                             <Card
                               key={field.key}
-                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-white/10'}`}
+                              className={`relative ${purchased ? 'border-primary/50 bg-primary/5' : 'border-border'}`}
                             >
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-4">
@@ -869,6 +910,14 @@ For AI partnership inquiries: ${formData.contactEmail}
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Import URL Modal */}
+      <ImportUrlDialog
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImport}
+        type="llms"
+      />
     </div>
   );
 }

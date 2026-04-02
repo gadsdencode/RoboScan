@@ -3,8 +3,7 @@ import { pgTable, text, varchar, serial, timestamp, boolean, jsonb, integer, dec
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
-// Reference: blueprint:javascript_log_in_with_replit
+// Session storage table - compatible with both Replit Auth and NextAuth
 export const sessions = pgTable(
   "sessions",
   {
@@ -15,6 +14,31 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// NextAuth.js tables
+export const accounts = pgTable("accounts", {
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type").notNull(),
+  provider: varchar("provider").notNull(),
+  providerAccountId: varchar("provider_account_id").notNull(),
+  refresh_token: text("refresh_token"),
+  access_token: text("access_token"),
+  expires_at: integer("expires_at"),
+  token_type: varchar("token_type"),
+  scope: varchar("scope"),
+  id_token: text("id_token"),
+  session_state: varchar("session_state"),
+}, (table) => [
+  uniqueIndex("provider_account_unique").on(table.provider, table.providerAccountId)
+]);
+
+export const verificationTokens = pgTable("verification_tokens", {
+  identifier: varchar("identifier").notNull(),
+  token: varchar("token").notNull(),
+  expires: timestamp("expires").notNull(),
+}, (table) => [
+  uniqueIndex("identifier_token_unique").on(table.identifier, table.token)
+]);
+
 // User storage table for Replit Auth
 // Reference: blueprint:javascript_log_in_with_replit
 export const users = pgTable("users", {
@@ -23,6 +47,13 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  
+  // Password authentication
+  passwordHash: varchar("password_hash"),
+  passwordSetAt: timestamp("password_set_at"),
+  
+  // Stripe customer ID for subscription management
+  stripeCustomerId: varchar("stripe_customer_id").unique(),
   
   // Gamification columns
   xp: integer("xp").notNull().default(0),
@@ -46,6 +77,19 @@ export const scans = pgTable("scans", {
   robotsTxtContent: text("robots_txt_content"),
   llmsTxtFound: boolean("llms_txt_found").notNull(),
   llmsTxtContent: text("llms_txt_content"),
+  // Additional technical files (6 new types)
+  sitemapXmlFound: boolean("sitemap_xml_found").default(false),
+  sitemapXmlContent: text("sitemap_xml_content"),
+  securityTxtFound: boolean("security_txt_found").default(false),
+  securityTxtContent: text("security_txt_content"),
+  manifestJsonFound: boolean("manifest_json_found").default(false),
+  manifestJsonContent: text("manifest_json_content"),
+  adsTxtFound: boolean("ads_txt_found").default(false),
+  adsTxtContent: text("ads_txt_content"),
+  humansTxtFound: boolean("humans_txt_found").default(false),
+  humansTxtContent: text("humans_txt_content"),
+  aiTxtFound: boolean("ai_txt_found").default(false),
+  aiTxtContent: text("ai_txt_content"),
   botPermissions: jsonb("bot_permissions").$type<Record<string, string>>(),
   errors: jsonb("errors").$type<string[]>(),
   warnings: jsonb("warnings").$type<string[]>(),
@@ -225,3 +269,160 @@ export const insertUserDomainCooldownSchema = createInsertSchema(userDomainCoold
 
 export type InsertUserDomainCooldown = z.infer<typeof insertUserDomainCooldownSchema>;
 export type UserDomainCooldown = typeof userDomainCooldowns.$inferSelect;
+
+// Subscriptions table for Stripe subscription management
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  stripeSubscriptionId: varchar("stripe_subscription_id").notNull().unique(),
+  stripePriceId: varchar("stripe_price_id").notNull(),
+  stripeProductId: varchar("stripe_product_id"),
+  status: varchar("status").notNull(), // 'active', 'canceled', 'past_due', 'trialing', 'incomplete', 'paused'
+  
+  // Billing cycle info
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  canceledAt: timestamp("canceled_at"),
+  
+  // Trial info
+  trialStart: timestamp("trial_start"),
+  trialEnd: timestamp("trial_end"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("subscription_user_idx").on(table.userId),
+  index("subscription_stripe_id_idx").on(table.stripeSubscriptionId),
+]);
+
+export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type Subscription = typeof subscriptions.$inferSelect;
+
+// Subscription events log for webhook tracking/auditing
+export const subscriptionEvents = pgTable("subscription_events", {
+  id: serial("id").primaryKey(),
+  subscriptionId: integer("subscription_id").references(() => subscriptions.id),
+  stripeEventId: varchar("stripe_event_id").notNull().unique(),
+  eventType: varchar("event_type").notNull(), // 'invoice.paid', 'customer.subscription.updated', etc.
+  eventData: jsonb("event_data").$type<Record<string, any>>(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
+export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({
+  id: true,
+  processedAt: true,
+});
+
+export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+
+// Subscription plans configuration (optional: for displaying plan info)
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  stripePriceId: varchar("stripe_price_id").notNull().unique(),
+  stripeProductId: varchar("stripe_product_id").notNull(),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  amount: integer("amount").notNull(), // in cents
+  currency: varchar("currency").notNull().default("usd"),
+  interval: varchar("interval").notNull(), // 'month', 'year'
+  intervalCount: integer("interval_count").notNull().default(1),
+  features: jsonb("features").$type<string[]>().default(sql`'[]'::jsonb`),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
+// Promotional codes for free subscription periods
+export const promotionalCodes = pgTable("promotional_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code").notNull().unique(),
+  description: text("description"),
+  monthsFree: integer("months_free").notNull().default(1),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  maxUses: integer("max_uses"), // null = unlimited
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("promotional_code_idx").on(table.code),
+]);
+
+export const insertPromotionalCodeSchema = createInsertSchema(promotionalCodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPromotionalCode = z.infer<typeof insertPromotionalCodeSchema>;
+export type PromotionalCode = typeof promotionalCodes.$inferSelect;
+
+// Promotional code redemptions tracking
+export const promotionalCodeRedemptions = pgTable("promotional_code_redemptions", {
+  id: serial("id").primaryKey(),
+  codeId: integer("code_id").notNull().references(() => promotionalCodes.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  subscriptionId: integer("subscription_id").references(() => subscriptions.id),
+  redeemedAt: timestamp("redeemed_at").defaultNow().notNull(),
+}, (table) => [
+  index("redemption_user_idx").on(table.userId),
+  index("redemption_code_idx").on(table.codeId),
+]);
+
+export const insertPromotionalCodeRedemptionSchema = createInsertSchema(promotionalCodeRedemptions).omit({
+  id: true,
+  redeemedAt: true,
+});
+
+export type InsertPromotionalCodeRedemption = z.infer<typeof insertPromotionalCodeRedemptionSchema>;
+export type PromotionalCodeRedemption = typeof promotionalCodeRedemptions.$inferSelect;
+
+// Scan Jobs table for async scanning architecture (QStash background processing)
+// Status: 'pending' -> 'processing' -> 'completed' | 'failed'
+export const scanJobs = pgTable("scan_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  url: text("url").notNull(),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  status: varchar("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  scanId: integer("scan_id").references(() => scans.id), // populated when scan completes
+  qstashMessageId: varchar("qstash_message_id"), // QStash message ID for tracking
+  error: text("error"), // Error message if failed
+  progress: integer("progress").default(0), // Progress percentage (0-100)
+  progressMessage: varchar("progress_message"), // Current progress status message
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"), // When processing started
+  completedAt: timestamp("completed_at"), // When processing completed/failed
+}, (table) => [
+  index("scan_job_user_idx").on(table.userId),
+  index("scan_job_status_idx").on(table.status),
+  index("scan_job_created_idx").on(table.createdAt),
+]);
+
+export const insertScanJobSchema = createInsertSchema(scanJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertScanJob = z.infer<typeof insertScanJobSchema>;
+export type ScanJob = typeof scanJobs.$inferSelect;
+
+// Scan job status type for type safety
+export type ScanJobStatus = 'pending' | 'processing' | 'completed' | 'failed';

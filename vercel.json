@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/public",
+  "installCommand": "npm install",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "{server/**,shared/**}"
+    },
+    "api/cron/scheduler.ts": {
+      "includeFiles": "{server/**,shared/**}"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/cron/(.*)",
+      "dest": "/api/cron/$1"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/scheduler",
+      "schedule": "* * * * *"
+    }
+  ]
+}
+

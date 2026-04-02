@@ -1,1 +1,1 @@
-export * from "@shared/gamification";
+export * from "../shared/gamification.js";

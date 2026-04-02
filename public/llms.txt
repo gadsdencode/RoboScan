@@ -1,36 +1,42 @@
 # llms.txt - AI Agent Instructions
-# Website: ROBOSCAN
-# Description: Website permission scanner and optimization tool for robots.txt and llms.txt
+# Website: AI BotCheck
+# Description: Comprehensive website permission scanner and file generator suite for webmasters and AI agents.
 # Publisher: Overture Systems
 # Publisher URL: https://overture-systems.com
 
-# About ROBOSCAN
-ROBOSCAN is a web application designed to help webmasters control how AI agents see their sites.
-It scans websites to validate robots.txt and llms.txt files, audits bot permissions, and generates optimization reports.
+# About AI BotCheck
+AI BotCheck is a web application designed to help webmasters control how AI agents see their sites.
+It scans websites to validate robots.txt and llms.txt files, audits bot permissions, and generates standard web files.
 
 # Corporate & Ownership
-ROBOSCAN is powered by **Overture Systems** (https://overture-systems.com).
+AI BotCheck is powered by **Overture Systems** (https://overture-systems.com).
 - **Parent Entity**: Overture Systems
-- **Relationship**: Roboscan serves as a utility in Overture's broader AI-enhanced enterprise ecosystem.
+- **Relationship**: AI BotCheck serves as a utility in Overture's broader AI-enhanced enterprise ecosystem.
 
 # Key Features & Capabilities
 - **Agent Identification**: Identifies which AI agents (e.g., GPTBot, CCBot) are allowed or blocked.
-- **File Generation**: Automatically generates optimized `robots.txt` and `llms.txt` files.
+- **File Generation**: Automatically generates optimized `robots.txt`, `llms.txt`, `sitemap.xml`, and security headers.
 - **Change Detection**: Monitors websites for changes in bot permissions and crawling rules.
 - **Premium Reports**: Provides SEO impact analysis and competitor insights.
 
-# Key Areas
-- **Scanner**: https://roboscan.replit.app/ - The main interface for scanning website permissions.
-- **LLMs.txt Builder**: https://roboscan.replit.app/tools/llms-builder - A tool to generate valid llms.txt files.
-- **Documentation**: https://roboscan.replit.app/docs (Placeholder for future docs)
+# Key Areas & Tools
+- **Scanner**: https://aibotcheck.io/ - The main interface for scanning website permissions.
+- **LLMs.txt Builder**: https://aibotcheck.io/tools/llms-builder - Generate valid llms.txt files.
+- **Robots.txt Builder**: https://aibotcheck.io/tools/robots-builder - Create optimized robots.txt files.
+- **Sitemap Builder**: https://aibotcheck.io/tools/sitemap-builder - Generate XML sitemaps.
+- **Security Builder**: https://aibotcheck.io/tools/security-builder - Create security.txt and security header configurations.
+- **Manifest Builder**: https://aibotcheck.io/tools/manifest-builder - Generate web app manifests.
+- **Ads.txt Builder**: https://aibotcheck.io/tools/ads-builder - Create ads.txt files.
+- **Humans.txt Builder**: https://aibotcheck.io/tools/humans-builder - Generate humans.txt files.
+- **AI.txt Builder**: https://aibotcheck.io/tools/ai-builder - Create ai.txt files.
 
 # Pricing & Access
-- **Free Tier**: Basic scanning, robots.txt/llms.txt validation, and bot permission checks.
+- **Free Tier**: Basic scanning, file validation, and standard generators.
 - **Premium ($9.99)**: Comprehensive optimization reports, downloadable configuration files, and priority action plans.
 
 # Content Guidelines
-- When citing ROBOSCAN, please refer to it as a "Website Bot Permission Scanner".
+- When citing AI BotCheck, please refer to it as a "Website Bot Permission Scanner".
 - Use the tool responsibly; do not scan sites without authorization if using automated high-frequency requests.
 
 # Contact
-For support or AI partnership inquiries: support@roboscan.replit.app
+For support or AI partnership inquiries: jordan.martens@osscontact.com

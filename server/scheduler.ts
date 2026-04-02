@@ -1,7 +1,7 @@
-import { storage } from "./storage";
-import { scanWebsite } from "./scanner";
-import { detectChanges } from "./change-detector";
-import { calculateLevel } from "./gamification";
+import { storage } from "./storage.js";
+import { scanWebsite } from "./scanner.js";
+import { detectChanges } from "./change-detector.js";
+import { calculateLevel } from "./gamification.js";
 import pLimit from "p-limit";
 
 // Calculate next run time based on frequency
@@ -193,17 +193,25 @@ export async function runScheduler() {
       await Promise.all(tasks);
     }
   } catch (error) {
-    console.error('[Scheduler] Error running scheduler:', error);
+    // Rethrow so callers (cron handler, startScheduler) can detect and report failure.
+    // Individual scan errors are already caught inside processRecurringScan.
+    console.error('[Scheduler] Fatal error running scheduler:', error);
+    throw error;
   }
 }
 
-// Start the scheduler with a 1-minute interval
+// Start the scheduler with a 1-minute interval (dev / long-running server only)
 export function startScheduler() {
   console.log('[Scheduler] Starting recurring scan scheduler...');
-  
+
+  const safeRun = () =>
+    runScheduler().catch(err =>
+      console.error('[Scheduler] Interval run failed:', err)
+    );
+
   // Run immediately on startup
-  runScheduler();
-  
+  safeRun();
+
   // Then run every minute
-  setInterval(runScheduler, 60 * 1000);
+  setInterval(safeRun, 60 * 1000);
 }

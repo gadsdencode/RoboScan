@@ -38,7 +38,7 @@ export function TrophyCase({ open, onOpenChange }: TrophyCaseProps) {
   const { data: unlocked = [], isLoading } = useQuery<UnlockedAchievement[]>({
     queryKey: ["/api/user/achievements"],
     queryFn: async () => {
-      const response = await fetch('/api/user/achievements');
+      const response = await fetch('/api/user/achievements', { credentials: "include" });
       if (!response.ok) throw new Error('Failed to fetch achievements');
       return response.json();
     },
