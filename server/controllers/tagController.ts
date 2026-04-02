@@ -2,8 +2,10 @@
 // Handles tag management routes for user scans
 
 import { Router, Response } from "express";
+import { AppError } from "../errors/AppError.js";
 import { storage } from "../storage.js";
 import { isAuthenticated } from "../auth.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const router = Router();
 
@@ -11,15 +13,16 @@ const router = Router();
  * GET /api/user/tags
  * Get all unique tags used by the authenticated user
  */
-router.get('/', isAuthenticated, async (req: any, res: Response) => {
-  try {
+router.get(
+  "/",
+  isAuthenticated,
+  asyncHandler(async (req: any, res: Response) => {
     const userId = req.user.claims.sub;
-    const tags = await storage.getAllUserTags(userId);
+    const tags = await storage.getAllUserTags(userId).catch(() => {
+      throw new AppError("Failed to get tags", 500);
+    });
     res.json(tags);
-  } catch (error) {
-    console.error('Get tags error:', error);
-    res.status(500).json({ message: "Failed to get tags" });
-  }
-});
+  })
+);
 
 export default router;

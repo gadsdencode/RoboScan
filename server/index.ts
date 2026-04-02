@@ -1,7 +1,6 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express from "express";
 import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
-import { AppError } from "./errors/AppError.js";
 // Scheduler is now handled by Vercel Cron Jobs (api/cron/scheduler.ts)
 
 // Default sensitive keys to redact from debug logs
@@ -114,39 +113,6 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
-
-  // Centralized error handler - handles AppError, Zod validation, and unknown errors
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    // Handle AppError instances (operational errors)
-    if (err instanceof AppError) {
-      return res.status(err.statusCode).json({
-        message: err.message,
-        code: err.code,
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-      });
-    }
-
-    // Handle Zod validation errors
-    if (err.name === 'ZodError') {
-      return res.status(400).json({
-        message: 'Validation error',
-        code: 'VALIDATION_ERROR',
-        errors: err.errors
-      });
-    }
-
-    // Log unknown/unexpected errors
-    console.error('[Server] Unhandled error:', err);
-
-    // Fallback for unknown errors - don't expose details in production
-    const status = err.status || err.statusCode || 500;
-    res.status(status).json({
-      message: process.env.NODE_ENV === 'production'
-        ? 'Internal server error'
-        : err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-    });
-  });
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
