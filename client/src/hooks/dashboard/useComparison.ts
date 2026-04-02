@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ScanWithPurchase } from "@/components/dashboard/ScanList";
 import { queryKeys } from "@/lib/queryKeys";
+import { runScanToCompletion } from "@/lib/scan-client";
 
 export interface UseComparisonOptions {
   getScansForUrl: (url: string) => ScanWithPurchase[];
@@ -30,39 +31,8 @@ export function useComparison({ getScansForUrl }: UseComparisonOptions) {
 
   const scanUrlForComparison = useCallback(
     async (url: string): Promise<ScanWithPurchase> => {
-      const res = await fetch("/api/scan?async=true", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(
-          (errorData as { message?: string }).message || `Failed to scan ${url}`
-        );
-      }
-
-      if (res.status === 202) {
-        const { jobId } = await res.json();
-        const maxAttempts = 120;
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          const statusRes = await fetch(`/api/scan-jobs/${jobId}/status`, {
-            credentials: "include",
-          });
-          if (!statusRes.ok) throw new Error("Failed to poll scan status");
-          const status = await statusRes.json();
-          if (status.status === "completed" && status.result)
-            return status.result as ScanWithPurchase;
-          if (status.status === "failed")
-            throw new Error(status.error || "Scan failed");
-        }
-        throw new Error("Scan timed out");
-      }
-
-      return res.json() as Promise<ScanWithPurchase>;
+      const result = await runScanToCompletion({ url }, { async: true });
+      return result as ScanWithPurchase;
     },
     []
   );
