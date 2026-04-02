@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -49,7 +49,10 @@ export function RecurringScanManager({
     queryFn: fetchRecurringScans,
   });
 
-  const recurringScans = recurringQuery.data ?? [];
+  const recurringScans = useMemo(
+    () => recurringQuery.data ?? [],
+    [recurringQuery.data]
+  );
 
   useEffect(() => {
     onRecurringScansChange?.(recurringScans);
