@@ -36,12 +36,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Validate required environment variables at runtime (not module load)
   // This allows the serverless function to start and return proper errors
-  if (!process.env.SESSION_SECRET) {
-    console.error('[Routes] FATAL: Missing required environment variable: SESSION_SECRET');
+  if (!process.env.JWT_SECRET) {
+    console.error('[Routes] FATAL: Missing required environment variable: JWT_SECRET');
     // Add a fallback route that returns a clear error for ALL routes
     app.all('*', (req, res) => {
       res.status(500).json({ 
-        message: 'Server configuration error: SESSION_SECRET not set',
+        message: 'Server configuration error: JWT_SECRET not set',
         error: 'MISSING_ENV_VAR'
       });
     });
