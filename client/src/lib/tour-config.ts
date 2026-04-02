@@ -11,10 +11,12 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   },
   {
+    // Resolved at runtime: desktop = Tools dropdown, mobile = hamburger (see getDashboardTourSteps)
     element: '[data-testid="button-tools-dropdown"]',
     popover: {
       title: "🛠️ Tools & Analysis",
-      description: "Access all 8 technical file builders (robots.txt, llms.txt, sitemap.xml, security.txt, manifest.json, ads.txt, humans.txt, ai.txt) and the Compare Sites analysis tool from this dropdown menu.",
+      description:
+        "On a wide screen, use the Tools dropdown. On smaller screens, tap the menu (☰) to open the same file builders and Compare Sites.",
       side: "bottom",
       align: "center"
     }
@@ -56,10 +58,13 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   },
   {
-    element: '[data-testid="button-create-recurring"]',
+    // Guardian: "New Recurring Scan"; non-subscriber gate: "Upgrade to Guardian" (same section)
+    element:
+      '[data-testid="button-create-recurring"], [data-testid="button-subscribe-recurring"]',
     popover: {
       title: "🔄 Monitor Automatically",
-      description: "Set up recurring scans to get notified when a website's bot permissions change. This unlocks the 'Guardian' achievement and earns passive XP!",
+      description:
+        "Set up recurring scans (Guardian) or upgrade to unlock automatic monitoring, change alerts, and passive XP. Recurring scans unlock the 'Guardian' achievement!",
       side: "left",
       align: "center"
     }
@@ -71,6 +76,120 @@ export const dashboardTourSteps: DriveStep[] = [
     }
   }
 ];
+
+function getToolsTourSelector(): string {
+  if (typeof window === "undefined") {
+    return '[data-testid="button-tools-dropdown"]';
+  }
+  return window.matchMedia("(min-width: 768px)").matches
+    ? '[data-testid="button-tools-dropdown"]'
+    : '[data-testid="button-tools-mobile"]';
+}
+
+/** Matches Tailwind `md` — used for Tools target + popover tuning */
+function isBelowMdViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    !window.matchMedia("(min-width: 768px)").matches
+  );
+}
+
+/**
+ * `side: left` + right-aligned nav targets clips off-screen on narrow viewports.
+ * Prefer `bottom` + `center` below md; keep desktop/tablet side placement for wide screens.
+ */
+function tuneDashboardStepPopover(step: DriveStep, index: number): DriveStep {
+  if (!step.popover) return step;
+  const narrow = isBelowMdViewport();
+  const popover = { ...step.popover };
+
+  switch (index) {
+    case 0: {
+      // Scan input — full-width on mobile; center the popover under the field
+      if (narrow) {
+        popover.side = "bottom";
+        popover.align = "center";
+      }
+      break;
+    }
+    case 1: {
+      // Tools / hamburger — top-right; bottom+center avoids horizontal overflow
+      if (narrow) {
+        popover.side = "bottom";
+        popover.align = "center";
+      }
+      break;
+    }
+    case 2:
+    case 3: {
+      // Trophy + help — icon row; bottom keeps popover in view
+      if (narrow) {
+        popover.side = "bottom";
+        popover.align = "center";
+      }
+      break;
+    }
+    case 4:
+    case 5: {
+      // Notifications + HUD — `left` overflows off the left edge on phones
+      if (narrow) {
+        popover.side = "bottom";
+        popover.align = "center";
+      } else {
+        popover.side = "left";
+        popover.align = "start";
+      }
+      break;
+    }
+    case 6: {
+      // Recurring section — full-width controls; bottom is stable on all widths
+      if (narrow) {
+        popover.side = "bottom";
+        popover.align = "center";
+      } else {
+        popover.side = "left";
+        popover.align = "center";
+      }
+      break;
+    }
+    case 7: {
+      // Final modal step (no element) — driver centers; explicit over + center for consistency
+      popover.side = "over";
+      popover.align = "center";
+      break;
+    }
+    default:
+      break;
+  }
+
+  return { ...step, popover };
+}
+
+/**
+ * Resolves the Tools step to the correct target for the current viewport, then drops
+ * steps whose `element` is missing (e.g. gated recurring UI).
+ */
+export function getDashboardTourSteps(): DriveStep[] {
+  const toolsSelector = getToolsTourSelector();
+
+  return dashboardTourSteps
+    .map((step, index) => {
+      let next = step;
+      if (index === 1 && step.element && typeof step.element === "string") {
+        next = { ...step, element: toolsSelector };
+      }
+      return tuneDashboardStepPopover(next, index);
+    })
+    .filter((step) => {
+      if (!step.element) return true;
+      if (typeof step.element !== "string") return true;
+      try {
+        return document.querySelector(step.element) !== null;
+      } catch {
+        return false;
+      }
+    });
+}
 
 export const builderTourSteps: DriveStep[] = [
   {
