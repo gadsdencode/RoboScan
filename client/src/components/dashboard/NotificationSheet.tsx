@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { useMutation } from "@tanstack/react-query";
 import { Bell, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { fetchScanById } from "@/lib/api/dashboard";
 
 export interface Notification {
   id: number;
@@ -50,6 +52,39 @@ export function NotificationSheet({
   setScanDetailsData,
   setShowScanDetailsModal,
 }: NotificationSheetProps) {
+  const loadScanMutation = useMutation({
+    mutationFn: async ({
+      scanId,
+      notificationId,
+    }: {
+      scanId: number;
+      notificationId: number;
+    }) => {
+      const scan = await fetchScanById(scanId);
+      return { scan, notificationId };
+    },
+    onMutate: ({ scanId }) => {
+      setLoadingScanId(scanId);
+    },
+    onSettled: () => {
+      setLoadingScanId(null);
+    },
+    onSuccess: ({ scan, notificationId }) => {
+      setScanDetailsData(scan);
+      setShowScanDetailsModal(true);
+      setShowNotificationsSheet(false);
+      onMarkNotificationRead(notificationId);
+    },
+    onError: (error) => {
+      const status = (error as Error & { status?: number }).status;
+      if (status === 404) {
+        toast.error("Scan not found. It may have been deleted.");
+      } else {
+        toast.error("Failed to load scan details");
+      }
+    },
+  });
+
   return (
     <Sheet open={showNotificationsSheet} onOpenChange={setShowNotificationsSheet}>
       <SheetContent className="w-full sm:max-w-md">
@@ -139,39 +174,26 @@ export function NotificationSheet({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={async () => {
-                                    try {
-                                      setLoadingScanId(notification.scanId!);
-                                      const response = await fetch(`/api/scans/${notification.scanId}`, { credentials: "include" });
-
-                                      if (!response.ok) {
-                                        if (response.status === 404) {
-                                          toast.error("Scan not found. It may have been deleted.");
-                                        } else {
-                                          toast.error("Failed to load scan details");
-                                        }
-                                        return;
-                                      }
-
-                                      const scan = await response.json();
-                                      setScanDetailsData(scan);
-                                      setShowScanDetailsModal(true);
-                                      setShowNotificationsSheet(false);
-                                      // Mark notification as read
-                                      onMarkNotificationRead(notification.id);
-                                    } catch (error) {
-                                      console.error('Failed to fetch scan:', error);
-                                      toast.error("Failed to load scan details");
-                                    } finally {
-                                      setLoadingScanId(null);
-                                    }
-                                  }}
-                                  disabled={loadingScanId === notification.scanId}
+                                  onClick={() =>
+                                    loadScanMutation.mutate({
+                                      scanId: notification.scanId!,
+                                      notificationId: notification.id,
+                                    })
+                                  }
+                                  disabled={
+                                    loadScanMutation.isPending &&
+                                    loadScanMutation.variables?.scanId ===
+                                      notification.scanId
+                                  }
                                   className="h-7 text-xs"
                                   data-testid={`button-view-scan-${notification.id}`}
                                 >
                                   <ArrowRight className="w-3 h-3 mr-1" />
-                                  {loadingScanId === notification.scanId ? 'Loading...' : 'View Scan'}
+                                  {loadScanMutation.isPending &&
+                                  loadScanMutation.variables?.scanId ===
+                                    notification.scanId
+                                    ? "Loading..."
+                                    : "View Scan"}
                                 </Button>
                               )}
 

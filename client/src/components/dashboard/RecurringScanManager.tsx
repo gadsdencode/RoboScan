@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   RecurringScans,
   type RecurringScan,
 } from "@/components/dashboard/RecurringScans";
 import { formatRelativeTime } from "@/lib/formatRelativeTime";
+import {
+  createRecurringScan,
+  deleteRecurringScan,
+  fetchRecurringScans,
+  patchRecurringScanActive,
+} from "@/lib/api/dashboard";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface RecurringScanManagerProps {
   onOpenPreferences: (scan: RecurringScan) => void | Promise<void>;
@@ -28,139 +36,120 @@ export function RecurringScanManager({
   onOpenPreferences,
   onRecurringScansChange,
 }: RecurringScanManagerProps) {
-  const [recurringScans, setRecurringScans] = useState<RecurringScan[]>([]);
+  const queryClient = useQueryClient();
   const [showCreateRecurringDialog, setShowCreateRecurringDialog] =
     useState(false);
   const [newRecurringUrl, setNewRecurringUrl] = useState("");
   const [newRecurringFrequency, setNewRecurringFrequency] = useState<
     "daily" | "weekly" | "monthly"
   >("daily");
-  const [isCreatingRecurring, setIsCreatingRecurring] = useState(false);
 
-  const fetchRecurringScans = useCallback(async () => {
-    try {
-      const response = await fetch("/api/recurring-scans", {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = (await response.json()) as RecurringScan[];
-        setRecurringScans(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch recurring scans:", error);
-    }
-  }, []);
+  const recurringQuery = useQuery({
+    queryKey: queryKeys.recurringScans.list,
+    queryFn: fetchRecurringScans,
+  });
 
-  useEffect(() => {
-    void fetchRecurringScans();
-  }, [fetchRecurringScans]);
+  const recurringScans = recurringQuery.data ?? [];
 
   useEffect(() => {
     onRecurringScansChange?.(recurringScans);
   }, [recurringScans, onRecurringScansChange]);
 
-  const handleCreateRecurringScan = async () => {
-    if (!newRecurringUrl.trim()) return;
-
-    setIsCreatingRecurring(true);
-
-    try {
-      const response = await fetch("/api/recurring-scans", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: newRecurringUrl,
-          frequency: newRecurringFrequency,
-        }),
-        credentials: "include",
-      });
-
+  const createMutation = useMutation({
+    mutationFn: async (input: {
+      url: string;
+      frequency: "daily" | "weekly" | "monthly";
+    }) => {
+      const response = await createRecurringScan(input);
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as {
           message?: string;
           requiresSubscription?: boolean;
         };
-
-        if (response.status === 403 && errorData.requiresSubscription) {
-          toast.error("Subscription Required", {
-            description:
-              "Recurring scans are a Guardian feature. Upgrade to enable automatic monitoring.",
-            action: {
-              label: "Upgrade",
-              onClick: () => {
-                window.location.href = "/pricing";
-              },
-            },
-          });
-          setShowCreateRecurringDialog(false);
-          return;
-        }
-
-        throw new Error(errorData.message || "Failed to create recurring scan");
+        const err = new Error(
+          errorData.message || "Failed to create recurring scan"
+        ) as Error & { status?: number; requiresSubscription?: boolean };
+        err.status = response.status;
+        err.requiresSubscription = errorData.requiresSubscription;
+        throw err;
       }
-
-      await fetchRecurringScans();
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.recurringScans.list,
+      });
       setShowCreateRecurringDialog(false);
-      const createdUrl = newRecurringUrl;
-      const createdFreq = newRecurringFrequency;
       setNewRecurringUrl("");
       setNewRecurringFrequency("daily");
-
       toast.success("Recurring Scan Created", {
-        description: `Monitoring ${createdUrl} ${createdFreq}`,
+        description: `Monitoring ${variables.url} ${variables.frequency}`,
       });
-    } catch (error) {
-      console.error("Create recurring scan error:", error);
+    },
+    onError: (error: Error & { status?: number; requiresSubscription?: boolean }) => {
+      if (error.status === 403 && error.requiresSubscription) {
+        toast.error("Subscription Required", {
+          description:
+            "Recurring scans are a Guardian feature. Upgrade to enable automatic monitoring.",
+          action: {
+            label: "Upgrade",
+            onClick: () => {
+              window.location.href = "/pricing";
+            },
+          },
+        });
+        setShowCreateRecurringDialog(false);
+        return;
+      }
       toast.error("Failed to create recurring scan", {
-        description:
-          error instanceof Error ? error.message : "Please try again",
+        description: error.message || "Please try again",
       });
-    } finally {
-      setIsCreatingRecurring(false);
-    }
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({
+      id,
+      currentlyActive,
+    }: {
+      id: number;
+      currentlyActive: boolean;
+    }) => patchRecurringScanActive(id, !currentlyActive),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.recurringScans.list,
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => deleteRecurringScan(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.recurringScans.list,
+      });
+    },
+  });
+
+  const handleCreateRecurringScan = async () => {
+    if (!newRecurringUrl.trim()) return;
+    await createMutation.mutateAsync({
+      url: newRecurringUrl,
+      frequency: newRecurringFrequency,
+    });
   };
 
   const handleToggleRecurringScan = async (
     id: number,
     currentlyActive: boolean
   ) => {
-    try {
-      const response = await fetch(`/api/recurring-scans/${id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ isActive: !currentlyActive }),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        await fetchRecurringScans();
-      }
-    } catch (error) {
-      console.error("Toggle recurring scan error:", error);
-    }
+    await toggleMutation.mutateAsync({ id, currentlyActive });
   };
 
   const handleDeleteRecurringScan = async (id: number) => {
     if (!confirm("Are you sure you want to delete this recurring scan?")) {
       return;
     }
-
-    try {
-      const response = await fetch(`/api/recurring-scans/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        await fetchRecurringScans();
-      }
-    } catch (error) {
-      console.error("Delete recurring scan error:", error);
-    }
+    await deleteMutation.mutateAsync(id);
   };
 
   return (
@@ -172,7 +161,7 @@ export function RecurringScanManager({
       setNewRecurringUrl={setNewRecurringUrl}
       newRecurringFrequency={newRecurringFrequency}
       setNewRecurringFrequency={setNewRecurringFrequency}
-      isCreatingRecurring={isCreatingRecurring}
+      isCreatingRecurring={createMutation.isPending}
       onCreateRecurringScan={handleCreateRecurringScan}
       onToggleRecurringScan={handleToggleRecurringScan}
       onDeleteRecurringScan={handleDeleteRecurringScan}

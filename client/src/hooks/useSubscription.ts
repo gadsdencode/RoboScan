@@ -2,6 +2,7 @@
 // Hook for managing Stripe subscriptions
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { useToast } from "./use-toast";
 
 // Types
@@ -146,14 +147,14 @@ export function useSubscription() {
 
   // Fetch available plans
   const plansQuery = useQuery({
-    queryKey: ["subscription-plans"],
+    queryKey: queryKeys.subscriptionPlans,
     queryFn: fetchSubscriptionPlans,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Fetch current subscription
   const currentSubscriptionQuery = useQuery({
-    queryKey: ["current-subscription"],
+    queryKey: queryKeys.currentSubscription,
     queryFn: fetchCurrentSubscription,
     staleTime: 1000 * 60 * 1, // 1 minute
   });
@@ -198,8 +199,8 @@ export function useSubscription() {
   const cancelMutation = useMutation({
     mutationFn: cancelSubscription,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
-      queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentSubscription });
+      queryClient.invalidateQueries({ queryKey: queryKeys.userAccessSummary });
       toast({
         title: "Subscription Canceled",
         description: "Your subscription will end at the current billing period.",
@@ -218,8 +219,8 @@ export function useSubscription() {
   const reactivateMutation = useMutation({
     mutationFn: reactivateSubscription,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
-      queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentSubscription });
+      queryClient.invalidateQueries({ queryKey: queryKeys.userAccessSummary });
       toast({
         title: "Subscription Reactivated",
         description: "Your subscription has been reactivated.",
@@ -270,12 +271,12 @@ export function useSubscription() {
     // Helpers
     formatPrice,
     refetchSubscription: () => {
-      void queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
-      void queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.currentSubscription });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userAccessSummary });
     },
     refreshSubscription: () => {
-      void queryClient.invalidateQueries({ queryKey: ["current-subscription"] });
-      void queryClient.invalidateQueries({ queryKey: ["user-access-summary"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.currentSubscription });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.userAccessSummary });
     },
   };
 }

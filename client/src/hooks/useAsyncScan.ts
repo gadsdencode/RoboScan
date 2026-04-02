@@ -6,6 +6,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import { calculateLevel } from "@shared/gamification";
+import { queryKeys } from "@/lib/queryKeys";
 
 // Sync scan response type (original format)
 export interface SyncScanResult {
@@ -182,8 +183,8 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
         }));
 
         // Invalidate queries
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/user/scans"] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.auth.user });
+        queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
 
         onComplete?.(result);
         return true; // Polling complete
@@ -253,14 +254,14 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
    * Perform optimistic UI update for gamification
    */
   const optimisticUpdate = useCallback(() => {
-    const previousUser = queryClient.getQueryData<User>(["/api/auth/user"]);
+    const previousUser = queryClient.getQueryData<User>(queryKeys.auth.user);
     
     if (previousUser) {
       const estimatedXpGain = 10;
       const newXp = (previousUser.xp || 0) + estimatedXpGain;
       const newLevel = calculateLevel(newXp);
 
-      queryClient.setQueryData<User>(["/api/auth/user"], {
+      queryClient.setQueryData<User>(queryKeys.auth.user, {
         ...previousUser,
         xp: newXp,
         level: newLevel,
@@ -339,15 +340,15 @@ export function useAsyncScan(options: UseAsyncScanOptions = {}) {
         }));
 
         // Invalidate queries
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/user/scans"] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.auth.user });
+        queryClient.invalidateQueries({ queryKey: queryKeys.userScans.root });
 
         onComplete?.(syncResult);
       }
     } catch (error) {
       // Rollback optimistic update
       if (previousUser) {
-        queryClient.setQueryData(["/api/auth/user"], previousUser);
+        queryClient.setQueryData(queryKeys.auth.user, previousUser);
       }
 
       const errorMsg = error instanceof Error ? error.message : 'Scan failed';

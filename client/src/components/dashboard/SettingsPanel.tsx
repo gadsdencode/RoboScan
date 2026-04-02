@@ -1,9 +1,11 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useState,
 } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +27,11 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import type { RecurringScan } from "@/components/dashboard/RecurringScans";
+import {
+  fetchRecurringPreferences,
+  patchRecurringPreferences,
+} from "@/lib/api/dashboard";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface NotificationPreferences {
   id: number;
@@ -44,12 +51,28 @@ type NotificationMethod = NotificationPreferences["notificationMethod"];
 
 export const SettingsPanel = forwardRef<SettingsPanelHandle, object>(
   function SettingsPanel(_props, ref) {
+    const queryClient = useQueryClient();
     const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
     const [selectedRecurringScan, setSelectedRecurringScan] =
       useState<RecurringScan | null>(null);
     const [preferences, setPreferences] =
       useState<NotificationPreferences | null>(null);
-    const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+
+    const preferencesQuery = useQuery({
+      queryKey: queryKeys.recurringPreferences(selectedRecurringScan?.id ?? 0),
+      queryFn: () => fetchRecurringPreferences(selectedRecurringScan!.id),
+      enabled: Boolean(selectedRecurringScan && showPreferencesDialog),
+    });
+
+    useEffect(() => {
+      setPreferences(null);
+    }, [selectedRecurringScan?.id]);
+
+    useEffect(() => {
+      if (preferencesQuery.data) {
+        setPreferences(preferencesQuery.data);
+      }
+    }, [preferencesQuery.data]);
 
     const resetDialog = useCallback(() => {
       setShowPreferencesDialog(false);
@@ -59,19 +82,7 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, object>(
 
     const openPreferences = useCallback(async (scan: RecurringScan) => {
       setSelectedRecurringScan(scan);
-      try {
-        const response = await fetch(
-          `/api/recurring-scans/${scan.id}/preferences`,
-          { credentials: "include" }
-        );
-        if (response.ok) {
-          const data = (await response.json()) as NotificationPreferences;
-          setPreferences(data);
-          setShowPreferencesDialog(true);
-        }
-      } catch (error) {
-        console.error("Fetch preferences error:", error);
-      }
+      setShowPreferencesDialog(true);
     }, []);
 
     useImperativeHandle(
@@ -82,40 +93,39 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, object>(
       [openPreferences]
     );
 
-    const handleSavePreferences = async () => {
-      if (!selectedRecurringScan || !preferences) return;
-
-      setIsSavingPreferences(true);
-
-      try {
-        const response = await fetch(
-          `/api/recurring-scans/${selectedRecurringScan.id}/preferences`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              notifyOnRobotsTxtChange: preferences.notifyOnRobotsTxtChange,
-              notifyOnLlmsTxtChange: preferences.notifyOnLlmsTxtChange,
-              notifyOnBotPermissionChange:
-                preferences.notifyOnBotPermissionChange,
-              notifyOnNewErrors: preferences.notifyOnNewErrors,
-              notificationMethod: preferences.notificationMethod,
-            }),
-            credentials: "include",
-          }
-        );
-
-        if (response.ok) {
-          resetDialog();
+    const saveMutation = useMutation({
+      mutationFn: async () => {
+        if (!selectedRecurringScan || !preferences) {
+          throw new Error("Missing preferences");
         }
-      } catch (error) {
+        await patchRecurringPreferences(selectedRecurringScan.id, {
+          notifyOnRobotsTxtChange: preferences.notifyOnRobotsTxtChange,
+          notifyOnLlmsTxtChange: preferences.notifyOnLlmsTxtChange,
+          notifyOnBotPermissionChange:
+            preferences.notifyOnBotPermissionChange,
+          notifyOnNewErrors: preferences.notifyOnNewErrors,
+          notificationMethod: preferences.notificationMethod,
+        });
+      },
+      onSuccess: () => {
+        if (selectedRecurringScan) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.recurringPreferences(selectedRecurringScan.id),
+          });
+        }
+        resetDialog();
+      },
+      onError: (error) => {
         console.error("Save preferences error:", error);
-      } finally {
-        setIsSavingPreferences(false);
-      }
+      },
+    });
+
+    const handleSavePreferences = () => {
+      void saveMutation.mutateAsync();
     };
+
+    const prefsLoading =
+      preferencesQuery.isPending && !preferencesQuery.data;
 
     return (
       <Dialog
@@ -139,6 +149,14 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, object>(
               )}
             </DialogDescription>
           </DialogHeader>
+          {preferencesQuery.isError && (
+            <p className="text-sm text-destructive py-2">
+              Failed to load notification settings. Please try again.
+            </p>
+          )}
+          {prefsLoading && (
+            <p className="text-sm text-muted-foreground py-4">Loading…</p>
+          )}
           {preferences && (
             <div className="space-y-4 py-4">
               <div className="space-y-3">
@@ -247,11 +265,11 @@ export const SettingsPanel = forwardRef<SettingsPanelHandle, object>(
             </Button>
             <Button
               onClick={handleSavePreferences}
-              disabled={isSavingPreferences}
+              disabled={saveMutation.isPending || !preferences}
               className="bg-primary text-primary-foreground hover:bg-primary/90 btn-hover-lift"
               data-testid="button-save-preferences"
             >
-              {isSavingPreferences ? "Saving..." : "Save Changes"}
+              {saveMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
