@@ -7,6 +7,7 @@ import { setupAuth } from "./auth.js";
 import { storage } from "./storage.js";
 import { ACHIEVEMENTS } from "./gamification.js";
 import { csrfProtection } from "./middleware/csrfProtection.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRateLimiter } from "./middleware/rateLimiter.js";
 
 // Import all controllers
@@ -134,6 +135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Promotional codes routes: /api/promotional-codes/*
   app.use('/api/promotional-codes', promotionalCodeController);
+
+  app.use(errorHandler);
 
   const httpServer = createServer(app);
 
