@@ -186,8 +186,7 @@ router.post('/', async (req: any, res: Response) => {
       gamificationUpdates = await awardScanXP(
         userId,
         scanResult.scanData,
-        scanResult.canonicalDomain,
-        scanResult.isOnCooldown
+        scanResult.canonicalDomain
       );
       const achievementsUnlocked = await evaluateScanAchievementsAfterScan(
         userId,

@@ -29,6 +29,41 @@
       "when": 1764243602875,
       "tag": "0003_bright_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1764250000000,
+      "tag": "0004_add_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1764260000000,
+      "tag": "0005_add_promotional_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1764270000000,
+      "tag": "0006_add_scan_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1764280000000,
+      "tag": "0007_add_jsonb_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1764290000000,
+      "tag": "0008_gamification_award_scan",
+      "breakpoints": true
     }
   ]
 }

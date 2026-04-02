@@ -183,18 +183,13 @@ router.post('/', async (req: Request, res: Response) => {
       const canonicalDomain = normalizeDomainForCooldown(url);
 
       if (canonicalDomain) {
-        const isOnCooldown = await storage.checkDomainCooldown(
-          userId,
-          canonicalDomain
-        );
         gamificationUpdates = await awardScanXP(
           userId,
           {
             robotsTxtFound: result.robotsTxtFound,
             llmsTxtFound: result.llmsTxtFound,
           },
-          canonicalDomain,
-          isOnCooldown
+          canonicalDomain
         );
       }
 

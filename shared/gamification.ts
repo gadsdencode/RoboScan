@@ -61,7 +61,7 @@ export const ACHIEVEMENTS = {
   GUARDIAN: {
     key: 'GUARDIAN',
     name: 'Guardian',
-    description: 'Ran 10 successful security scans',
+    description: 'Completed 10 scans where security.txt was found',
     xpReward: 100,
     icon: 'Shield'
   },
