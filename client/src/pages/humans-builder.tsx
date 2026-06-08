@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Plus, Trash2, Users, Heart, Globe, Mail, MapPin, Calendar, Link } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 interface TeamMember {
   role: string;
@@ -41,6 +43,7 @@ interface HumansFormData {
 }
 
 export default function HumansBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
@@ -228,6 +231,7 @@ export default function HumansBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="tools/humans-builder" />
       <Navbar />
 
       {/* Main Content */}

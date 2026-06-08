@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, ShieldCheck, Mail, Key, Globe, Calendar, Award, Link } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 interface SecurityTxtFormData {
   // Required fields
@@ -27,6 +29,7 @@ interface SecurityTxtFormData {
 }
 
 export default function SecurityBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
@@ -207,6 +210,7 @@ export default function SecurityBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="tools/security-builder" />
       <Navbar />
 
       {/* Main Content */}

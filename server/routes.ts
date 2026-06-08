@@ -29,7 +29,10 @@ import {
   promotionalCodeController,
   accessController,
   buildersValidationController,
+  shareController,
+  badgeController,
 } from "./controllers/index.js";
+import { renderShareHtml } from "./utils/shareHtml.js";
 
 // Guard against duplicate auth setup
 let authInitialized = false;
@@ -128,6 +131,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Tools routes: POST /api/test-bot-access
   app.use('/api', toolsController);
+
+  // Public scan share: summary JSON + embeddable SVG badge (no auth)
+  app.use('/api/share', shareController);
+  app.use('/api/badge', badgeController);
+
+  // Public share view (/s/:token): serve the SPA shell with per-scan OG meta
+  // injected so social crawlers (LinkedIn/X) unfurl correctly. Humans still boot
+  // the SPA and get the interactive view. Falls through if no build exists (dev).
+  app.get('/s/:token', async (req, res, next) => {
+    try {
+      const html = await renderShareHtml(req.params.token);
+      if (!html) return next();
+      res.status(200).set({ "Content-Type": "text/html; charset=utf-8" }).end(html);
+    } catch (error) {
+      console.error('[Routes] share view render error:', error);
+      next();
+    }
+  });
 
   // SEO routes: GET /sitemap.xml
   app.use('/', seoController);

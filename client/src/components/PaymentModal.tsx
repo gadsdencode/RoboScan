@@ -20,14 +20,13 @@ function formatPrice(amount: number): string {
   }).format(amount);
 }
 
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-
-const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
 
 let stripePromiseSingleton: ReturnType<typeof loadStripe> | null = null;
 function getStripePromise() {
+  if (!STRIPE_PUBLIC_KEY) {
+    return null;
+  }
   if (!stripePromiseSingleton) {
     stripePromiseSingleton = loadStripe(STRIPE_PUBLIC_KEY);
   }

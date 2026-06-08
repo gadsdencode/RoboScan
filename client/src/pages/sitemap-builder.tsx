@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Plus, Trash2, MapPin } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 interface SitemapUrl {
   loc: string;
@@ -26,6 +28,7 @@ interface SitemapFormData {
 }
 
 export default function SitemapBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
@@ -179,6 +182,7 @@ export default function SitemapBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="tools/sitemap-builder" />
       <Navbar />
 
       {/* Main Content */}

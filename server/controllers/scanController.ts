@@ -33,6 +33,7 @@ import {
   awardScanXP,
   evaluateScanAchievementsAfterScan,
 } from "../services/gamificationService.js";
+import { createScanShareToken } from "../utils/shareToken.js";
 
 const router = Router();
 
@@ -117,6 +118,7 @@ router.get('/scans', isAuthenticated, async (req: any, res: Response) => {
           isPurchased,
           isSubscriber,
           hasFullAccess, // Can see full details (errors, warnings, content)
+          shareToken: createScanShareToken(scan.id),
         };
       })
     );
@@ -209,6 +211,8 @@ router.post('/', async (req: any, res: Response) => {
       botPermissions: scan.botPermissions,
       errors: scan.errors,
       warnings: scan.warnings,
+      score: scan.score,
+      shareToken: createScanShareToken(scan.id),
       gamification: gamificationUpdates,
     });
   } catch (error) {
@@ -295,6 +299,7 @@ router.get('/:jobId/status', async (req: any, res: Response) => {
           errors: scan.errors,
           warnings: scan.warnings,
           score: scan.score,
+          shareToken: createScanShareToken(scan.id),
         };
 
         if (userId) {
@@ -364,6 +369,7 @@ router.get('/:id', isAuthenticated, async (req: any, res: Response) => {
       isPurchased: accessLevel.isPurchased,
       isSubscriber: accessLevel.isSubscriber,
       hasFullAccess: accessLevel.hasFullAccess,
+      shareToken: createScanShareToken(scanId),
     };
 
     res.json(scanWithAccess);

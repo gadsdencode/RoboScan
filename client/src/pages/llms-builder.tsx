@@ -8,6 +8,9 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { builderTourSteps } from "@/lib/tour-config";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
+import { BuilderLandingSections } from "@/components/BuilderLandingSections";
+import { LLMS_LANDING } from "@/lib/content/builderLanding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 import { useAchievementToast } from "@/hooks/useAchievementToast";
 import { useAuth } from "@/hooks/useAuth";
 import { loadStripe } from "@stripe/stripe-js";
@@ -152,6 +156,7 @@ function PaymentForm({
 }
 
 export default function LLMsBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const showAchievementToasts = useAchievementToast();
   const { user } = useAuth();
@@ -526,6 +531,7 @@ For AI partnership inquiries: ${formData.contactEmail}
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="tools/llms-builder" />
       <Navbar 
         toolbarItems={
           <>
@@ -566,11 +572,10 @@ For AI partnership inquiries: ${formData.contactEmail}
               <span className="text-sm font-medium">AI Optimization Tool</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              llms.txt Builder
+              {LLMS_LANDING.h1}
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Create a professional llms.txt file to help AI agents understand and cite your content correctly.
-              The llms.txt standard provides structured guidance for AI systems.
+              {LLMS_LANDING.valueProp}
             </p>
           </div>
 
@@ -905,6 +910,8 @@ For AI partnership inquiries: ${formData.contactEmail}
               </Card>
             </div>
           </div>
+
+          <BuilderLandingSections content={LLMS_LANDING} />
         </motion.div>
       </div>
 

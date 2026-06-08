@@ -1,5 +1,58 @@
 {
   "version": 2,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "aibotcheck.io"
+        }
+      ],
+      "destination": "https://www.aibotcheck.io/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/llms-builder",
+      "destination": "/tools/llms-builder",
+      "permanent": true
+    },
+    {
+      "source": "/robots-builder",
+      "destination": "/tools/robots-builder",
+      "permanent": true
+    },
+    {
+      "source": "/sitemap-builder",
+      "destination": "/tools/sitemap-builder",
+      "permanent": true
+    },
+    {
+      "source": "/security-builder",
+      "destination": "/tools/security-builder",
+      "permanent": true
+    },
+    {
+      "source": "/manifest-builder",
+      "destination": "/tools/manifest-builder",
+      "permanent": true
+    },
+    {
+      "source": "/ads-builder",
+      "destination": "/tools/ads-builder",
+      "permanent": true
+    },
+    {
+      "source": "/humans-builder",
+      "destination": "/tools/humans-builder",
+      "permanent": true
+    },
+    {
+      "source": "/ai-builder",
+      "destination": "/tools/ai-builder",
+      "permanent": true
+    }
+  ],
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
@@ -17,7 +70,15 @@
       "dest": "/api/cron/$1"
     },
     {
+      "src": "/api/og",
+      "dest": "/api/og"
+    },
+    {
       "src": "/api/(.*)",
+      "dest": "/api/index"
+    },
+    {
+      "src": "/s/(.*)",
       "dest": "/api/index"
     },
     {

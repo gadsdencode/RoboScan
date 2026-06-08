@@ -43,7 +43,7 @@ const BUILDER_TOOLS = [
   {
     name: "robots.txt",
     description: "Control how search engines crawl your site",
-    href: "/robots-builder",
+    href: "/tools/robots-builder",
     icon: Bot,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
@@ -51,7 +51,7 @@ const BUILDER_TOOLS = [
   {
     name: "llms.txt",
     description: "Guide AI agents on citing your content",
-    href: "/llms-builder",
+    href: "/tools/llms-builder",
     icon: FileCode,
     color: "text-primary",
     bgColor: "bg-primary/10",
@@ -59,7 +59,7 @@ const BUILDER_TOOLS = [
   {
     name: "sitemap.xml",
     description: "Help search engines discover your pages",
-    href: "/sitemap-builder",
+    href: "/tools/sitemap-builder",
     icon: MapPin,
     color: "text-cyan-500",
     bgColor: "bg-cyan-500/10",
@@ -67,7 +67,7 @@ const BUILDER_TOOLS = [
   {
     name: "security.txt",
     description: "RFC 9116 security disclosure contact",
-    href: "/security-builder",
+    href: "/tools/security-builder",
     icon: ShieldCheck,
     color: "text-emerald-500",
     bgColor: "bg-emerald-500/10",
@@ -75,7 +75,7 @@ const BUILDER_TOOLS = [
   {
     name: "manifest.json",
     description: "Make your site a Progressive Web App",
-    href: "/manifest-builder",
+    href: "/tools/manifest-builder",
     icon: Smartphone,
     color: "text-purple-500",
     bgColor: "bg-purple-500/10",
@@ -83,7 +83,7 @@ const BUILDER_TOOLS = [
   {
     name: "ads.txt",
     description: "Declare authorized ad sellers (IAB)",
-    href: "/ads-builder",
+    href: "/tools/ads-builder",
     icon: DollarSign,
     color: "text-amber-500",
     bgColor: "bg-amber-500/10",
@@ -91,7 +91,7 @@ const BUILDER_TOOLS = [
   {
     name: "humans.txt",
     description: "Credit the team behind your website",
-    href: "/humans-builder",
+    href: "/tools/humans-builder",
     icon: Users,
     color: "text-pink-500",
     bgColor: "bg-pink-500/10",
@@ -99,7 +99,7 @@ const BUILDER_TOOLS = [
   {
     name: "ai.txt",
     description: "Control AI training & scraping permissions",
-    href: "/ai-builder",
+    href: "/tools/ai-builder",
     icon: Brain,
     color: "text-violet-500",
     bgColor: "bg-violet-500/10",

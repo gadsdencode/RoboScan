@@ -26,4 +26,4 @@ Disallow: /dashboard
 Disallow: /api/
 
 # Sitemaps
-Sitemap: https://aibotcheck.io/sitemap.xml
+Sitemap: https://www.aibotcheck.io/sitemap.xml

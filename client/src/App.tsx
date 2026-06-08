@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageLoader } from "@/components/PageLoader";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { isPrerenderSnapshot } from "@/lib/isPrerenderSnapshot";
 import Home from "@/pages/home";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -24,10 +25,32 @@ const AdsBuilder = lazy(() => import("@/pages/ads-builder"));
 const HumansBuilder = lazy(() => import("@/pages/humans-builder"));
 const AIBuilder = lazy(() => import("@/pages/ai-builder"));
 const Pricing = lazy(() => import("@/pages/pricing"));
+const Privacy = lazy(() => import("@/pages/privacy"));
+const Terms = lazy(() => import("@/pages/terms"));
+const BotDirectoryIndex = lazy(() => import("@/pages/bot-directory-index"));
+const BotDirectoryPage = lazy(() => import("@/pages/bot-directory"));
+const GuidePage = lazy(() => import("@/pages/guide"));
+const ComparePage = lazy(() => import("@/pages/compare"));
+const ExamplesPage = lazy(() => import("@/pages/examples"));
+const SharePage = lazy(() => import("@/pages/share"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const snapshot = isPrerenderSnapshot();
+
+  const renderHomeRoute = () => {
+    if (snapshot) {
+      return <Home />;
+    }
+    if (isLoading) {
+      return <DashboardSkeleton />;
+    }
+    if (!isAuthenticated) {
+      return <Home />;
+    }
+    return <Dashboard />;
+  };
 
   return (
     <Suspense fallback={<PageLoader />}>
@@ -35,15 +58,7 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
         <Route path="/set-password" component={SetPassword} />
-        <Route path="/">
-          {isLoading ? (
-            <DashboardSkeleton />
-          ) : !isAuthenticated ? (
-            <Home />
-          ) : (
-            <Dashboard />
-          )}
-        </Route>
+        <Route path="/">{renderHomeRoute()}</Route>
         <Route path="/dashboard">
           {isLoading ? (
             <DashboardSkeleton />
@@ -86,6 +101,24 @@ function Router() {
           <Redirect to="/tools/ai-builder" />
         </Route>
         <Route path="/pricing" component={Pricing} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/bot-directory" component={BotDirectoryIndex} />
+        <Route path="/bot-directory/:slug">
+          {(params) => <BotDirectoryPage slug={params.slug} />}
+        </Route>
+        <Route path="/guides/:slug">
+          {(params) => <GuidePage slug={params.slug} />}
+        </Route>
+        <Route path="/compare/:slug">
+          {(params) => <ComparePage slug={params.slug} />}
+        </Route>
+        <Route path="/examples/:slug">
+          {(params) => <ExamplesPage slug={params.slug} />}
+        </Route>
+        <Route path="/s/:token">
+          {(params) => <SharePage token={params.token} />}
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Suspense>

@@ -13,6 +13,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { Seo } from "@/components/Seo";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 // Feature comparison data
 const FREE_FEATURES = [
@@ -45,6 +47,7 @@ const DEFAULT_INTERVAL = "mo";
 const FALLBACK_GUARDIAN_PRICE_ID = import.meta.env.VITE_GUARDIAN_PRICE_ID || "";
 
 export default function Pricing() {
+  usePrerenderReady();
   const { user } = useAuth();
   const {
     plans,
@@ -96,6 +99,7 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="pricing" />
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">

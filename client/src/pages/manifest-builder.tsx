@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Smartphone, Palette, Image, Plus, Trash2, Globe, Layout } from "lucide-react";
 import { BuilderPageLayout } from "@/components/builders/BuilderPageLayout";
+import { Seo } from "@/components/Seo";
 import { useBuilderActions } from "@/hooks/useBuilderActions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 interface ManifestIcon {
   src: string;
@@ -38,6 +40,7 @@ interface ManifestFormData {
 }
 
 export default function ManifestBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const rewardBuilderValidation = useBuilderValidationReward();
   const { handleCopy, handleDownload } = useBuilderActions({
@@ -195,7 +198,9 @@ export default function ManifestBuilder() {
   };
 
   return (
-    <BuilderPageLayout
+    <>
+      <Seo route="tools/manifest-builder" />
+      <BuilderPageLayout
       title="manifest.json Builder"
       description="Create a Web App Manifest to make your website installable as a Progressive Web App (PWA)."
       icon={Smartphone}
@@ -590,6 +595,7 @@ export default function ManifestBuilder() {
             </div>
           </div>
     </BuilderPageLayout>
+    </>
   );
 }
 

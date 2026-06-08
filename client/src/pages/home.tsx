@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Sparkles, Lock, Zap, FileSearch, Clock, DollarSign, TrendingUp, Eye, RefreshCw, Building2, User, ChevronRight, Globe, FileText, ShieldCheck, Cpu } from "lucide-react";
+import { Shield, Bot, FileCode, Search, CheckCircle, XCircle, Terminal, ArrowRight, Sparkles, Lock, Zap, FileSearch, Clock, DollarSign, TrendingUp, Eye, RefreshCw, Building2, User, ChevronRight, Globe, FileText, ShieldCheck, Cpu, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PremiumReport } from "@/components/PremiumReport";
+import { Link } from "wouter";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 import { runScanToCompletion } from "@/lib/scan-client";
 import { getReportAccessToken } from "@/lib/reportAccess";
+import { ShareScoreDialog } from "@/components/ShareScoreDialog";
+import { deriveBotStatus, hostnameFromUrl } from "@shared/publicScanSummary";
 
 // Enhanced StepTracker Component with Pre-flight Checklist
 type ScanStep = 'select-type' | 'input' | 'scanning' | 'report';
@@ -20,10 +25,9 @@ interface StepTrackerProps {
 
 const StepTracker = ({ currentStep, preflightStatus }: StepTrackerProps) => {
   const steps = [
-    { id: 'select-type', label: 'Choose Path', number: 1 },
-    { id: 'input', label: 'Enter URL', number: 2 },
-    { id: 'scanning', label: 'Scanning', number: 3 },
-    { id: 'report', label: 'View Report', number: 4 }
+    { id: 'input', label: 'Enter URL', number: 1 },
+    { id: 'scanning', label: 'Scanning', number: 2 },
+    { id: 'report', label: 'View Report', number: 3 }
   ];
 
   const getStepState = (stepId: string) => {
@@ -98,18 +102,12 @@ const Hero = ({
   currentStep,
   isScanning,
   preflightStatus,
-  userType,
-  setUserType,
-  onProceedToInput,
   children // [NEW] Accept children (The Terminal)
 }: { 
   onScan: (url: string) => void;
   currentStep: ScanStep;
   isScanning: boolean;
   preflightStatus?: string;
-  userType: 'business' | 'agency';
-  setUserType: (type: 'business' | 'agency') => void;
-  onProceedToInput: () => void;
   children?: React.ReactNode;
 }) => {
   const [url, setUrl] = useState("");
@@ -132,9 +130,9 @@ const Hero = ({
 
       <div className="container relative z-10 px-6 py-12 flex flex-col items-center text-center max-w-5xl">
         
-        {/* 1. COLLAPSIBLE HEADER: Only show on 'select-type' step - stays collapsed after user proceeds */}
+        {/* 1. COLLAPSIBLE HERO: pain-led framing on the first (input) step - collapses once scanning starts */}
         <AnimatePresence>
-          {currentStep === 'select-type' && (
+          {currentStep === 'input' && (
             <motion.div
               initial={{ opacity: 0, y: 20, height: 'auto' }}
               animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -142,28 +140,29 @@ const Hero = ({
               transition={{ duration: 0.5 }}
               className="flex flex-col items-center overflow-hidden"
             >
-              {/* Badge with "Big 7" positioning */}
+              {/* Pain-framed badge */}
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-primary/20 to-blue-500/20 border border-primary/30 text-primary text-xs font-mono mb-8">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                 </span>
-                <span className="font-semibold">SEO on Steroids for AI</span>
+                <span className="font-semibold">Are AI bots locked out of your site?</span>
                 <span className="text-muted-foreground">•</span>
-                <span>8 Technical Files</span>
+                <span>Free instant scan</span>
               </div>
-              
-              <h1 className="text-4xl md:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto leading-[1.1]">
-                Rank Higher in the <br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-cyan-400">AI Era</span>
-              </h1>
-              
-              <p className="text-2xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
-                Get discovered by the <span className="text-foreground font-semibold">Big 7 LLMs.</span> <br />
-              </p>
 
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed">
-                We audit your current setup, benchmark competitor strategies, and generate the <span className="text-primary font-semibold">8 essential files</span> required for AI discovery, citation, and ranking.
+              <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 max-w-4xl mx-auto leading-[1.1]">
+                See which{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-cyan-400">
+                  AI bots
+                </span>{" "}
+                can access your website — and fix what blocks discovery.
+              </h1>
+
+              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+                AI BotCheck scans robots.txt, llms.txt, sitemap.xml, and AI crawler
+                permissions, then generates the files you need to improve AI
+                visibility.
               </p>
 
               {/* Big 7 LLM logos/badges */}
@@ -186,100 +185,7 @@ const Hero = ({
           <StepTracker currentStep={currentStep} preflightStatus={preflightStatus} />
         </div>
 
-        {/* Step 1: User Type Selection - Choose Path */}
-        {currentStep === 'select-type' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-xl mx-auto mb-8"
-          >
-            <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-2xl">
-              <div className="flex items-start gap-3 mb-6">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <User className="w-5 h-5 text-primary" />
-                </div>
-                <div className="text-left flex-1">
-                  <h3 className="font-bold text-lg mb-1">How will you use AI BotCheck?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Select your path to get a tailored experience
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                {/* Business Option */}
-                <button
-                  type="button"
-                  onClick={() => setUserType('business')}
-                  className={`
-                    relative flex flex-col items-center justify-center p-5 rounded-xl border-2 transition-all duration-200 group
-                    ${userType === 'business' 
-                      ? 'border-primary bg-primary/5 text-primary shadow-md ring-1 ring-primary/20 scale-[1.02]' 
-                      : 'border-border bg-card/50 text-muted-foreground hover:border-primary/30 hover:bg-card hover:text-foreground'}
-                  `}
-                >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <User className={`w-5 h-5 ${userType === 'business' ? 'fill-current' : ''}`} />
-                    <span className="font-bold text-lg tracking-tight">Business Owner</span>
-                  </div>
-                  <span className="text-xs font-medium opacity-80">
-                    Optimizing a Single Website
-                  </span>
-                  
-                  {/* Active Checkmark Badge */}
-                  {userType === 'business' && (
-                    <div className="absolute top-2 right-2 text-primary">
-                      <CheckCircle className="w-4 h-4" />
-                    </div>
-                  )}
-                </button>
-
-                {/* Agency Option */}
-                <button
-                  type="button"
-                  onClick={() => setUserType('agency')}
-                  className={`
-                    relative flex flex-col items-center justify-center p-5 rounded-xl border-2 transition-all duration-200 group
-                    ${userType === 'agency' 
-                      ? 'border-blue-500 bg-blue-500/5 text-blue-500 shadow-md ring-1 ring-blue-500/20 scale-[1.02]' 
-                      : 'border-border bg-card/50 text-muted-foreground hover:border-blue-500/30 hover:bg-card hover:text-foreground'}
-                  `}
-                >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <Building2 className={`w-5 h-5 ${userType === 'agency' ? 'fill-current' : ''}`} />
-                    <span className="font-bold text-lg tracking-tight">Agency</span>
-                  </div>
-                  <span className="text-xs font-medium opacity-80">
-                    Managing Multiple Clients
-                  </span>
-
-                  {/* Active Checkmark Badge */}
-                  {userType === 'agency' && (
-                    <div className="absolute top-2 right-2 text-blue-500">
-                      <CheckCircle className="w-4 h-4" />
-                    </div>
-                  )}
-                </button>
-              </div>
-
-              {/* Continue Button */}
-              <Button 
-                onClick={onProceedToInput}
-                size="lg" 
-                className={`w-full h-12 font-bold btn-hover-lift ${
-                  userType === 'agency' 
-                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white' 
-                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                }`}
-              >
-                Continue
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 2: Input Form - Only show on 'input' or 'scanning' step */}
+        {/* Step 1: Input Form - scanning is the first action (no audience gate) */}
         {(currentStep === 'input' || currentStep === 'scanning') && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -298,11 +204,9 @@ const Hero = ({
                     <Search className="w-5 h-5 text-primary" />
                   </div>
                   <div className="text-left flex-1">
-                    <h3 className="font-bold text-lg mb-1">Enter Your Website URL</h3>
+                    <h3 className="font-bold text-lg mb-1">Enter your website URL</h3>
                     <p className="text-sm text-muted-foreground">
-                      {userType === 'business' 
-                        ? "Get AI-ready in under 3 minutes. No technical knowledge required."
-                        : "Enter your client's website to generate a professional audit."}
+                      Get your AI visibility results in minutes. No signup, no credit card.
                     </p>
                   </div>
                 </div>
@@ -310,7 +214,7 @@ const Hero = ({
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="relative flex-1">
                     <Input 
-                      placeholder={userType === 'business' ? "example.com" : "client-website.com"} 
+                      placeholder="example.com" 
                       className="h-12 bg-background border-border focus:border-primary transition-colors text-base font-mono"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
@@ -336,10 +240,27 @@ const Hero = ({
                       </>
                     ) : (
                       <>
-                        Begin Analysis
+                        Check my site free
                         <ArrowRight className="w-4 h-4 ml-2" />
                       </>
                     )}
+                  </Button>
+                </div>
+
+                {/* Secondary CTA: jump straight to the robots.txt generator */}
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="lg"
+                    className="h-11 font-medium"
+                    disabled={isScanning}
+                    data-testid="button-generate-robots"
+                  >
+                    <a href="/tools/robots-builder">
+                      <FileCode className="w-4 h-4 mr-2" />
+                      Generate robots.txt
+                    </a>
                   </Button>
                 </div>
               </div>
@@ -399,6 +320,8 @@ interface ScanResult {
   botPermissions: Record<string, string>;
   errors: string[];
   warnings: string[];
+  score?: number;
+  shareToken?: string;
 }
 
 const TerminalDemo = ({ 
@@ -407,7 +330,8 @@ const TerminalDemo = ({
   onScanComplete,
   onUnlockReport,
   onScanError,
-  userType
+  userType,
+  setUserType
 }: { 
   isScanning: boolean; 
   targetUrl: string;
@@ -415,10 +339,12 @@ const TerminalDemo = ({
   onUnlockReport: () => void;
   onScanError: () => void;
   userType: 'business' | 'agency';
+  setUserType: (type: 'business' | 'agency') => void;
 }) => {
   const [lines, setLines] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!isScanning || !targetUrl) return;
@@ -713,6 +639,50 @@ const TerminalDemo = ({
                 data-testid="upgrade-cta"
               >
                 <div className="p-6 bg-card border-2 border-primary/40 rounded-xl shadow-lg shadow-primary/10 flex-1 flex flex-col">
+                  {/* Post-scan audience segmentation: tailor the next step to the user */}
+                  <div className="mb-5" data-testid="audience-toggle">
+                    <p className="text-xs text-muted-foreground mb-2">Tailor your next step — I'm a:</p>
+                    <div className="inline-flex rounded-lg border border-border bg-background/50 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setUserType('business')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          userType === 'business'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        data-testid="audience-business"
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        Business owner
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUserType('agency')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          userType === 'agency'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                        data-testid="audience-agency"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        Agency
+                      </button>
+                    </div>
+                  </div>
+
+                  {scanResult?.shareToken && (
+                    <Button
+                      variant="outline"
+                      className="w-full mb-5 font-medium"
+                      onClick={() => setShareOpen(true)}
+                      data-testid="button-share-score"
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share my score
+                    </Button>
+                  )}
                   {userType === 'business' ? (
                     /* Business Owner CTA - Single Site License */
                     <>
@@ -925,6 +895,20 @@ const TerminalDemo = ({
           </Card>
         </motion.div>
       </div>
+
+      {scanResult?.shareToken && (
+        <ShareScoreDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          shareToken={scanResult.shareToken}
+          hostname={hostnameFromUrl(targetUrl)}
+          score={scanResult.score ?? 0}
+          bots={Object.entries(scanResult.botPermissions || {}).map(([name, raw]) => ({
+            name,
+            status: deriveBotStatus(raw),
+          }))}
+        />
+      )}
     </motion.div>
   );
 };
@@ -1235,8 +1219,8 @@ const Footer = () => (
         <span>AI BotCheck</span>
       </div>
       <div className="flex gap-8 text-sm text-muted-foreground">
-        <a href="#" className="hover:text-primary">Privacy</a>
-        <a href="#" className="hover:text-primary">Terms</a>
+        <Link href="/privacy"><a className="hover:text-primary">Privacy</a></Link>
+        <Link href="/terms"><a className="hover:text-primary">Terms</a></Link>
         <a href="https://overture-systems.com" className="hover:text-primary">Overture Systems</a>
       </div>
       <div className="text-xs text-muted-foreground/50">
@@ -1250,18 +1234,15 @@ const Footer = () => (
 type UserType = 'business' | 'agency';
 
 export default function Home() {
+  usePrerenderReady();
   const [isScanning, setIsScanning] = useState(false);
   const [targetUrl, setTargetUrl] = useState("");
   const [currentScanId, setCurrentScanId] = useState<number | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPremiumReport, setShowPremiumReport] = useState(false);
   const [premiumReportData, setPremiumReportData] = useState<any>(null);
-  const [currentStep, setCurrentStep] = useState<ScanStep>('select-type');
+  const [currentStep, setCurrentStep] = useState<ScanStep>('input');
   const [userType, setUserType] = useState<UserType>('business');
-
-  const handleProceedToInput = useCallback(() => {
-    setCurrentStep('input');
-  }, []);
 
   const handleScan = (url: string) => {
     setTargetUrl(url);
@@ -1315,6 +1296,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+      <Seo route="home" />
       <Navbar />
       {showPremiumReport && premiumReportData ? (
         <div className="container mx-auto px-6 pt-24">
@@ -1328,9 +1310,6 @@ export default function Home() {
             currentStep={currentStep}
             isScanning={isScanning}
             preflightStatus={isScanning ? "Resolving DNS..." : undefined}
-            userType={userType}
-            setUserType={setUserType}
-            onProceedToInput={handleProceedToInput}
           >
             {/* Conditionally render TerminalDemo inside Hero */}
             <TerminalDemo 
@@ -1340,11 +1319,12 @@ export default function Home() {
               onUnlockReport={handleUnlockReport}
               onScanError={handleScanError}
               userType={userType}
+              setUserType={setUserType}
             />
           </Hero>
           
-          {/* Show Value Proposition and How It Works on select-type and input steps */}
-          {!isScanning && (currentStep === 'select-type' || currentStep === 'input') && (
+          {/* Show Value Proposition and How It Works on the initial (input) step */}
+          {!isScanning && currentStep === 'input' && (
             <>
               <ValueProposition userType={userType} />
               <HowItWorks userType={userType} />

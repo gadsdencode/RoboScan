@@ -12,12 +12,15 @@ import {
   Plus,
   X,
   Download,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PremiumUnlockCard } from "./PremiumUnlockCard";
+import { ShareScoreDialog } from "@/components/ShareScoreDialog";
+import { deriveBotStatus, hostnameFromUrl } from "@shared/publicScanSummary";
 import type { ScanWithPurchase } from "./ScanList";
 
 interface BotTestResult {
@@ -85,6 +88,7 @@ export function ScanCard({
 }: ScanCardProps) {
   const [editingTags, setEditingTags] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
 
   const handleAddTag = async () => {
     if (tagInput.trim()) {
@@ -167,6 +171,33 @@ export function ScanCard({
         onQuickCompare={onQuickCompare}
         onCompareScans={onCompareScans}
       />
+
+      {/* Share */}
+      {scan.shareToken && (
+        <>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShareOpen(true)}
+              data-testid={`button-share-${scan.id}`}
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              Share
+            </Button>
+          </div>
+          <ShareScoreDialog
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            shareToken={scan.shareToken}
+            hostname={hostnameFromUrl(scan.url)}
+            score={scan.score ?? 0}
+            bots={Object.entries((scan.botPermissions ?? {}) as Record<string, string>).map(
+              ([name, raw]) => ({ name, status: deriveBotStatus(raw) }),
+            )}
+          />
+        </>
+      )}
     </Card>
   );
 }
