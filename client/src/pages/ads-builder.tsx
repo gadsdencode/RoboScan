@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { motion } from "framer-motion";
 import { Download, CheckCircle, AlertCircle, Copy, FileText, Sparkles, Plus, Trash2, DollarSign, Building, BadgeCheck, Globe } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 interface AdRecord {
   domain: string;
@@ -40,6 +42,7 @@ const AD_NETWORK_PRESETS = [
 ];
 
 export default function AdsBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const rewardBuilderValidation = useBuilderValidationReward();
   const [isValidating, setIsValidating] = useState(false);
@@ -200,6 +203,7 @@ export default function AdsBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="tools/ads-builder" />
       <Navbar />
 
       {/* Main Content */}

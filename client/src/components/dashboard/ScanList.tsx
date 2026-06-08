@@ -13,6 +13,8 @@ import { ScanCard } from "./ScanCard";
 
 export interface ScanWithPurchase extends Scan {
   isPurchased: boolean;
+  /** Signed token for the public share view (/s/:token). */
+  shareToken?: string;
 }
 
 interface ScanListProps {

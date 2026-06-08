@@ -8,6 +8,9 @@ import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
 import { robotsBuilderTourSteps } from "@/lib/tour-config";
 import { Navbar } from "@/components/Navbar";
+import { Seo } from "@/components/Seo";
+import { BuilderLandingSections } from "@/components/BuilderLandingSections";
+import { ROBOTS_LANDING } from "@/lib/content/builderLanding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +26,7 @@ import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useBuilderValidationReward } from "@/hooks/useBuilderValidationReward";
+import { usePrerenderReady } from "@/hooks/usePrerenderReady";
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
 
@@ -150,6 +154,7 @@ function PaymentForm({
 }
 
 export default function RobotsBuilder() {
+  usePrerenderReady();
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -507,6 +512,7 @@ export default function RobotsBuilder() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo route="tools/robots-builder" />
       <Navbar 
         toolbarItems={
           <>
@@ -545,11 +551,10 @@ export default function RobotsBuilder() {
               <span className="text-sm font-medium">Crawl Control Tool</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              robots.txt Builder
+              {ROBOTS_LANDING.h1}
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Create a professional robots.txt file to control how search engines and AI bots crawl your website.
-              Set clear guidelines for bot behavior and improve your SEO.
+              {ROBOTS_LANDING.valueProp}
             </p>
           </div>
 
@@ -869,6 +874,8 @@ export default function RobotsBuilder() {
               </Card>
             </div>
           </div>
+
+          <BuilderLandingSections content={ROBOTS_LANDING} />
         </motion.div>
       </div>
 

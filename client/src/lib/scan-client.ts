@@ -29,6 +29,9 @@ export interface SyncScanResult {
   botPermissions: Record<string, string>;
   errors: string[];
   warnings: string[];
+  score?: number;
+  /** Signed token for the public share view (/s/:token). */
+  shareToken?: string;
   gamification?: {
     xpGained: number;
     baseXp?: number;
@@ -71,6 +74,7 @@ export interface ScanJobStatus {
     errors: string[];
     warnings: string[];
     score?: number;
+    shareToken?: string;
   };
 }
 
