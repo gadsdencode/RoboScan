@@ -99,6 +99,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "@sparticuz/chromium": "^147.0.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
@@ -115,6 +116,7 @@
     "esbuild": "^0.25.0",
     "postcss": "^8.5.6",
     "puppeteer": "^24.36.1",
+    "puppeteer-core": "^24.43.1",
     "sirv": "^3.0.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.20.5",

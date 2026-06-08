@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { mkdir, writeFile, copyFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import puppeteer, { type Page } from "puppeteer";
+import type { Browser, Page } from "puppeteer-core";
 import sirv from "sirv";
 import { PRERENDER_PATHS } from "../client/src/lib/seo/prerender";
 import { PRERENDER_READY_SELECTOR } from "../client/src/hooks/usePrerenderReady";
@@ -12,6 +12,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = path.resolve(__dirname, "../dist/public");
 const PREVIEW_PORT = 4173;
 const PREVIEW_ORIGIN = `http://127.0.0.1:${PREVIEW_PORT}`;
+
+// On Vercel/Lambda the build container lacks the system libraries (libnspr4, etc.)
+// that Puppeteer's bundled Chrome needs, so use @sparticuz/chromium there.
+// Locally (Windows/macOS/dev Linux), use full puppeteer's bundled Chrome.
+const IS_SERVERLESS_BUILD = Boolean(
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_REGION,
+);
+
+async function launchBrowser(): Promise<Browser> {
+  if (IS_SERVERLESS_BUILD) {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    const puppeteerCore = (await import("puppeteer-core")).default;
+    return puppeteerCore.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    }) as unknown as Promise<Browser>;
+  }
+
+  const puppeteer = (await import("puppeteer")).default;
+  return puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  }) as unknown as Promise<Browser>;
+}
 
 function outputFileForRoute(route: string): string {
   if (route === "/") {
@@ -111,10 +136,7 @@ async function main() {
   console.log(`Prerendering ${PRERENDER_PATHS.length} public routes…`);
 
   const server = await startPreviewServer();
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();
