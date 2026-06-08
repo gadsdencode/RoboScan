@@ -4,8 +4,8 @@
 // it intentionally omits userId, raw file contents, errors/warnings, tags, and any
 // premium-report data.
 
-import type { Scan } from "./schema";
-import { scoreToGrade, type ScoreGrade } from "./scoreGrade";
+import type { Scan } from "./schema.js";
+import { scoreToGrade, type ScoreGrade } from "./scoreGrade.js";
 
 export type BotShareStatus = "allow" | "block" | "mixed" | "unknown";
 
